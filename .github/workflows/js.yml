@@ -1,0 +1,22 @@
+name: Create js image
+
+on: workflow_dispatch
+
+jobs:
+  build_basic:
+    runs-on: ubuntu-latest
+    container:  hashicorp/packer
+    env:
+      DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Create zepben/pipeline-node
+        run: |
+          apk add docker
+          mkdir /build
+          export PACKER_CONFIG_DIR=/build
+          cd pipelines/JavaScript/
+          echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USER --password-stdin
+          packer build config.json
+        shell: bash

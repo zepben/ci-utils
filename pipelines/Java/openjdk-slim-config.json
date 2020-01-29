@@ -1,0 +1,48 @@
+{
+    "builders": [
+        {
+            "type": "docker",
+            "image": "openjdk:14-jdk-alpine",
+            "commit": "true"
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "shell",
+            "scripts": [ "openjdk-install-slim-deps.sh", "../init.sh", "init.sh" ]
+        },
+        {
+            "type": "file",
+            "source": "../scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "../scripts-build/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "./scripts/",
+            "destination": "/scripts"
+        }
+    ],
+    "post-processors": [
+        [
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-java-openjdk",
+                "tag": "0.1.0-slim"
+            },
+            "docker-push"
+        ],
+        [
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-java-openjdk",
+                "tag": "slim"
+            },
+            "docker-push"
+        ]
+    ]
+ }

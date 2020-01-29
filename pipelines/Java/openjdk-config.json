@@ -1,0 +1,57 @@
+{
+    "builders": [
+        {
+            "type": "docker",
+            "image": "openjdk:14-jdk-alpine",
+            "commit": "true",
+            "changes": [
+                "ENV MAVEN_HOME /usr/local/maven",
+                "ENV PATH=${PATH}:${MAVEN_HOME}/bin"
+            ]
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "shell",
+            "scripts": [ "openjdk-install-deps.sh", "../init.sh", "init.sh" ]
+        },
+        {
+            "type": "file",
+            "source": "../scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "../scripts-build/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "maven-settings.xml",
+            "destination": "/usr/share/maven/conf/settings.xml"
+        },
+        {
+            "type": "file",
+            "source": "./scripts/",
+            "destination": "/scripts"
+        }
+    ],
+    "post-processors": [
+        [
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-java-openjdk",
+                "tag": "0.1.0"
+            },
+            "docker-push"
+        ],
+        [
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-java-openjdk",
+                "tag": "latest"
+            },
+            "docker-push"
+        ]
+    ]
+ }

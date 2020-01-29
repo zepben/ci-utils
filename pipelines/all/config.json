@@ -1,0 +1,68 @@
+{
+    "builders": [
+        {
+            "type": "docker",
+            "image": "ubuntu:18.04",
+            "commit": "true"
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "shell",
+            "scripts": [ "../init.sh", "install-dependencies.sh", "init.sh" ]
+        },
+        {
+            "type": "file",
+            "source": "../scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "../CSharp/scripts/cs-common.sh",
+            "destination": "/scripts/cs-common.sh"
+        },
+        {
+            "type": "file",
+            "source": "../CSharp/Nuget.Config",
+            "destination": "/root/.dotnet/Nuget.Config"
+        },
+        {
+            "type": "file",
+            "source": "../Java/scripts/java-common.sh",
+            "destination": "/scripts/java-common.sh"
+        },
+        {
+            "type": "file",
+            "source": "../Java/scripts/gradle.sh",
+            "destination": "/scripts/gradle.sh"
+        },
+        {
+            "type": "file",
+            "source": "../Java/scripts/maven.sh",
+            "destination": "/scripts/maven.sh"
+        },
+        {
+            "type": "file",
+            "source": "../Python/scripts/py-common.sh",
+            "destination": "/scripts/py-common.sh"
+        }
+    ],
+    "post-processors": [
+        [ 
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-all",
+                "tag": "1.0.0"
+            },
+            "docker-push"
+        ],
+        [ 
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-all",
+                "tag": "latest"
+            },
+            "docker-push"
+        ]
+    ]
+ }

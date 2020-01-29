@@ -1,0 +1,102 @@
+#!/bin/bash
+# Update the project version to the next one (patch version for LTS, minor version for all others).
+# Options:
+#   See build_lang_options and java_build_tool_options in ../../scripts/common.sh
+#   --no-commit     - Only update the file without commiting.
+#   --snapshot      - Increments the snapshot version. Only useful for C# and Python, ie 1.0.0-pre1, 1.0.0b1. Java doesn't have this concept.
+#   --release       - Use this option on create release step.
+# Args:
+#   1  - Project file.
+#  [2] - Changelog file.
+#  [3] - Update changelog command.
+# Environment Variables:
+#   BITBUCKET_BRANCH
+
+source "$(dirname "$0")/common.sh"
+
+allOptions=( "${update_project_options[@]}" )
+get_params $@
+
+debug "Options=${options[@]}"
+debug "1=${args[0]}"
+debug "2=${args[1]}"
+debug "3=${args[@]:2}"
+info "Branch: $BITBUCKET_BRANCH"
+
+if [[ ! " ${options[@]} " =~ " --no-commit " ]]; then
+    run git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+    run git fetch --all
+fi
+
+BITBUCKET_BRANCH=${BITBUCKET_BRANCH:?'BITBUCKET_BRANCH variable missing.'}
+if [[ " ${options[@]} " =~ " --release " && $BITBUCKET_BRANCH = "hotfix/"* ]]; then
+    run git push origin -d $BITBUCKET_BRANCH
+    if [[ ! -z $(git branch -a | grep remotes/origin/release) ]]; then
+        run git push origin -d release
+    fi
+    exit 0
+fi
+
+file=${args[0]:?'File variable missing.'}
+
+# optional variables
+changelog=${args[1]}
+update_changelog_command=${args[@]:2}
+
+# Update project version
+info "Updating version..."
+if [[ " ${options[@]} " =~ " --snapshot " ]]; then
+    build_lang ${options[@]}
+    update_snapshot_version
+else
+    # Checkout release branch
+    if [[ ! " ${options[@]} " =~ " --no-commit " ]]; then
+        if [[ " ${options[@]} " =~ " --release " ]]; then
+            if [[ -z $(git branch -a | grep remotes/origin/release) ]]; then
+                run git checkout -b release
+            else
+                run git checkout release
+            fi
+        else
+            run git checkout $BITBUCKET_BRANCH
+        fi
+    fi
+    build_lang ${options[@]}
+
+    # Determine which version to update
+    if [[ $BITBUCKET_BRANCH = "LTS/"* || $BITBUCKET_BRANCH = "hotfix/"* ]]; then
+        version_type="patch"
+    else
+        version_type="minor"
+    fi
+    
+    update_version
+fi
+
+# Update changelog
+if [[ ! -z $changelog ]]; then
+    info "Updating changelog..."
+    if [[ -z $update_changelog_command ]]; then
+        fail "Need to specify command to update changelog when changelog parameter is specified."
+    fi
+    version=$new_version
+    run_eval $update_changelog_command $changelog
+fi
+
+# commit changes
+stage_file $file
+stage_file $changelog
+
+if [[ ! " ${options[@]} " =~ " --no-commit " ]]; then
+    git remote set-url origin "https://${BB_AUTH_STRING}@bitbucket.org/$BITBUCKET_REPO_FULL_NAME"
+    if [[ " ${options[@]} " =~ " --release " ]]; then
+        commit_update_version 
+        run git checkout $BITBUCKET_BRANCH
+        run git pull
+        run git merge release
+        run git push origin $BITBUCKET_BRANCH
+        run git push origin -d release
+    else
+        commit_update_version $BITBUCKET_BRANCH
+    fi
+fi

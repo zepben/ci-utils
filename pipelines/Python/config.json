@@ -1,0 +1,43 @@
+{
+    "builders": [
+        {
+            "type": "docker",
+            "image": "python:3.7-slim",
+            "commit": "true"
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "shell",
+            "scripts": [ "install-dependencies.sh", "../init.sh" ]
+        },
+        {
+            "type": "file",
+            "source": "../scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "./scripts/py-common.sh",
+            "destination": "/scripts/py-common.sh"
+        }
+    ],
+    "post-processors": [
+        [ 
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-python",
+                "tag": "0.1.0"
+            },
+            "docker-push"
+        ],
+        [ 
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-python",
+                "tag": "latest"
+            },
+            "docker-push"
+        ]
+    ]
+ }

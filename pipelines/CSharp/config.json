@@ -1,0 +1,48 @@
+{
+    "builders": [
+        {
+            "type": "docker",
+            "image": "mcr.microsoft.com/dotnet/core/sdk:3.1-alpine",
+            "commit": "true"
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "shell",
+            "scripts": [ "install-dependencies.sh", "../init.sh" ]
+        },
+        {
+            "type": "file",
+            "source": "../scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "./scripts/cs-common.sh",
+            "destination": "/scripts/cs-common.sh"
+        },
+        {
+            "type": "file",
+            "source": "./Nuget.Config",
+            "destination": "/root/.dotnet/Nuget.Config"
+        }
+    ],
+    "post-processors": [
+        [ 
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-dotnet",
+                "tag": "0.1.0"
+            },
+            "docker-push"
+        ],
+        [ 
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-dotnet",
+                "tag": "latest"
+            },
+            "docker-push"
+        ]
+    ]
+ }

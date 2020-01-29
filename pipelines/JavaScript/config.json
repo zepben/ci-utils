@@ -1,0 +1,53 @@
+{
+    "builders": [
+        {
+            "type": "docker",
+            "image": "node:12-alpine",
+            "commit": "true"
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "shell",
+            "scripts": [ "install-dependencies.sh", "../init.sh" ]
+        },
+        {
+            "type": "file",
+            "source": "../scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "../scripts-build/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "./scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "./.npmrc",
+            "destination": "/root/.npmrc"
+        }
+    ],
+    "post-processors": [
+        [ 
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-node",
+                "tag": "3.0.0"
+            },
+            "docker-push"
+        ],
+        [ 
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-node",
+                "tag": "latest"
+            },
+            "docker-push"
+        ]
+    ]
+ }

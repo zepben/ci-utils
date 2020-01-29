@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.1.0 http://maven.apache.org/xsd/settings-1.1.0.xsd"
+xmlns="http://maven.apache.org/SETTINGS/1.1.0"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <mirrors>
+        <mirror>
+            <id>google-maven-central</id>
+            <name>GCS Maven Central mirror</name>
+            <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
+            <mirrorOf>central</mirrorOf>
+        </mirror>
+    </mirrors>
+    <servers>
+        <server>
+            <username>${server.username}</username>
+            <password>${server.password}</password>
+            <id>zepben-maven</id>
+        </server>
+        <server>
+            <id>ossrh</id>
+            <username>${server.username}</username>
+            <password>${server.password}</password>
+        </server>
+        <server>
+            <id>${gpg.key.id}</id>
+            <passphrase>${gpg.key.password}</passphrase>
+        </server>
+    </servers>
+    <profiles>
+        <profile>
+            <id>ossrh</id>
+            <properties>
+                <gpg.keyname>${gpg.key.id}</gpg.keyname>
+                <gpg.executable>gpg2</gpg.executable>
+            </properties>
+        </profile>
+        <profile>
+            <id>zepben-maven</id>
+            <properties>
+                <repos.url>${server.repo.url}</repos.url>
+                <releases.url>${server.release.url}</releases.url>
+                <snapshots.url>${server.snapshot.url}</snapshots.url>
+            </properties>
+            <repositories>
+                <repository>
+                    <id>zepben-maven</id>
+                    <url>${server.repo.url}</url>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>true</enabled>
+                        <updatePolicy>always</updatePolicy>
+                    </snapshots>
+                </repository>
+            </repositories>
+            <pluginRepositories>
+                <pluginRepository>
+                    <id>zepben-maven</id>
+                    <url>${server.repo.url}</url>
+                    <snapshots>
+                        <enabled>true</enabled>
+                        <updatePolicy>always</updatePolicy>
+                    </snapshots>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                </pluginRepository>
+            </pluginRepositories>
+        </profile>
+    </profiles>
+    <activeProfiles>
+        <activeProfile>zepben-maven</activeProfile>
+        <activeProfile>ossrh</activeProfile>
+    </activeProfiles>
+</settings>

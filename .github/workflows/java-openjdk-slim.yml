@@ -1,0 +1,29 @@
+name: Create openjdk slim image
+
+on: workflow_dispatch
+
+jobs:
+  build_java_openjdk_slim:
+    runs-on: ubuntu-latest
+    container:  hashicorp/packer
+    env:
+      DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+      DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Cache maven deps
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: maven
+
+      - name: Create zepben/pipeline-java-openjdk
+        run: |
+          apk add docker tar
+          mkdir /build
+          export PACKER_CONFIG_DIR=/build
+          cd pipelines/Java/
+          echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USER --password-stdin
+          packer build openjdk-slim-config.json
+        shell: bash

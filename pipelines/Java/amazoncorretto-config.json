@@ -1,0 +1,58 @@
+{
+    "builders": [
+        {
+            "type": "docker",
+            "image": "maven:3.6.1-amazoncorretto-11",
+            "commit": "true"
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "shell",
+            "scripts": [ "amazoncorretto-install-dependencies.sh", "../init.sh", "init.sh" ]
+        },
+        {
+            "type": "file",
+            "source": "../scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "../scripts-build/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "maven-settings.xml",
+            "destination": "/usr/share/maven/conf/settings.xml"
+        },
+        {
+            "type": "file",
+            "source": "./scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "../basic/aws/",
+            "destination": "/root/.aws/"
+        }
+    ],
+    "post-processors": [
+        [
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-java-amazoncorretto",
+                "tag": "4.1.0"
+            },
+            "docker-push"
+        ],
+        [
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-java-amazoncorretto",
+                "tag": "latest"
+            },
+            "docker-push"
+        ]
+    ]
+ }

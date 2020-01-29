@@ -1,0 +1,68 @@
+{
+    "builders": [
+        {
+            "type": "docker",
+            "image": "alpine",
+            "commit": "true"
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "file",
+            "source": "./scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "shell",
+            "scripts": [ "install-dependencies.sh", "../init.sh" ]
+        },
+        {
+            "type": "file",
+            "source": "../scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "../CSharp/scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "../Java/scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "../JavaScript/scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "../Python/scripts/",
+            "destination": "/scripts"
+        },
+        {
+            "type": "file",
+            "source": "./aws/",
+            "destination": "/root/.aws/"
+        }
+    ],
+    "post-processors": [
+        [
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-basic",
+                "tag": "5.0.0"
+            },
+            "docker-push"
+        ],
+        [
+            {
+                "type": "docker-tag",
+                "repository": "zepben/pipeline-basic",
+                "tag": "latest"
+            },
+            "docker-push"
+        ]
+    ]
+ }

@@ -27,21 +27,39 @@ info "Sending notification to Slack..."
 
 curl_output_file="/tmp/slack-notification-$RANDOM.txt"
 
-payload=$(jq -n \
-  --arg MESSAGE "${MESSAGE}" \
-  --arg BITBUCKET_WORKSPACE "${BITBUCKET_WORKSPACE}" \
-  --arg BITBUCKET_REPO_SLUG "${BITBUCKET_REPO_SLUG}" \
-  --arg BITBUCKET_BUILD_NUMBER "${BITBUCKET_BUILD_NUMBER}" \
-  --arg BITBUCKET_REPO_FULL_NAME "${BITBUCKET_REPO_FULL_NAME}" \
-'{ attachments: [
-  {
-    "fallback": $MESSAGE,
-    "color": "#439FE0",
-    "pretext": "*<https://bitbucket.org/\($BITBUCKET_REPO_FULL_NAME)|\($BITBUCKET_REPO_SLUG)>*: <https://bitbucket.org/\($BITBUCKET_WORKSPACE)/\($BITBUCKET_REPO_SLUG)/addon/pipelines/home#!/results/\($BITBUCKET_BUILD_NUMBER)|Pipeline #\($BITBUCKET_BUILD_NUMBER)>",
-    "text": $MESSAGE,
-    "mrkdwn_in": ["pretext"]
-  }
-]}')
+if [[ -z "$GITHUB_ACTIONS" ]]; then
+  payload=$(jq -n \
+    --arg MESSAGE "${MESSAGE}" \
+    --arg GITHUB_REPOSITORY "${GITHUB_REPOSITORY}" \
+    --arg GITHUB_SERVER_URL "${GITHUB_SERVER_URL}" \
+    --arg GITHUB_RUN_ID "${GITHUB_RUN_ID}" \
+    --arg GITHUB_RUN_NUMBER "${GITHUB_RUN_NUMBER}" \
+  '{ attachments: [
+    {
+      "fallback": $MESSAGE,
+      "color": "#439FE0",
+      "pretext": "*<\($GITHUB_SERVER_URL)/\($GITHUB_REPOSITORY)>*: <\($GITHUB_SERVER_URL)/\($GITHUB_REPOSITORY)/actions/runs/\($GITHUB_RUN_ID)|Pipeline #\($GITHUB_RUN_NUMBER)>",
+      "text": $MESSAGE,
+      "mrkdwn_in": ["pretext"]
+    }
+  ]}')
+else
+  payload=$(jq -n \
+    --arg MESSAGE "${MESSAGE}" \
+    --arg BITBUCKET_WORKSPACE "${BITBUCKET_WORKSPACE}" \
+    --arg BITBUCKET_REPO_SLUG "${BITBUCKET_REPO_SLUG}" \
+    --arg BITBUCKET_BUILD_NUMBER "${BITBUCKET_BUILD_NUMBER}" \
+    --arg BITBUCKET_REPO_FULL_NAME "${BITBUCKET_REPO_FULL_NAME}" \
+  '{ attachments: [
+    {
+      "fallback": $MESSAGE,
+      "color": "#439FE0",
+      "pretext": "*<https://bitbucket.org/\($BITBUCKET_REPO_FULL_NAME)|\($BITBUCKET_REPO_SLUG)>*: <https://bitbucket.org/\($BITBUCKET_WORKSPACE)/\($BITBUCKET_REPO_SLUG)/addon/pipelines/home#!/results/\($BITBUCKET_BUILD_NUMBER)|Pipeline #\($BITBUCKET_BUILD_NUMBER)>",
+      "text": $MESSAGE,
+      "mrkdwn_in": ["pretext"]
+    }
+  ]}')
+fi
 
 run curl -s -X POST --output ${curl_output_file} -w "%{http_code}" \
   -H "Content-Type: application/json" \

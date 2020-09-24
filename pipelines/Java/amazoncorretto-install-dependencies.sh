@@ -9,3 +9,4 @@ pip3 install --upgrade pip
 # The upgrade will remove the pip3 binary and replace it with pip
 pip install awscli
 
+mkdir /maven

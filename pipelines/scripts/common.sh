@@ -11,6 +11,9 @@ red="\\e[31m"
 green="\\e[32m"
 reset="\\e[0m"
 
+git config --global user.email "ci@zepben.com"
+git config --global user.name "CI"
+
 #######################################
 # echoes a message in blue
 # Globals:

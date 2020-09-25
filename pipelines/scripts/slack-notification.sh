@@ -27,7 +27,7 @@ info "Sending notification to Slack..."
 
 curl_output_file="/tmp/slack-notification-$RANDOM.txt"
 
-if [[ -z "$GITHUB_ACTIONS" ]]; then
+if [[ ! -z "$GITHUB_ACTIONS" ]]; then
   payload=$(jq -n \
     --arg MESSAGE "${MESSAGE}" \
     --arg GITHUB_REPOSITORY "${GITHUB_REPOSITORY}" \

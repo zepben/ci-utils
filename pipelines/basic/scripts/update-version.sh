@@ -10,7 +10,7 @@
 #  [2] - Changelog file.
 #  [3] - Update changelog command.
 # Environment Variables:
-#   BITBUCKET_BRANCH
+#   BITBUCKET_BRANCH/GITHUB_REF
 
 source "$(dirname "$0")/common.sh"
 
@@ -21,16 +21,17 @@ debug "Options=${options[@]}"
 debug "1=${args[0]}"
 debug "2=${args[1]}"
 debug "3=${args[@]:2}"
-info "Branch: $BITBUCKET_BRANCH"
 
 if [[ ! " ${options[@]} " =~ " --no-commit " ]]; then
     run git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
     run git fetch --all
 fi
 
-BITBUCKET_BRANCH=${BITBUCKET_BRANCH:?'BITBUCKET_BRANCH variable missing.'}
-if [[ " ${options[@]} " =~ " --release " && $BITBUCKET_BRANCH = "hotfix/"* ]]; then
-    run git push origin -d $BITBUCKET_BRANCH
+BRANCH=${BITBUCKET_BRANCH:=${GITHUB_REF:?'Branch ref was missing, was this run in github or bitbucket?'}}
+BRANCH=${BRANCH/refs\/heads\//}
+info "Branch: $BRANCH"
+if [[ " ${options[@]} " =~ " --release " && $BRANCH = *"hotfix/"* ]]; then
+    run git push origin -d $BRANCH
     if [[ ! -z $(git branch -a | grep remotes/origin/release) ]]; then
         run git push origin -d release
     fi
@@ -58,13 +59,13 @@ else
                 run git checkout release
             fi
         else
-            run git checkout $BITBUCKET_BRANCH
+            run git checkout $BRANCH
         fi
     fi
     build_lang ${options[@]}
 
     # Determine which version to update
-    if [[ $BITBUCKET_BRANCH = "LTS/"* || $BITBUCKET_BRANCH = "hotfix/"* ]]; then
+    if [[ $BRANCH = "LTS/"* || $BRANCH = "hotfix/"* ]]; then
         version_type="patch"
     else
         version_type="minor"
@@ -91,12 +92,12 @@ if [[ ! " ${options[@]} " =~ " --no-commit " ]]; then
     git remote set-url origin "https://${BB_AUTH_STRING}@bitbucket.org/$BITBUCKET_REPO_FULL_NAME"
     if [[ " ${options[@]} " =~ " --release " ]]; then
         commit_update_version 
-        run git checkout $BITBUCKET_BRANCH
+        run git checkout $BRANCH
         run git pull
         run git merge release
-        run git push origin $BITBUCKET_BRANCH
+        run git push origin $BRANCH
         run git push origin -d release
     else
-        commit_update_version $BITBUCKET_BRANCH
+        commit_update_version $BRANCH
     fi
 fi

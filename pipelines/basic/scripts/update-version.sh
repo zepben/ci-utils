@@ -89,7 +89,10 @@ stage_file $file
 stage_file $changelog
 
 if [[ ! " ${options[@]} " =~ " --no-commit " ]]; then
-    git remote set-url origin "https://${BB_AUTH_STRING}@bitbucket.org/$BITBUCKET_REPO_FULL_NAME"
+    if [[ ! -z $BITBUCKET_REPO_FULL_NAME ]]; then
+        git remote set-url origin "https://${BB_AUTH_STRING}@bitbucket.org/$BITBUCKET_REPO_FULL_NAME"
+    fi
+    
     if [[ " ${options[@]} " =~ " --release " ]]; then
         commit_update_version 
         run git checkout $BRANCH

@@ -27,7 +27,7 @@
             {
                 "type": "docker-tag",
                 "repository": "zepben/pipeline-python",
-                "tag": "0.1.0"
+                "tag": "0.2.0"
             },
             "docker-push"
         ],

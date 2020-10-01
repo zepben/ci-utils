@@ -52,7 +52,7 @@
             {
                 "type": "docker-tag",
                 "repository": "zepben/pipeline-basic",
-                "tag": "5.0.0"
+                "tag": "5.1.0"
             },
             "docker-push"
         ],

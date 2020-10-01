@@ -1,15 +1,3 @@
-debug "ZEPBEN_NUGET_UPLOAD_FEED=${ZEPBEN_NUGET_UPLOAD_FEED}"
-debug "ZEPBEN_NUGET_UPLOAD_KEY=${ZEPBEN_NUGET_UPLOAD_KEY}"
-debug "ZEPBEN_NUGET_FEED=${ZEPBEN_NUGET_FEED}"
-debug "ZEPBEN_NUGET_FEED_USERNAME=${ZEPBEN_NUGET_FEED_USERNAME}"
-debug "ZEPBEN_NUGET_FEED_PASSWORD=${ZEPBEN_NUGET_FEED_PASSWORD}"
-
-ZEPBEN_NUGET_UPLOAD_FEED=${ZEPBEN_NUGET_UPLOAD_FEED:?'Nuget upload source variable missing.'}
-ZEPBEN_NUGET_UPLOAD_KEY=${ZEPBEN_NUGET_UPLOAD_KEY:?'Nuget upload key variable missing.'}
-ZEPBEN_NUGET_FEED=${ZEPBEN_NUGET_FEED:?'Zepben Nuget feed variable missing.'}
-ZEPBEN_NUGET_FEED_USERNAME=${ZEPBEN_NUGET_FEED_USERNAME:?'Zepben Nuget feed username variable missing.'}
-ZEPBEN_NUGET_FEED_PASSWORD=${ZEPBEN_NUGET_FEED_PASSWORD:?'Zepben Nuget feed password variable missing.'}
-
 if [[ $file == *".csproj" ]]; then
     version=$(xmlstarlet sel -t -v "/Project/PropertyGroup/Version" $file)
     sem_version=${version%-pre*}
@@ -33,7 +21,19 @@ run_build() {
     fi
 }
 
+
 deploy_lib(){
+    debug "ZEPBEN_NUGET_UPLOAD_FEED=${ZEPBEN_NUGET_UPLOAD_FEED}"
+    debug "ZEPBEN_NUGET_UPLOAD_KEY=${ZEPBEN_NUGET_UPLOAD_KEY}"
+    debug "ZEPBEN_NUGET_FEED=${ZEPBEN_NUGET_FEED}"
+    debug "ZEPBEN_NUGET_FEED_USERNAME=${ZEPBEN_NUGET_FEED_USERNAME}"
+    debug "ZEPBEN_NUGET_FEED_PASSWORD=${ZEPBEN_NUGET_FEED_PASSWORD}"
+
+    ZEPBEN_NUGET_UPLOAD_FEED=${ZEPBEN_NUGET_UPLOAD_FEED:?'Nuget upload source variable missing.'}
+    ZEPBEN_NUGET_UPLOAD_KEY=${ZEPBEN_NUGET_UPLOAD_KEY:?'Nuget upload key variable missing.'}
+    ZEPBEN_NUGET_FEED=${ZEPBEN_NUGET_FEED:?'Zepben Nuget feed variable missing.'}
+    ZEPBEN_NUGET_FEED_USERNAME=${ZEPBEN_NUGET_FEED_USERNAME:?'Zepben Nuget feed username variable missing.'}
+    ZEPBEN_NUGET_FEED_PASSWORD=${ZEPBEN_NUGET_FEED_PASSWORD:?'Zepben Nuget feed password variable missing.'}
     if [[ $file != *".csproj" ]]; then
         fail "Arg 1 must be a csproj file."
     fi

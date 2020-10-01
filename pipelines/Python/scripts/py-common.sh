@@ -1,12 +1,6 @@
 #!/bin/bash
 
-debug "ZEPBEN_PYPI_REPO=$ZEPBEN_PYPI_REPO"
-debug "ZEPBEN_PYPI_USERNAME=$ZEPBEN_PYPI_USERNAME"
-debug "ZEPBEN_PYPI_PASSWORD=$ZEPBEN_PYPI_PASSWORD"
 
-ZEPBEN_PYPI_REPO=${ZEPBEN_PYPI_REPO:?'Maven repo username variable missing.'}
-ZEPBEN_PYPI_USERNAME=${ZEPBEN_PYPI_USERNAME:?'Maven repo password variable missing.'}
-ZEPBEN_PYPI_PASSWORD=${ZEPBEN_PYPI_PASSWORD:?'Maven repo url variable missing.'}
 
 if [ ! -f "$file" ]; then
     fail "$file is not present."
@@ -22,6 +16,13 @@ run_build() {
 }
 
 deploy_lib(){
+    debug "ZEPBEN_PYPI_REPO=$ZEPBEN_PYPI_REPO"
+    debug "ZEPBEN_PYPI_USERNAME=$ZEPBEN_PYPI_USERNAME"
+    debug "ZEPBEN_PYPI_PASSWORD=$ZEPBEN_PYPI_PASSWORD"
+    ZEPBEN_PYPI_REPO=${ZEPBEN_PYPI_REPO:?'Nexus pypi repo URL missing.'}
+    ZEPBEN_PYPI_USERNAME=${ZEPBEN_PYPI_USERNAME:?'Nexus username missing.'}
+    ZEPBEN_PYPI_PASSWORD=${ZEPBEN_PYPI_PASSWORD:?'Nexus password missing.'}
+
     if [[ " ${options[@]} " =~ " --snapshot " && $version != *"b"* ]]; then
         info "--snapshot option is only for non finalized. Skipping deployment."
         exit 0

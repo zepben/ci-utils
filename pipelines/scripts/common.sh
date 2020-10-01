@@ -152,8 +152,10 @@ commit_update_version() {
 
   run git commit -m "Update version to next snapshot [skip ci]"
   
-  if [[ $branch == "master" || $branch == "LTS"* ]]; then
-    run git remote set-url origin "https://${BB_AUTH_STRING}@bitbucket.org/$BITBUCKET_REPO_FULL_NAME"
+  if [[ $branch == "master" || $branch == "LTS"* || $branch == "main" ]]; then
+    if [[ -z "$GITHUB_ACTIONS" ]]; then
+      run git remote set-url origin "https://${BB_AUTH_STRING}@bitbucket.org/$BITBUCKET_REPO_FULL_NAME"
+    fi
   fi
   run git push -u origin $branch
 }

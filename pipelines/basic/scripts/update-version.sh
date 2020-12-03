@@ -20,7 +20,6 @@ get_params $@
 debug "Options=${options[@]}"
 debug "1=${args[0]}"
 debug "2=${args[1]}"
-debug "3=${args[@]:2}"
 
 if [[ ! " ${options[@]} " =~ " --no-commit " ]]; then
     run git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
@@ -42,7 +41,6 @@ file=${args[0]:?'File variable missing.'}
 
 # optional variables
 changelog=${args[1]}
-update_changelog_command=${args[@]:2}
 
 # Update project version
 info "Updating version..."
@@ -77,11 +75,9 @@ fi
 # Update changelog
 if [[ ! -z $changelog ]]; then
     info "Updating changelog..."
-    if [[ -z $update_changelog_command ]]; then
-        fail "Need to specify command to update changelog when changelog parameter is specified."
-    fi
     version=$new_version
-    run_eval $update_changelog_command $changelog
+    rm -f $changelog && touch $changelog
+    printf "### v${version//-SNAPSHOT/}\n\n##### Breaking Changes\n None.\n\n##### New Features\n* None.\n\n##### Enhancements\n* None.\n\n##### Fixes\n* None.\n\n##### Notes\n* None." >> $changelog
 fi
 
 # commit changes

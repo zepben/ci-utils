@@ -18,6 +18,7 @@ alias release-checks="bash /scripts/release-checks.sh";
 alias create-branch="bash /scripts/create-branch.sh";
 alias rebase="bash /scripts/rebase-onto-release.sh";
 alias azure-devops="bash /scripts/trigger-azure-devops.sh";
+alias gh-action="bash /scripts/trigger-gh-action.sh";
 alias release-docs-source="bash /scripts/release-docs-source.sh";
 alias cs-release-checks="bash /scripts/release-checks.sh --csharp";
 alias cs-update-version="bash /scripts/update-version.sh --csharp";

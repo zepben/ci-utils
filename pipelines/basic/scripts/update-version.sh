@@ -77,7 +77,7 @@ if [[ ! -z $changelog ]]; then
     info "Updating changelog..."
     version=$new_version
     rm -f $changelog && touch $changelog
-    printf "### v${version//-SNAPSHOT/}\n\n##### Breaking Changes\n None.\n\n##### New Features\n* None.\n\n##### Enhancements\n* None.\n\n##### Fixes\n* None.\n\n##### Notes\n* None." >> $changelog
+    printf "### v${version//-SNAPSHOT/}\n\n##### Breaking Changes\n* None.\n\n##### New Features\n* None.\n\n##### Enhancements\n* None.\n\n##### Fixes\n* None.\n\n##### Notes\n* None." >> $changelog
 fi
 
 # commit changes

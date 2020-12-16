@@ -93,13 +93,16 @@ update_snapshot_version(){
 }
 
 finalize_version(){
-    if [[ $file != *".csproj" ]]; then
-        fail "Arg 1 must be a csproj file."
-    fi
     new_version=${version%-pre*}
     write_new_version "$version" "$new_version"
 
-    sed -i "s/-pre[0-9]\+//g" $file
+    if [[ $file == *".cs" ]]; then
+        info_version=$(cat $file | grep "AssemblyInformationalVersion(\"[0-9]\+\.[0-9]\+\.[0-9]\+.*\")" | grep -o "[0-9]\+\.[0-9]\+\.[0-9]\++build[0-9]\+")
+        info_version_date=${info_version#*build}
+        new_info_version_date=$(date '+%d%m%Y%H%M%S')
+        info "Setting informational version to ${info_version%+build*}+build${new_info_version_date}"
+        sed -i "s|$info_version_date|$new_info_version_date|g" $file
+    fi
 }
 
 package(){

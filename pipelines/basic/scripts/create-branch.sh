@@ -84,6 +84,6 @@ run git fetch --tags origin
 info "Creating branch..."
 run git checkout $COMMIT_ID -b $branch_name
 # Slack notification
-run bash $(dirname "$0")/slack-notification.sh "Created branch <https://bitbucket.org/$BITBUCKET_REPO_FULL_NAME/branch/$branch_name|$branch_name> on *<https://bitbucket.org/$BITBUCKET_REPO_FULL_NAME|$BITBUCKET_REPO_SLUG>*."
+run bash $(dirname "$0")/slack-notification.sh "Created branch $branch_name."
 
 success "Branch $branch_name creation successful."

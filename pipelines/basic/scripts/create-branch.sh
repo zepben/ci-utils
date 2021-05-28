@@ -32,12 +32,12 @@ if [[ -z ${args[0]} ]]; then
     BITBUCKET_COMMIT=${BITBUCKET_COMMIT:?'Commit variable missing.'}
 
     # Get tag reference from commit hash
-    commit_tag=$(git ls-remote --tags origin | grep "^$BITBUCKET_COMMIT" || true)
+    commit_tag=$(git describe --tags --abbrev=0)
     if [[ -z $commit_tag ]]; then
-        fail "$BITBUCKET_COMMIT commit has not been tagged."
+        fail "No releases have been made yet. You must release at least once."
     fi
-    version=$(echo $commit_tag | grep -o refs/tags/.* | grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+" || true)
-    COMMIT_ID=$BITBUCKET_COMMIT
+    version=${commit_tag/v/}
+    COMMIT_ID=$(git rev-list -n 1 $commit_tag)
 
     run git remote set-url origin "https://${BB_AUTH_STRING}@bitbucket.org/$BITBUCKET_REPO_FULL_NAME"
 else

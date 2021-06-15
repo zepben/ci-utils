@@ -92,8 +92,7 @@ if [[ ! " ${options[@]} " =~ " --no-commit " ]]; then
     if [[ " ${options[@]} " =~ " --release " ]]; then
         commit_update_version 
         run git checkout $BRANCH
-        run git pull
-        run git merge release
+        run git pull origin release
         run git push origin $BRANCH
         run git push origin -d release
     else

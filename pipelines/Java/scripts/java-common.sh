@@ -24,7 +24,7 @@ java_build_tool() {
 java_build_tool "${options[@]}"
 
 info "Version: $version"
-sem_version=${version/-SNAPSHOT/}
+sem_version=${version/-SNAPSHOT*/}
 info "Sem Version: $sem_version"
 
 run_build() {
@@ -32,7 +32,7 @@ run_build() {
 }
 
 deploy_lib(){
-    if [[ " ${options[@]} " =~ " --snapshot " && $version != *"-SNAPSHOT" ]]; then
+    if [[ " ${options[@]} " =~ " --snapshot " && $version != *"-SNAPSHOT"* ]]; then
         info "--snapshot option is only for non finalized versions. Skipping deployment."
         exit 0
     fi
@@ -41,7 +41,7 @@ deploy_lib(){
 }
 
 package(){
-    if [[ " ${options[@]} " =~ " --snapshot " && $version != *"-SNAPSHOT" ]]; then
+    if [[ " ${options[@]} " =~ " --snapshot " && $version != *"-SNAPSHOT"* ]]; then
         info "--snapshot option is only for non finalized versions. Skipping deployment."
         exit 0
     fi
@@ -61,17 +61,19 @@ write_new_version(){
 
 update_version(){
     incr_version $version_type $version
-    write_new_version $version "${new_version}-SNAPSHOT"
+    write_new_version $version "${new_version}-SNAPSHOT1"
 }
 
 update_snapshot_version(){
-    info "Java doesn't support numbered snapshots."
-    exit 0
+    new_version=${version%-SNAPSHOT*}
+    beta=${version##*-SNAPSHOT}
+    beta=$((++beta))
+    write_new_version $version "${new_version}-SNAPSHOT${beta}"
 }
 
 finalize_version(){
-    new_version=${version/-SNAPSHOT/}
-    sed -i "s/-SNAPSHOT//g" $file
+    new_version=${version/-SNAPSHOT*/}
+    sed -i "s/-SNAPSHOT[0-9]*//g" $file
 }
 
 check_release_version(){

@@ -37,7 +37,7 @@
             {
                 "type": "docker-tag",
                 "repository": "zepben/pipeline-node",
-                "tag": "3.0.0"
+                "tag": "2.0.1"
             },
             "docker-push"
         ],

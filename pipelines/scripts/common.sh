@@ -8,6 +8,7 @@ set -o pipefail
 gray="\\e[37m"
 blue="\\e[36m"
 red="\\e[31m"
+yellow="\\e[33m"
 green="\\e[32m"
 reset="\\e[0m"
 
@@ -24,6 +25,8 @@ git config --global user.name "CI"
 #   None
 #######################################
 info() { echo -e "${blue}INFO: $*${reset}"; }
+
+warn() { echo -e "${yellow}WARN: $*${reset}"; }
 
 #######################################
 # echoes a message in red
@@ -189,7 +192,7 @@ stage_file() {
     info "Staging $file changes..."
     run git add $file
     if [[ $(git diff --staged --quiet $file)$? != 1 ]]; then 
-        fail "$file was not updated"
+        warn "$file was not updated"
     fi
   fi
 }

@@ -61,9 +61,11 @@ write_new_version(){
         info "Writing new version $new_ver..."
         if [[ $file == *".csproj" ]]; then
             run xmlstarlet ed -P -L -u "/Project/PropertyGroup/Version" -v $new_ver $file
-            if [[ $new_ver != *"-pre"* ]]; then
-                run xmlstarlet ed -P -L -u "/Project/PropertyGroup/AssemblyVersion" -v "${new_ver}.0" $file
-                run xmlstarlet ed -P -L -u "/Project/PropertyGroup/FileVersion" -v "${new_ver}.0" $file
+            pre=${new_ver#*"-pre"}
+            sem_version=${new_ver%-pre*}
+            if [[ $new_ver == *"-pre"* ]]; then
+                run xmlstarlet ed -P -L -u "/Project/PropertyGroup/AssemblyVersion" -v "${sem_version}.${pre}" $file
+                run xmlstarlet ed -P -L -u "/Project/PropertyGroup/FileVersion" -v "${sem_version}.${pre}" $file
             fi
         else
             sed -i "s/$old_ver/$new_ver/g" $file

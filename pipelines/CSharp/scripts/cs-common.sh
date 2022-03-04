@@ -1,6 +1,9 @@
 if [[ $file == *".csproj" ]]; then
     version=$(xmlstarlet sel -t -v "/Project/PropertyGroup/Version" $file)
     sem_version=${version%-pre*}
+elif [[ $file == *".nuspec" ]]; then
+    version=$(xmlstarlet sel -t -v "/package/metadata/version" $file)
+    sem_version=${version%-pre*}
 elif [[ $file == *"AssemblyInfo.cs" ]]; then
     version=$(cat $file | grep "AssemblyVersion(\"[0-9]\+\.[0-9]\+\.[0-9]\+\")" | grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+")
     sem_version=${version%-pre*}
@@ -67,6 +70,8 @@ write_new_version(){
                 run xmlstarlet ed -P -L -u "/Project/PropertyGroup/AssemblyVersion" -v "${sem_version}.${pre}" $file
                 run xmlstarlet ed -P -L -u "/Project/PropertyGroup/FileVersion" -v "${sem_version}.${pre}" $file
             fi
+        elif [[ $file == *".nuspec" ]]; then
+            run xmlstarlet ed -P -L -u "/package/metadata/version" -v $new_ver $file
         else
             sed -i "s/$old_ver/$new_ver/g" $file
         fi

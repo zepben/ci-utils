@@ -79,11 +79,11 @@ write_new_version(){
 }
 
 update_version(){
-    if [[ $file != *".csproj" && $file != *"AssemblyInfo.cs" ]]; then
+    if [[ $file != *".csproj" && $file != *".nuspec" && $file != *"AssemblyInfo.cs" ]]; then
         fail "Arg 1 must be a csproj file or AssemblyInfo.cs."
     fi
     incr_version $version_type $version
-    if [[ $file == *".csproj" ]]; then
+    if [[ $file == *".csproj" || $file == *".nuspec" ]]; then
         new_version="${new_version}-pre1"
     fi
     write_new_version $version ${new_version}

@@ -1,8 +1,12 @@
 {
+    "variables": {
+        "dockerhub_user": null,
+        "dockerhub_pw": null
+    },
     "builders": [
         {
             "type": "docker",
-            "image": "ubuntu:18.04",
+            "image": "ubuntu:22.04",
             "commit": "true"
         }
     ],
@@ -47,22 +51,19 @@
             "destination": "/scripts/py-common.sh"
         }
     ],
-    "post-processors": [
-        [ 
+   "post-processors": [
+        [
             {
                 "type": "docker-tag",
                 "repository": "zepben/pipeline-all",
-                "tag": "1.0.0"
+                "tags": ["1.1.0", "latest"]
             },
-            "docker-push"
-        ],
-        [ 
             {
-                "type": "docker-tag",
-                "repository": "zepben/pipeline-all",
-                "tag": "latest"
-            },
-            "docker-push"
+                "type": "docker-push",
+                "login": true,
+                "login_username": "{{user `dockerhub_user`}}",
+                "login_password": "{{user `dockerhub_pw`}}"
+            }
         ]
     ]
  }

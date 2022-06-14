@@ -1,4 +1,8 @@
 {
+    "variables": {
+        "dockerhub_user": null,
+        "dockerhub_pw": null
+    },
     "builders": [
         {
             "type": "docker",
@@ -32,22 +36,19 @@
             "destination": "/root/.npmrc"
         }
     ],
-    "post-processors": [
-        [ 
+   "post-processors": [
+        [
             {
                 "type": "docker-tag",
                 "repository": "zepben/pipeline-node",
-                "tag": "2.0.1"
+                "tags": ["2.1.0", "latest"]
             },
-            "docker-push"
-        ],
-        [ 
             {
-                "type": "docker-tag",
-                "repository": "zepben/pipeline-node",
-                "tag": "latest"
-            },
-            "docker-push"
+                "type": "docker-push",
+                "login": true,
+                "login_username": "{{user `dockerhub_user`}}",
+                "login_password": "{{user `dockerhub_pw`}}"
+            }
         ]
     ]
  }

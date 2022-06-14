@@ -24,6 +24,5 @@ jobs:
           mkdir /build
           export PACKER_CONFIG_DIR=/build
           cd pipelines/Java/
-          echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USER --password-stdin
           packer build -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN openjdk-config.json
         shell: bash

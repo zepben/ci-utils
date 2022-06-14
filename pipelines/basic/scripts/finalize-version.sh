@@ -4,11 +4,11 @@
 # * A new entry of changelog is added when command is specified.
 # Options:
 #   See build_lang_options and java_build_tool_options in ../../scripts/common.sh
-#   --no-commit     - Only update the file without commiting.
+#   --no-commit     - Only update the file without committing.
 # Args:
 #   1  - Project file.
 #  [2] - Changelog file.
-#  [3] - Update changelog command.
+#  [3] - Update changelog command (required if changelog file is specified).
 # Environment Variables:
 #   BITBUCKET_BRANCH
 

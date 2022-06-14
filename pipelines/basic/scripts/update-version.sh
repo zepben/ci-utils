@@ -68,7 +68,7 @@ else
     else
         version_type="minor"
     fi
-    
+
     update_version
 fi
 
@@ -76,7 +76,7 @@ fi
 if [[ ! -z $changelog ]]; then
     info "Updating changelog..."
     rm -f $changelog && touch $changelog
-    printf "##### Breaking Changes\n* None.\n\n##### New Features\n* None.\n\n##### Enhancements\n* None.\n\n##### Fixes\n* None.\n\n##### Notes\n* None." >> $changelog
+    printf "### v$version\n\n##### Breaking Changes\n* None.\n\n##### New Features\n* None.\n\n##### Enhancements\n* None.\n\n##### Fixes\n* None.\n\n##### Notes\n* None." >> $changelog
 fi
 
 # commit changes
@@ -87,9 +87,9 @@ if [[ ! " ${options[@]} " =~ " --no-commit " ]]; then
     if [[ ! -z $BITBUCKET_REPO_FULL_NAME ]]; then
         git remote set-url origin "https://${BB_AUTH_STRING}@bitbucket.org/$BITBUCKET_REPO_FULL_NAME"
     fi
-    
+
     if [[ " ${options[@]} " =~ " --release " ]]; then
-        commit_update_version 
+        commit_update_version
         run git checkout $BRANCH
         run git pull origin release
         run git push origin $BRANCH

@@ -7,8 +7,7 @@
 #   --no-commit     - Only update the file without committing.
 # Args:
 #   1  - Project file.
-#  [2] - Changelog file.
-#  [3] - Update changelog command (required if changelog file is specified).
+#  [2] - EDNAR-style changelog file.
 # Environment Variables:
 #   BITBUCKET_BRANCH
 
@@ -20,13 +19,11 @@ get_params $@
 debug "Options=${options[@]}"
 debug "1=${args[0]}"
 debug "2=${args[1]}"
-debug "3=${args[@]:2}"
 
 file=${args[0]:?'File variable missing.'}
 
 # optional variables
 changelog=${args[1]}
-update_changelog_command=${args[@]:2}
 
 if [[ ! " ${options[@]} " =~ " --no-commit " ]]; then
     run git checkout -b release
@@ -39,11 +36,8 @@ finalize_version
 
 # Update changelog
 if [[ ! -z $changelog ]]; then
-    info "Updating changelog..."
-    if [[ -z $update_changelog_command ]]; then
-        fail "Need to specify command to update changelog when changelog parameter is specified."
-    fi
-    run_eval $update_changelog_command $changelog
+    info "Timestamping version in changelog..."
+    sed -i "s/UNRELEASED/$(date +'%Y-%m-%d')/g" $changelog
 fi
 
 # commit changes

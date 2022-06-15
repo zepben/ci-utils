@@ -5,6 +5,7 @@ apk add --no-cache xmlstarlet
 apk add --no-cache openssh-client
 apk add --no-cache curl
 apk add --no-cache zip
+apk add --no-cache tar
 apk add --no-cache jq
 apk add --no-cache python3 py3-pip
 apk add --no-cache gnupg

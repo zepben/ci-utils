@@ -2,13 +2,13 @@
 # Update the project version to the next one (patch version for LTS, minor version for all others).
 # Options:
 #   See build_lang_options and java_build_tool_options in ../../scripts/common.sh
-#   --no-commit     - Only update the file without commiting.
-#   --snapshot      - Increments the snapshot version. Only useful for C# and Python, ie 1.0.0-pre1, 1.0.0b1. Java doesn't have this concept.
-#   --release       - Use this option on create release step.
+#   --no-commit       - Only update the file without commiting.
+#   --snapshot        - Increments the snapshot version. Only useful for C# and Python, ie 1.0.0-pre1, 1.0.0b1. Java doesn't have this concept.
+#   --release         - Use this option on create release step.
+#   --grow-changelog  - Updates changelog by inserting EDNAR-style template instead of resetting it to the regular one.
 # Args:
 #   1  - Project file.
 #  [2] - Changelog file.
-#  [3] - Update changelog command.
 # Environment Variables:
 #   BITBUCKET_BRANCH/GITHUB_REF
 
@@ -74,9 +74,14 @@ fi
 
 # Update changelog
 if [[ ! -z $changelog ]]; then
-    info "Updating changelog..."
-    rm -f $changelog && touch $changelog
-    printf "### v$new_version\n\n##### Breaking Changes\n* None.\n\n##### New Features\n* None.\n\n##### Enhancements\n* None.\n\n##### Fixes\n* None.\n\n##### Notes\n* None." >> $changelog
+    if [[ " ${options[@]} " =~ " --grow-changelog " ]]; then
+        info "Inserting template into changelog..."
+        sed -i "/^# .*/a ## [$new_version] - UNRELEASED\n### Breaking Changes\n- None.\n\n### Added\n- None.\n\n### Changed\n- None.\n\n### Fixed\n- None.\n\n### Removed\n- None.\n\n### Notes\n- None.\n" $changelog
+    else
+        info "Resetting changelog to template..."
+        rm -f $changelog && touch $changelog
+        printf "### v$new_version\n\n##### Breaking Changes\n* None.\n\n##### New Features\n* None.\n\n##### Enhancements\n* None.\n\n##### Fixes\n* None.\n\n##### Notes\n* None." >> $changelog
+    fi
 fi
 
 # commit changes

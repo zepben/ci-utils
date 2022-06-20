@@ -6,7 +6,7 @@
     "builders": [
         {
             "type": "docker",
-            "image": "node:12-alpine",
+            "image": "node:14-alpine",
             "commit": "true"
         }
     ],
@@ -41,7 +41,7 @@
             {
                 "type": "docker-tag",
                 "repository": "zepben/pipeline-node",
-                "tags": ["2.1.0", "latest"]
+                "tags": ["3.0.0", "latest"]
             },
             {
                 "type": "docker-push",

@@ -26,7 +26,7 @@ deploy_lib(){
 }
 
 package(){
-    if [[ " ${options[@]} " =~ " --snapshot " && $version != *"-next" ]]; then
+    if [[ " ${options[@]} " =~ " --snapshot " && $version != *"-next"* ]]; then
         info "--snapshot option is only for non finalized versions. Skipping deployment."
         exit 0
     fi

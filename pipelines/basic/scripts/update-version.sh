@@ -76,7 +76,7 @@ fi
 if [[ ! -z $changelog ]]; then
     if [[ " ${options[@]} " =~ " --grow-changelog " ]]; then
         info "Inserting template into changelog..."
-        sed -i "/^# .*/a ## [$new_version] - UNRELEASED\n### Breaking Changes\n- None.\n\n### Added\n- None.\n\n### Changed\n- None.\n\n### Fixed\n- None.\n\n### Removed\n- None.\n\n### Notes\n- None.\n" $changelog
+        sed -i "/^# .*/a ## [${new_version/-SNAPSHOT*/}] - UNRELEASED\n### Breaking Changes\n- None.\n\n### Added\n- None.\n\n### Changed\n- None.\n\n### Fixed\n- None.\n\n### Removed\n- None.\n\n### Notes\n- None.\n" $changelog
     else
         info "Resetting changelog to template..."
         rm -f $changelog && touch $changelog

@@ -236,7 +236,7 @@ build_lang() {
 
 java_build_tool_options=( "--maven" "--gradle" )
 
-update_project_options=( "--no-commit" "--snapshot" "--release" "${build_lang_options[@]}" "${java_build_tool_options[@]}" )
+update_project_options=( "--no-commit" "--snapshot" "--release" "--grow-changelog" "${build_lang_options[@]}" "${java_build_tool_options[@]}" )
 release_options=( "--snapshot" "${build_lang_options[@]}" "${java_build_tool_options[@]}" )
 release_app_options=( "--build-docs", "--include-docs" "--no-build" "${release_options[@]}" )
 build_options=( "--no-test" "${build_lang_options[@]}" "${java_build_tool_options[@]}" )

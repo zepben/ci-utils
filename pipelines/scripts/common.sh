@@ -2,7 +2,6 @@
 
 # Begin Standard 'imports'
 set -e
-set -x
 set -o pipefail
 
 
@@ -243,3 +242,6 @@ release_app_options=( "--build-docs", "--include-docs" "--no-build" "${release_o
 build_options=( "--no-test" "${build_lang_options[@]}" "${java_build_tool_options[@]}" )
 finalize_project_options=( "--no-commit" "${build_lang_options[@]}" "${java_build_tool_options[@]}" )
 check_release_version_options=( "${build_lang_options[@]}" "${java_build_tool_options[@]}" )
+
+# Display all run commands
+set -x

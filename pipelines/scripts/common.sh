@@ -2,6 +2,7 @@
 
 # Begin Standard 'imports'
 set -e
+set -x
 set -o pipefail
 
 
@@ -154,7 +155,7 @@ commit_update_version() {
   info "Commiting changes to $branch..."
 
   run git commit -m "Update version to next snapshot [skip ci]"
-  
+
   if [[ $branch == "master" || $branch == "LTS"* || $branch == "main" ]]; then
     if [[ -z "$GITHUB_ACTIONS" ]]; then
       run git remote set-url origin "https://${BB_AUTH_STRING}@bitbucket.org/$BITBUCKET_REPO_FULL_NAME"
@@ -191,7 +192,7 @@ stage_file() {
   if [[ ! -z $file ]]; then
     info "Staging $file changes..."
     run git add $file
-    if [[ $(git diff --staged --quiet $file)$? != 1 ]]; then 
+    if [[ $(git diff --staged --quiet $file)$? != 1 ]]; then
         warn "$file was not updated"
     fi
   fi

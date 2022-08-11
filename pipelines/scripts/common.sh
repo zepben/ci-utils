@@ -50,6 +50,8 @@ error() { echo -e "${red}ERROR: $*${reset}"; }
 #######################################
 debug() {
   if [[ "${DEBUG}" == "true" ]]; then
+    # Display all run commands
+    set -x
     echo -e "${gray}DEBUG: $*${reset}";
   fi
 }
@@ -243,5 +245,3 @@ build_options=( "--no-test" "${build_lang_options[@]}" "${java_build_tool_option
 finalize_project_options=( "--no-commit" "${build_lang_options[@]}" "${java_build_tool_options[@]}" )
 check_release_version_options=( "${build_lang_options[@]}" "${java_build_tool_options[@]}" )
 
-# Display all run commands
-set -x

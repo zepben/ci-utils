@@ -88,6 +88,9 @@ fi
 stage_file $file
 stage_file $changelog
 
+# Show status for debugging
+git status
+
 if [[ ! " ${options[@]} " =~ " --no-commit " ]]; then
     if [[ ! -z $BITBUCKET_REPO_FULL_NAME ]]; then
         git remote set-url origin "https://${BB_AUTH_STRING}@bitbucket.org/$BITBUCKET_REPO_FULL_NAME"

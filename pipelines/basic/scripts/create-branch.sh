@@ -43,9 +43,10 @@ if [[ -z ${args[0]} ]]; then
 else
     debug "1=${args[0]}"
     version=${args[0]}
-    tag=$(git tag -l | grep "v$version[.0-9]*" | tail -1)
+    tag=$(git tag -l | grep "$version\.[0-9]*" | tail -1)
     version=${tag/v/}
     COMMIT_ID=$(git rev-list -n 1 $tag)
+    debug "COMMIT_ID=$COMMIT_ID"
 fi
 
 if [[ ! $version =~ [0-9]+.[0-9]+.[0-9]+ ]]; then
@@ -55,6 +56,12 @@ fi
 info "$version - $COMMIT_ID"
 
 IFS='.' read -r -a array <<< "$version"
+
+len=${#array[@]}
+if [ $len -gt 3 ]
+then
+    fail "Version $version had more than 3 parts and is not a valid version. Did you enter the correct minor version?"
+fi
 
 next_version="${array[0]}.${array[1]}.$((++array[2]))"
 info "Next version: $next_version"

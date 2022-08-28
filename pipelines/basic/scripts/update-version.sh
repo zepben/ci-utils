@@ -80,7 +80,7 @@ if [[ ! -z $changelog ]]; then
     else
         info "Resetting changelog to template..."
         rm -f $changelog && touch $changelog
-        printf "### v$new_version\n\n##### Breaking Changes\n* None.\n\n##### New Features\n* None.\n\n##### Enhancements\n* None.\n\n##### Fixes\n* None.\n\n##### Notes\n* None." >> $changelog
+        printf "### v${new_version/-SNAPSHOT*/}\n\n##### Breaking Changes\n* None.\n\n##### New Features\n* None.\n\n##### Enhancements\n* None.\n\n##### Fixes\n* None.\n\n##### Notes\n* None." >> $changelog
     fi
 fi
 

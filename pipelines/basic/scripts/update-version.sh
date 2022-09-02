@@ -73,14 +73,15 @@ else
 fi
 
 # Update changelog
+release_notes_template="### Breaking Changes\n* None.\n\n### New Features\n* None.\n\n### Enhancements\n* None.\n\n### Fixes\n* None.\n\n### Notes\n* None.\n"
 if [[ ! -z $changelog ]]; then
     if [[ " ${options[@]} " =~ " --grow-changelog " ]]; then
         info "Inserting template into changelog..."
-        sed -i "/^# .*/a ## [${new_version/-SNAPSHOT*/}] - UNRELEASED\n### Breaking Changes\n- None.\n\n### Added\n- None.\n\n### Changed\n- None.\n\n### Fixed\n- None.\n\n### Removed\n- None.\n\n### Notes\n- None.\n" $changelog
+        sed -i "/^# .*/a ## [${new_version/-SNAPSHOT*/}] - UNRELEASED\n$release_notes_template" $changelog
     else
         info "Resetting changelog to template..."
         rm -f $changelog && touch $changelog
-        printf "### v${new_version/-SNAPSHOT*/}\n\n##### Breaking Changes\n* None.\n\n##### New Features\n* None.\n\n##### Enhancements\n* None.\n\n##### Fixes\n* None.\n\n##### Notes\n* None." >> $changelog
+        printf "## v${new_version/-SNAPSHOT*/}\n\n$release_notes_template" >> $changelog
     fi
 fi
 

@@ -37,5 +37,6 @@ java_deploy(){
 java_write_new_version(){
     old_version=${1:? 'Old version is required.'}
     new_version=${2:? 'New version is required.'}
-    run xmlstarlet ed -P -L -N pom="http://maven.apache.org/POM/4.0.0" -u "/pom:project/pom:version" -v "$new_version" $file
+    xmlstarlet ed -P -L -N pom="http://maven.apache.org/POM/4.0.0" -u "/pom:project/pom:version" -v "$new_version" $file
+    echo "Finished updating new version $new_version"
 }

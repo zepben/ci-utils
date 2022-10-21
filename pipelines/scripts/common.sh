@@ -4,6 +4,9 @@
 set -e
 set -o pipefail
 
+# debug messages always for now
+set -x
+
 
 gray="\\e[37m"
 blue="\\e[36m"

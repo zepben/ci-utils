@@ -75,14 +75,14 @@ fi
 # Update changelog
 release_notes_template="### Breaking Changes\n* None.\n\n### New Features\n* None.\n\n### Enhancements\n* None.\n\n### Fixes\n* None.\n\n### Notes\n* None.\n"
 if [[ ! -z $changelog ]]; then
-    grow_changelog_format=$(egrep "## \[[0-9]+\.[0-9]+\.[0-9]+" $changelog)
+    grow_changelog_format=$(egrep "## \[[0-9]+\.[0-9]+\.[0-9]\] -+" $changelog || true)
     if [[ " ${options[@]} " =~ " --grow-changelog " || ! -z $grow_changelog_format ]]; then
         info "Inserting template into changelog..."
         sed -i "/^# .*/a ## [${new_version/-SNAPSHOT*/}] - UNRELEASED\n$release_notes_template" $changelog
     else
         info "Resetting changelog to template..."
         rm -f $changelog && touch $changelog
-        printf "## v${new_version/-SNAPSHOT*/}\n\n$release_notes_template" >> $changelog
+        printf "## [${new_version/-SNAPSHOT*/}]\n\n$release_notes_template" >> $changelog
     fi
 fi
 

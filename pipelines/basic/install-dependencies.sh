@@ -10,6 +10,9 @@ apk add --no-cache jq
 apk add --no-cache python3 py3-pip
 apk add --no-cache gnupg
 apk add --no-cache coreutils
+apk add --no-cache docker
+apk add --no-cache packer
+apk add --no-cache github-cli
 apk add --no-cache --upgrade bash
 
 pip3 install --upgrade pip

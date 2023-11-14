@@ -77,6 +77,8 @@ release_notes_template="### Breaking Changes\n* None.\n\n### New Features\n* Non
 if [[ ! -z $changelog ]]; then
     grow_changelog_format=$(egrep "## \[[0-9]+\.[0-9]+\.[0-9]\] -+" $changelog || true)
     if [[ " ${options[@]} " =~ " --grow-changelog " || ! -z $grow_changelog_format ]]; then
+        info "Updating the release date"
+        sed -i "s/UNRELEASED/$(date +'%Y-%m-%d')/g" $changelog
         info "Inserting template into changelog..."
         sed -i "/^# .*/a ## [${new_version/-SNAPSHOT*/}] - UNRELEASED\n$release_notes_template" $changelog
     else

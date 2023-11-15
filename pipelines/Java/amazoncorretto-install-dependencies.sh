@@ -1,7 +1,7 @@
 yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm # for downloading xmlstarlet
 yum install xmlstarlet -y
 yum install jq -y
-yum install zip gnupg python3 python3-pip -y
+yum install zip gnupg python3 python3-pip git zip -y
 yum clean all
 rm -rf /var/cache/yum
 

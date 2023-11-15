@@ -2,7 +2,7 @@
     "builders": [
         {
             "type": "docker",
-            "image": "maven:3.6.1-amazoncorretto-11",
+            "image": "maven:3.9.5-amazoncorretto-11",
             "commit": "true"
         }
     ],
@@ -41,15 +41,15 @@
         [
             {
                 "type": "docker-tag",
-                "repository": "zepben/pipeline-java-amazoncorretto",
-                "tag": "4.1.0"
+                "repository": "zepben/pipeline-java",
+                "tag": "4.2.0"
             },
             "docker-push"
         ],
         [
             {
                 "type": "docker-tag",
-                "repository": "zepben/pipeline-java-amazoncorretto",
+                "repository": "zepben/pipeline-java",
                 "tag": "latest"
             },
             "docker-push"

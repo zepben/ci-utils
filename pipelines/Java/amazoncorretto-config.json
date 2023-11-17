@@ -6,7 +6,7 @@
     "builders": [
         {
             "type": "docker",
-            "image": "maven:3.9.5-amazoncorretto-11",
+            "image": "maven:3.8.7-amazoncorretto-11",
             "commit": "true"
         }
     ],

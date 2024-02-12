@@ -19,19 +19,19 @@ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         </server>
         <server>
             <id>ossrh</id>
-            <username>${server.username}</username>
-            <password>${server.password}</password>
+            <username>${ossrh.server.username}</username>
+            <password>${ossrh.server.password}</password>
         </server>
         <server>
-            <id>${gpg.key.id}</id>
-            <passphrase>${gpg.key.password}</passphrase>
+            <id>${gpg.keyname}</id>
+            <passphrase>${gpg.password}</passphrase>
         </server>
     </servers>
     <profiles>
         <profile>
             <id>ossrh</id>
             <properties>
-                <gpg.keyname>${gpg.key.id}</gpg.keyname>
+                <gpg.keyname>${gpg.keyname}</gpg.keyname>
                 <gpg.executable>gpg2</gpg.executable>
             </properties>
         </profile>

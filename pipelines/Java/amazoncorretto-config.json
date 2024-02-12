@@ -46,7 +46,7 @@
             {
                 "type": "docker-tag",
                 "repository": "zepben/pipeline-java",
-                "tags": ["4.2.0", "latest"]
+                "tags": ["4.3.0"]
             },
             {
                 "type": "docker-push",

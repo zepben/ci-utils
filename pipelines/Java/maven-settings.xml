@@ -23,7 +23,7 @@ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
             <password>${ossrh.server.password}</password>
         </server>
         <server>
-            <id>${gpg.keyname}</id>
+            <id>${gpg.key}</id>
             <passphrase>${gpg.password}</passphrase>
         </server>
     </servers>
@@ -31,7 +31,7 @@ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         <profile>
             <id>ossrh</id>
             <properties>
-                <gpg.keyname>${gpg.keyname}</gpg.keyname>
+                <gpg.keyname>${gpg.key}</gpg.keyname>
                 <gpg.executable>gpg2</gpg.executable>
             </properties>
         </profile>

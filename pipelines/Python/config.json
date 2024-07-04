@@ -7,7 +7,7 @@
     "builders": [
         {
             "type": "docker",
-            "image": "python:3.7-slim",
+            "image": "python:3.9-slim",
             "commit": "true"
         }
     ],

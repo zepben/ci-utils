@@ -7,7 +7,7 @@
     "builders": [
         {
             "type": "docker",
-            "image": "python:3.7-slim",
+            "image": "python:3.9-slim",
             "commit": "true"
         }
     ],
@@ -32,7 +32,7 @@
             {
                 "type": "docker-tag",
                 "repository": "zepben/pipeline-python",
-                "tags": ["0.3.0", "latest"]
+                "tags": ["0.4.0"]
             },
             {
                 "type": "docker-push",

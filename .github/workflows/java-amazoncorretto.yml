@@ -12,11 +12,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Packer Version
+        run: |
+          packer version
+
       - name: Create zepben/pipeline-java-amazoncorretto
         run: |
           apk add docker tar
           mkdir /build
           export PACKER_CONFIG_DIR=/build
           cd pipelines/Java/
+          packer init amazoncorretto-config.pkr.hcl
+          packer validate amazoncorretto-config.pkr.hcl
           packer build -on-error=abort -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
         shell: bash

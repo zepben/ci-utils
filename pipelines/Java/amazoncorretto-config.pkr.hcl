@@ -8,11 +8,13 @@ packer {
 }
 
 variable "dockerhub_pw" {
-  type = string
+  type    = string
+  default = "${env("DOCKER_HUB_ACCESS_TOKEN")}"
 }
 
 variable "dockerhub_user" {
-  type = string
+  type    = string
+  default = "${env("DOCKER_HUB_USER")}"
 }
 
 source "docker" "image" {

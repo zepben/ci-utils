@@ -32,7 +32,7 @@ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
             <id>ossrh</id>
             <properties>
                 <gpg.keyname>${gpg.key}</gpg.keyname>
-                <gpg.executable>gpg2</gpg.executable>
+                <gpg.executable>gpg</gpg.executable>
             </properties>
         </profile>
         <profile>

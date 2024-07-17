@@ -5,18 +5,16 @@ on: workflow_dispatch
 jobs:
   build_java_amazoncorretto:
     runs-on: ubuntu-latest
-    container:  hashicorp/packer:1.9
+    container:  hashicorp/packer:1.11
     env:
       DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
       DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - name: Cache maven deps
-        uses: actions/cache@v2
-        with:
-          path: ~/.m2/repository
-          key: maven
+      - name: Packer Version
+        run: |
+          packer version
 
       - name: Create zepben/pipeline-java-amazoncorretto
         run: |
@@ -24,5 +22,7 @@ jobs:
           mkdir /build
           export PACKER_CONFIG_DIR=/build
           cd pipelines/Java/
-          packer build -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.json
+          packer init amazoncorretto-config.pkr.hcl
+          packer validate amazoncorretto-config.pkr.hcl
+          packer build -on-error=abort -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
         shell: bash

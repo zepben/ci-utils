@@ -1,12 +1,21 @@
-yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm # for downloading xmlstarlet
-yum install xmlstarlet -y
-yum install jq -y
-yum install zip gnupg python3 python3-pip git zip -y
-yum clean all
-rm -rf /var/cache/yum
+apt -y update && apt install --no-install-recommends -y wget gpg ca-certificates
+wget -O - https://apt.corretto.aws/corretto.key | gpg --dearmor -o /usr/share/keyrings/corretto-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] https://apt.corretto.aws stable main" | tee /etc/apt/sources.list.d/corretto.list
+apt -y update && apt install --no-install-recommends -y \
+ java-11-amazon-corretto-jdk \
+ xmlstarlet \
+ jq \
+ gnupg \
+ python3 \
+ python3-pip \
+ git \
+ zip \
+ curl \
+ wget \
+ awscli \
+ maven && rm -rf /var/lib/apt/lists/*
 
-pip3 install --upgrade pip
-# The upgrade will remove the pip3 binary and replace it with pip
-pip install awscli
+apt clean
+rm -rf /usr/lib/jvm/java-11-amazon-corretto/lib/src.zip 
 
 mkdir /maven

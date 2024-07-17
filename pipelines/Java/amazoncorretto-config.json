@@ -6,7 +6,7 @@
     "builders": [
         {
             "type": "docker",
-            "image": "maven:3.9.8-amazoncorretto-11-al2023",
+            "image": "debian:bookworm-20240701-slim",
             "commit": "true"
         }
     ],
@@ -46,7 +46,7 @@
             {
                 "type": "docker-tag",
                 "repository": "zepben/pipeline-java",
-                "tags": ["4.4.0"]
+                "tags": ["4.5.0"]
             },
             {
                 "type": "docker-push",

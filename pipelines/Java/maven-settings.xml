@@ -3,14 +3,6 @@
 xmlns="http://maven.apache.org/SETTINGS/1.1.0"
 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <localRepository>/maven</localRepository>
-    <mirrors>
-        <mirror>
-            <id>google-maven-central</id>
-            <name>GCS Maven Central mirror</name>
-            <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
-            <mirrorOf>central</mirrorOf>
-        </mirror>
-    </mirrors>
     <servers>
         <server>
             <username>${server.username}</username>

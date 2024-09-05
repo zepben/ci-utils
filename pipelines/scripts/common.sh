@@ -157,7 +157,7 @@ commit_update_version() {
   branch=${1:-release}
   info "Commiting changes to $branch..."
 
-  run git commit -m "Update version to next snapshot [skip ci]"
+  run git commit -m "Update snapshot $version to $new_version [skip ci]"
 
   if [[ $branch == "master" || $branch == "LTS"* || $branch == "main" ]]; then
     if [[ -z "$GITHUB_ACTIONS" ]]; then
@@ -168,7 +168,7 @@ commit_update_version() {
 }
 
 commit_finalize_version() {
-  run git commit -m "Update versions for release [skip ci]"
+  run git commit -m "Release $new_version [skip ci]"
   run git push -u origin release
 }
 

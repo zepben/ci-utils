@@ -33,12 +33,12 @@ deploy_lib(){
 }
 
 write_new_version(){
-    old_ver=${1:? 'Old version is required.'}
-    new_ver=${2:? 'New version is required.'}
+    old_version=${1:? 'Old version is required.'}
+    new_version=${2:? 'New version is required.'}
 
-    if [[ $old_ver != $new_ver ]]; then
-        info "Writing new version $new_ver..."
-        run sed -i "/version[[:space:]]*=[[:space:]]*/s/$old_ver/$new_ver/" $file
+    if [[ $old_version != $new_version ]]; then
+        info "Writing new version $new_version..."
+        run sed -i "/version[[:space:]]*=[[:space:]]*/s/$old_version/$new_version/" $file
     fi
 }
 

@@ -42,12 +42,12 @@ package(){
 }
 
 write_new_version(){
-    old_ver=${1:? 'Old version is required.'}
-    new_ver=${2:? 'New version is required.'}
+    old_version=${1:? 'Old version is required.'}
+    new_version=${2:? 'New version is required.'}
 
     if [[ $old_ver != $new_ver ]]; then
-        info "Writing new version $new_ver..."
-        run jq --arg VERSION $new_ver '.version = $VERSION' $file
+        info "Writing new version $new_version..."
+        run jq --arg VERSION $new_verion '.version = $VERSION' $file
         run cp -f $output_file $file
     fi
 }

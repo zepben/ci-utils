@@ -1,22 +1,22 @@
 apk add --no-cache --update
-apk add --no-cache tzdata
-apk add --no-cache git
-apk add --no-cache xmlstarlet
-apk add --no-cache openssh-client
-apk add --no-cache curl
-apk add --no-cache zip
-apk add --no-cache tar
-apk add --no-cache jq
-apk add --no-cache python3 py3-pip
-apk add --no-cache gnupg
-apk add --no-cache coreutils
-apk add --no-cache docker
-apk add --no-cache packer
-apk add --no-cache github-cli
+apk add --no-cache \
+ tzdata \
+ git \
+ xmlstarlet \
+ openssh-client \
+ curl \
+ zip \
+ tar \
+ jq \
+ python3 \
+ py3-pip \
+ gnupg \
+ coreutils \
+ docker \
+ github-cli
+
 apk add --no-cache --upgrade bash
 
-pip3 install --upgrade pip
-pip3 install awscli
 
 cat > /scripts/.bashrc << EOF
 alias release-checks="bash /scripts/release-checks.sh";

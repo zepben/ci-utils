@@ -19,7 +19,7 @@ variable "dockerhub_user" {
 
 variable "container_version_tag" {
   type = string
-  default = "5.7.3"
+  default = "5.7.4"
 }
 
 source "docker" "image" {

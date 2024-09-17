@@ -57,23 +57,23 @@ deploy_lib(){
 }
 
 write_new_version(){
-    old_ver=${1:? 'Old version is required.'}
-    new_ver=${2:? 'New version is required.'}
+    old_version=${1:? 'Old version is required.'}
+    new_version=${2:? 'New version is required.'}
 
-    if [[ $old_ver != $new_ver ]]; then
-        info "Writing new version $new_ver..."
+    if [[ $old_version != $new_version ]]; then
+        info "Writing new version $new_version..."
         if [[ $file == *".csproj" ]]; then
-            run xmlstarlet ed -P -L -u "/Project/PropertyGroup/Version" -v $new_ver $file
-            pre=${new_ver#*"-pre"}
-            sem_version=${new_ver%-pre*}
-            if [[ $new_ver == *"-pre"* ]]; then
+            run xmlstarlet ed -P -L -u "/Project/PropertyGroup/Version" -v $new_version $file
+            pre=${new_version#*"-pre"}
+            sem_version=${new_version%-pre*}
+            if [[ $new_version == *"-pre"* ]]; then
                 run xmlstarlet ed -P -L -u "/Project/PropertyGroup/AssemblyVersion" -v "${sem_version}.${pre}" $file
                 run xmlstarlet ed -P -L -u "/Project/PropertyGroup/FileVersion" -v "${sem_version}.${pre}" $file
             fi
         elif [[ $file == *".nuspec" ]]; then
-            run xmlstarlet ed -P -L -u "/package/metadata/version" -v $new_ver $file
+            run xmlstarlet ed -P -L -u "/package/metadata/version" -v $new_version $file
         else
-            sed -i "s/$old_ver/$new_ver/g" $file
+            sed -i "s/$old_version/$new_version/g" $file
         fi
     fi
 }

@@ -18,7 +18,7 @@ release-lib.sh [ --snapshot ]
 
 release-app.sh [ --snapshot ] [ --build-docs \<mkdocs config file\> \<docs path\> | --include-docs \<docs path\> ]
 
-Notes: 
+Notes:
 
 * _--include-docs_ option copies content of docs path.
 
@@ -65,4 +65,4 @@ BITBUCKET_BUILD_NUMBER
 # Test
 `bash test.sh` to copy all scripts into single location.
 
-docker run -it --env-file D:\Projects\vm-container-images\pipelines\all\env.list --mount type=bind,source="D:\Projects\cimproto",target="/app" --mount type=bind,source="D:\Projects\vm-container-images\pipelines\bin",target="/test_scripts" --rm --entrypoint bash mavenrepo.zepben.com:8083/repository/zepben-docker/pipeline-all
+docker run -it --env-file D:\Projects\vm-container-images\pipelines\all\env.list --mount type=bind,source="D:\Projects\cimproto",target="/app" --mount type=bind,source="D:\Projects\vm-container-images\pipelines\bin",target="/test_scripts" --rm --entrypoint bash nexus.z.zepben.cloud:8083/repository/zepben-docker/pipeline-all

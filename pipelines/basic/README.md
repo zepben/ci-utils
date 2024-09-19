@@ -38,7 +38,7 @@ Where lang is the following:
 Where tool is the following:
 
 * Java
-  
+
     * `mvn`       - Maven
     * `gradle`    - Gradle
 
@@ -52,4 +52,4 @@ Where tool is the following:
 
 ## Running Docker locally for testing
 
-docker run -it --env-file D:\Projects\containers-and-vms\pipelines\basic\env.list --mount type=bind,source="D:\Projects\company-super-pom",target="/app" --rm --entrypoint bash mavenrepo.zepben.com:8083/repository/zepben-docker/pipeline-basic:latest
+docker run -it --env-file D:\Projects\containers-and-vms\pipelines\basic\env.list --mount type=bind,source="D:\Projects\company-super-pom",target="/app" --rm --entrypoint bash nexus.z.zepben.cloud:8083/repository/zepben-docker/pipeline-basic:latest

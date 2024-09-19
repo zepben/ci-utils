@@ -50,4 +50,4 @@ BITBUCKET_REPO_FULL_NAME
 
 # Running Docker locally
 
-docker run -it --env-file D:\Projects\containers-and-vms\pipelines\JavaScript\env.list --mount type=bind,source="D:\Projects\web-client",target="/app" --rm --entrypoint bash mavenrepo.zepben.com:8083/repository/zepben-docker/pipeline-node:latest
+docker run -it --env-file D:\Projects\containers-and-vms\pipelines\JavaScript\env.list --mount type=bind,source="D:\Projects\web-client",target="/app" --rm --entrypoint bash nexus.z.zepben.cloud:8083/repository/zepben-docker/pipeline-node:latest

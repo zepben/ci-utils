@@ -71,6 +71,10 @@ update_snapshot_version(){
     write_new_version $version "${new_version}-SNAPSHOT${beta}"
 }
 
+find_unreleased_version() {
+    unreleased_version=${new_version/-SNAPSHOT*/}
+}
+
 finalize_version(){
     new_version=${version/-SNAPSHOT*/}
     sed -i "s/-SNAPSHOT[0-9]*//g" $file

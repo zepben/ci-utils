@@ -73,6 +73,7 @@ else
 fi
 
 # Update changelog
+find_unreleased_version
 release_notes_template="### Breaking Changes\n* None.\n\n### New Features\n* None.\n\n### Enhancements\n* None.\n\n### Fixes\n* None.\n\n### Notes\n* None.\n"
 if [[ ! -z $changelog ]]; then
     grow_changelog_format=$(egrep "## \[[0-9]+\.[0-9]+\.[0-9]\] -+" $changelog || true)
@@ -80,11 +81,11 @@ if [[ ! -z $changelog ]]; then
         info "Updating the release date"
         sed -i "s/UNRELEASED/$(date +'%Y-%m-%d')/g" $changelog
         info "Inserting template into changelog..."
-        sed -i "/^# .*/a ## [${new_version/-SNAPSHOT*/}] - UNRELEASED\n$release_notes_template" $changelog
+        sed -i "/^# .*/a ## [${unreleased_version}] - UNRELEASED\n$release_notes_template" $changelog
     else
         info "Resetting changelog to template..."
         rm -f $changelog && touch $changelog
-        printf "## [${new_version/-SNAPSHOT*/}]\n\n$release_notes_template" >> $changelog
+        printf "## [${unreleased_version}]\n\n$release_notes_template" >> $changelog
     fi
 fi
 

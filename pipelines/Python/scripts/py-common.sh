@@ -54,6 +54,10 @@ update_snapshot_version(){
     write_new_version $version "${new_version}b${beta}"
 }
 
+find_unreleased_version() {
+    unreleased_version=${new_version/b*/}
+}
+
 finalize_version(){
     new_version=${version%b*}
     write_new_version "$version" "$new_version"

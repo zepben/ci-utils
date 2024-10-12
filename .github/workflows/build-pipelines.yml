@@ -1,0 +1,131 @@
+name: Create basic and base java pipelines
+
+on: workflow_dispatch
+
+jobs:
+  precheck:
+    runs-on: ubuntu-latest
+    container:  zepben/pipeline-basic
+    outputs:
+      TAGS: ${{ steps.tags.output.tags }}
+      GIT_TAG: ${{ steps.tags.output.git_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Figure out the tag for the build
+        id: tags
+        run: |
+          tag=$(cat changelog.md | grep UNRELE | grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+")
+          source pipelines/scripts/common.sh
+          check_tag_exists 
+
+          if [ ${GITHUB_REF_NAME} == "main" ]; then
+            echo "tags=[$tag, latest]" >> "${GITHUB_OUTPUT}"
+            echo "git_tag=${tag}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "tags=[${tag}-test]" >> "${GITHUB_OUTPUT}"
+          fi
+
+  build-basic-pipeline:
+    runs-on: ubuntu-latest
+    container:  hashicorp/packer:1.11
+    needs: [pre-check]
+    env:
+      DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+      DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Packer Version
+        run: |
+          packer version
+
+      - name: Create zepben/pipeline-basic pipeline container
+        run: |
+          apk add docker tar
+          mkdir /build
+          export PACKER_CONFIG_DIR=/build
+          cd pipelines/basic/
+          packer init basic.pkr.hcl
+          packer validate basic.pkr.hcl
+          packer build -on-error=abort -var container_version_tag="${{ needs.pre-check.outputs.tags }}" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN basic.pkr.hcl
+        shell: bash
+
+  build-java-amazoncorretto:
+    runs-on: ubuntu-latest
+    container:  hashicorp/packer:1.11
+    needs: [pre-check]
+    env:
+      DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+      DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Packer Version
+        run: |
+          packer version
+
+      - name: Create zepben/pipeline-java-amazoncorretto
+        run: |
+          apk add docker tar
+          mkdir /build
+          export PACKER_CONFIG_DIR=/build
+          cd pipelines/Java/
+          packer init amazoncorretto-config.pkr.hcl
+          packer validate amazoncorretto-config.pkr.hcl
+          packer build -on-error=abort -var container_version_tag="${{ needs.pre-check.outputs.tags }} "-var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
+        shell: bash
+
+      - name: Figure out the tag for pipeline-java-ewb
+        run: |
+          if [ ${GITHUB_REF_NAME} != "main" ]; then
+            echo "TAG=${{ needs.pre-check.outputs.git_tag }}-test" >> "${GITHUB_ENV}"
+
+      - name: Build java-ewb pipeline
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.CI_GITHUB_TOKEN }}
+          repository: "zepben/evolve-super-pom"
+          event-type: "build-container"
+          client-payload: '{"tag": "${TAG}"}'
+        continue-on-error: true
+
+
+
+  finalise-version:
+    runs-on: ubuntu-latest
+    if: ${{ GITHUB_REF_NAME }} == "main"
+    container:  zepben/pipeline-basic
+    needs: [pre-check, build-basic-pipeline, build-java-amazoncorretto]
+
+    steps:
+      - name: Checkout release branch
+        run: |
+          git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+          git fetch --all
+          git checkout release
+        shell: bash
+      
+      - name: Create tag and update changelog
+        run: |
+
+          source pipelines/scripts/common.sh
+          sed -i "s/UNRELEASED/$(date +'%Y-%m-%d')/g" changelog.md
+          # Update changelog version
+          IFS='.' read -r -a array <<< "$version"
+          array[3]=$((++array[3]))
+          release_notes_template="### Breaking Changes\n* None.\n\n### New Features\n* None.\n\n### Enhancements\n* None.\n\n### Fixes\n* None.\n\n### Notes\n* None.\n"
+          sed -i "/^# .*/a ## [${array}] - UNRELEASED\n$release_notes_template" changelog.md
+
+          stage_file changelog.md
+
+          # Push release branch to repo
+          new_version=$array
+          commit_finalize_version
+
+          # Merge and tag
+          git merge origin/release
+          git push origin ${GITHUB_REF/refs\/heads\//}
+          git tag "${{ needs.pre-check.git_tag }}"
+          git push --tags
+

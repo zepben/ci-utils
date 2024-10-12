@@ -18,8 +18,8 @@ variable "dockerhub_user" {
 }
 
 variable "container_version_tag" {
-  type = string
-  default = "4.5.2"
+  type = list(string)
+  default = []
 }
 
 source "docker" "image" {

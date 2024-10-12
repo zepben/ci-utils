@@ -18,8 +18,8 @@ variable "dockerhub_user" {
 }
 
 variable "container_version_tag" {
-  type = string
-  default = "5.7.5"
+  type = list(string)
+  default = []
 }
 
 source "docker" "image" {
@@ -72,7 +72,7 @@ build {
   post-processors {
     post-processor "docker-tag" {
       repository = "zepben/pipeline-basic"
-      tags       = [var.container_version_tag]
+      tags       = var.container_version_tag
     }
     post-processor "docker-push" {
       login          = true

@@ -17,7 +17,7 @@ variable "dockerhub_user" {
   default = "${env("DOCKER_HUB_USER")}"
 }
 
-variable "container_version_tag" {
+variable "container_version_labels" {
   type = list(string)
   default = []
 }
@@ -72,7 +72,7 @@ build {
   post-processors {
     post-processor "docker-tag" {
       repository = "zepben/pipeline-basic"
-      tags       = ${var.container_version_tag}
+      tags       = var.container_version_labels
     }
     post-processor "docker-push" {
       login          = true

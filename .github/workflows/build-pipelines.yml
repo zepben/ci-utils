@@ -7,9 +7,8 @@ jobs:
     runs-on: ubuntu-latest
     container:  zepben/pipeline-basic
     outputs:
-      DOCKER_TAGS: ${{ steps.tags.output.tags }}
-      EWB_JAVA_DOCKER_TAG: ${{ steps.tags.output.ewb }}
-      GIT_TAG: ${{ steps.tags.output.git_tag }}
+      LABELS: ${{ steps.tags.output.labels }}
+      TAG: ${{ steps.tags.output.tag }}
     steps:
       - uses: actions/checkout@v4
 
@@ -21,13 +20,11 @@ jobs:
           check_tag_exists 
 
           if [ ${GITHUB_REF_NAME} == "main" ]; then
-            echo "tags=[$tag, latest]" >> "${GITHUB_OUTPUT}"
-            echo "git_tag=${tag}" >> "${GITHUB_OUTPUT}"
-            echo "ewb=latest" >> "${GITHUB_OUTPUT}"
+            echo "labels=[$tag, latest]" >> "${GITHUB_OUTPUT}"
+            echo "tag=$tag" >> "${GITHUB_OUTPUT}"
           else
-            echo "tags=[test]" >> "${GITHUB_OUTPUT}"
-            echo "git_tag=test" >> "${GITHUB_OUTPUT}"
-            echo "ewb=test" >> "${GITHUB_OUTPUT}"
+            echo "labels=[test]" >> "${GITHUB_OUTPUT}"
+            echo "tag=test" >> "${GITHUB_OUTPUT}"
           fi
 
   build-basic-pipeline:
@@ -52,7 +49,7 @@ jobs:
           cd pipelines/basic/
           packer init basic.pkr.hcl
           packer validate basic.pkr.hcl
-          packer build -on-error=abort -var container_version_tag="${{ needs.pre-check.outputs.DOCKER_TAGS }}" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN basic.pkr.hcl
+          packer build -on-error=abort -var container_version_labels="${{ needs.pre-check.outputs.LABELS }}" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN basic.pkr.hcl
         shell: bash
 
   build-java-amazoncorretto:
@@ -77,7 +74,7 @@ jobs:
           cd pipelines/Java/
           packer init amazoncorretto-config.pkr.hcl
           packer validate amazoncorretto-config.pkr.hcl
-          packer build -on-error=abort -var container_version_tag="${{ needs.pre-check.outputs.DOCKER_TAGS }} "-var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
+          packer build -on-error=abort -var container_version_labels="${{ needs.pre-check.outputs.LABELS }} "-var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
         shell: bash
 
       # Now that we've built the container, built java-ewb in superpom repo
@@ -87,7 +84,7 @@ jobs:
           token: ${{ secrets.CI_GITHUB_TOKEN }}
           repository: "zepben/evolve-super-pom"
           event-type: "build-container"
-          client-payload: '{"tag": "${{ needs.pre-check.outputs.EWB_JAVA_DOCKER_TAG }}"}'
+          client-payload: '{"labels": "${{ needs.pre-check.outputs.LABELS }}", "tag": "${{ needs.pre-check.outputs.TAG }}"}'
         continue-on-error: true
 
 

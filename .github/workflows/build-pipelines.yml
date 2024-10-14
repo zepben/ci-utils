@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     container:  zepben/pipeline-basic
     outputs:
-      TAGS: ${{ steps.tags.output.tags }}
+      DOCKER_TAGS: ${{ steps.tags.output.tags }}
       GIT_TAG: ${{ steps.tags.output.git_tag }}
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +23,8 @@ jobs:
             echo "tags=[$tag, latest]" >> "${GITHUB_OUTPUT}"
             echo "git_tag=${tag}" >> "${GITHUB_OUTPUT}"
           else
-            echo "tags=[${tag}-test]" >> "${GITHUB_OUTPUT}"
+            echo "tags=[test]" >> "${GITHUB_OUTPUT}"
+            echo "git_tag=test" >> "${GITHUB_OUTPUT}"
           fi
 
   build-basic-pipeline:
@@ -76,18 +77,13 @@ jobs:
           packer build -on-error=abort -var container_version_tag="${{ needs.pre-check.outputs.tags }} "-var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
         shell: bash
 
-      - name: Figure out the tag for pipeline-java-ewb
-        run: |
-          if [ ${GITHUB_REF_NAME} != "main" ]; then
-            echo "TAG=${{ needs.pre-check.outputs.git_tag }}-test" >> "${GITHUB_ENV}"
-
       - name: Build java-ewb pipeline
         uses: peter-evans/repository-dispatch@v1
         with:
           token: ${{ secrets.CI_GITHUB_TOKEN }}
           repository: "zepben/evolve-super-pom"
           event-type: "build-container"
-          client-payload: '{"tag": "${TAG}"}'
+          client-payload: '{"tag": "${{ needs.pre-check.outputs.git_tag }}"}'
         continue-on-error: true
 
 

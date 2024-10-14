@@ -63,7 +63,7 @@ build {
     post-processor "docker-tag" {
       name       = "docker.tag"
       repository = "zepben/pipeline-java"
-      tags       = [var.container_version_tag]
+      tags       = var.container_version_tag
     }
     post-processor "docker-push" {
       name           = "docker.push"

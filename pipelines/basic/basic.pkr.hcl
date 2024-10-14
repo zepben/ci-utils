@@ -72,7 +72,7 @@ build {
   post-processors {
     post-processor "docker-tag" {
       repository = "zepben/pipeline-basic"
-      tags       = var.container_version_tag
+      tags       = ${var.container_version_tag}
     }
     post-processor "docker-push" {
       login          = true

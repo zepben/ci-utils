@@ -17,9 +17,9 @@ variable "dockerhub_user" {
   default = "${env("DOCKER_HUB_USER")}"
 }
 
-variable "container_version_tag" {
-  type = string
-  default = "4.5.2"
+variable "container_version_labels" {
+  type = list(string)
+  default = []
 }
 
 source "docker" "image" {
@@ -63,7 +63,7 @@ build {
     post-processor "docker-tag" {
       name       = "docker.tag"
       repository = "zepben/pipeline-java"
-      tags       = [var.container_version_tag]
+      tags       = var.container_version_labels
     }
     post-processor "docker-push" {
       name           = "docker.push"

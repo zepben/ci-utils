@@ -64,7 +64,7 @@ finalize_version(){
 
     # Clear all beta/snapshots from dependencies
     # this clears "zepben.<anything>==<numbers>b<numbers>" to "zepben.<anything>==<numbers>"
-    sed -i "s/\(zepben.*==.*\)b.*\"/\1\"/g" $file
+    sed -i "s/\(zepben.*=.*\)b.*\"/\1\"/g" $file
 }
 
 package(){

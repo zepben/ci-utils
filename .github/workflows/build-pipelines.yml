@@ -1,0 +1,150 @@
+name: Create basic and base java pipelines
+
+on: workflow_dispatch
+
+jobs:
+  precheck:
+    runs-on: ubuntu-latest
+    container:  zepben/pipeline-basic:5.7.5
+    outputs:
+      base_image: ${{ steps.tags.outputs.base_image }}
+      labels: ${{ steps.tags.outputs.labels }}
+      tag: ${{ steps.tags.outputs.tag }}
+    steps:
+
+      - uses: actions/checkout@v4
+      - name: Work around git permission issue
+        run: |
+          dname=$(echo ${{github.repository}} | cut -d'/' -f2)
+          git config --global --add safe.directory /__w/$dname/$dname
+        shell: sh
+
+      - name: Create release branch
+        run: |
+          git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+          git fetch --all
+          git checkout -b release
+        shell: bash
+
+      - name: Figure out the tag for the build
+        id: tags
+        shell: bash
+        run: |
+          ver_tag=$(cat changelog.md | grep UNRELE | grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+")
+          source /scripts/common.sh
+          check_tag_exists "${ver_tag}"
+
+          if [ ${GITHUB_REF_NAME} == "main" ]; then
+            echo "labels=[${ver_tag}, latest]" >> "${GITHUB_OUTPUT}"
+            echo "base_image=zepben/pipeline-java" >> "${GITHUB_OUTPUT}"
+            echo "tag=${ver_tag}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "labels=[test]" >> "${GITHUB_OUTPUT}"
+            echo "base_image=zepben/pipeline-java:test" >> "${GITHUB_OUTPUT}"
+            echo "tag=test" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Update changelog and commit release branch
+        shell: bash
+        id: tag
+        run: |
+          source /scripts/common.sh
+          sed -i "s/UNRELEASED/$(date +'%Y-%m-%d')/g" changelog.md
+          # Update changelog version
+          incr_version minor ${{ steps.tags.outputs.tag }}
+          release_notes_template="### Breaking Changes\n* None.\n\n### New Features\n* None.\n\n### Enhancements\n* None.\n\n### Fixes\n* None.\n\n### Notes\n* None.\n"
+          sed -i "/^# .*/a ## [${new_version}] - UNRELEASED\n$release_notes_template" changelog.md
+
+          stage_file changelog.md
+
+          # Reset new_version to the unreleased yet tag
+          new_version=${{ steps.tags.outputs.tag }}
+          # Push release branch to repo
+          commit_finalize_version
+
+  build-basic-pipeline:
+    runs-on: ubuntu-latest
+    container:  hashicorp/packer:1.11
+    needs: [precheck]
+    env:
+      DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+      DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Packer Version
+        run: |
+          packer version
+
+      - name: Create zepben/pipeline-basic pipeline container
+        run: |
+          apk add docker tar
+          mkdir /build
+          export PACKER_CONFIG_DIR=/build
+          cd pipelines/basic/
+          packer init basic.pkr.hcl
+          packer validate basic.pkr.hcl
+          packer build -on-error=abort -var container_version_labels="${{ needs.precheck.outputs.labels }}" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN basic.pkr.hcl
+        shell: bash
+
+  build-java-amazoncorretto:
+    runs-on: ubuntu-latest
+    container:  hashicorp/packer:1.11
+    needs: [precheck]
+    env:
+      DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+      DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Packer Version
+        run: |
+          packer version
+
+      - name: Create zepben/pipeline-java-amazoncorretto
+        run: |
+          apk add docker tar
+          mkdir /build
+          export PACKER_CONFIG_DIR=/build
+          cd pipelines/Java/
+          packer init amazoncorretto-config.pkr.hcl
+          packer validate amazoncorretto-config.pkr.hcl
+          packer build -on-error=abort -var container_version_labels="${{ needs.precheck.outputs.labels }} "-var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
+        shell: bash
+
+      # Now that we've built the container, built java-ewb in superpom repo
+      - name: Build java-ewb pipeline
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.CI_GITHUB_TOKEN }}
+          repository: "zepben/evolve-super-pom"
+          event-type: "build-container"
+          client-payload: '{"labels": "${{ needs.precheck.outputs.labels }}", "base_image": "${{ needs.precheck.outputs.base_image }}"}'
+
+  finalise-version:
+    runs-on: ubuntu-latest
+    if: ${{ github.ref_name == 'main' }}
+    container:  zepben/pipeline-basic:5.7.5
+    needs: [precheck, build-basic-pipeline, build-java-amazoncorretto]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Work around git permission issue
+        run: |
+          dname=$(echo ${{github.repository}} | cut -d'/' -f2)
+          git config --global --add safe.directory /__w/$dname/$dname
+        shell: sh
+
+      - name: Merge and tag
+        shell: bash
+        id: tag
+        run: |
+          # Merge and tag, and delete release branch
+          git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+          git fetch --all
+          git branch -a
+          git merge origin/release
+          git push origin ${GITHUB_REF/refs\/heads\//}
+          git tag "${{ needs.precheck.outputs.tag }}"
+          git push --tags
+          git push origin -d release

@@ -61,6 +61,10 @@ find_unreleased_version() {
 finalize_version(){
     new_version=${version%b*}
     write_new_version "$version" "$new_version"
+
+    # Clear all beta/snapshots from dependencies
+    # this clears "zepben.<anything>[<= | == | >=]<numbers>b<numbers>" to "zepben.<anything>[<= | == | >=]<numbers>"
+    sed -i "s/\(zepben.*=.*\)b.*\"/\1\"/g" $file
 }
 
 package(){

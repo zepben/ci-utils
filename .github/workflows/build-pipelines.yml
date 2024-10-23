@@ -87,7 +87,7 @@ jobs:
           packer validate basic.pkr.hcl
 
           # Split the passed values into an array
-          array=(${{ github.event.client_payload.labels }})
+          array=(${{ needs.precheck.outputs.labels }})
           # Print every array entry encased by double quotes
           tags=$(printf "\"%s\"," "${array[@]}")
           # Construct the list parameter for the container tags
@@ -120,7 +120,7 @@ jobs:
           packer validate amazoncorretto-config.pkr.hcl
 
           # Split the passed values into an array
-          array=(${{ github.event.client_payload.labels }})
+          array=(${{ needs.precheck.outputs.labels }})
           # Print every array entry encased by double quotes
           tags=$(printf "\"%s\"," "${array[@]}")
           # Construct the list parameter for the container tags

@@ -85,7 +85,15 @@ jobs:
           cd pipelines/basic/
           packer init basic.pkr.hcl
           packer validate basic.pkr.hcl
-          packer build -on-error=abort -var container_version_labels="${{ needs.precheck.outputs.labels }}" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN basic.pkr.hcl
+
+          # Split the passed values into an array
+          array=(${{ github.event.client_payload.labels }})
+          # Print every array entry encased by double quotes
+          tags=$(printf "\"%s\"," "${array[@]}")
+          # Construct the list parameter for the container tags
+          IMAGE_TAGS="-var container_version_labels='[$tags]'"
+
+          packer build -on-error=abort $IMAGE_TAGS -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN basic.pkr.hcl
         shell: bash
 
   build-java-amazoncorretto:
@@ -110,7 +118,14 @@ jobs:
           cd pipelines/Java/
           packer init amazoncorretto-config.pkr.hcl
           packer validate amazoncorretto-config.pkr.hcl
-          packer build -on-error=abort -var container_version_labels="${{ needs.precheck.outputs.labels }} "-var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
+
+          # Split the passed values into an array
+          array=(${{ github.event.client_payload.labels }})
+          # Print every array entry encased by double quotes
+          tags=$(printf "\"%s\"," "${array[@]}")
+          # Construct the list parameter for the container tags
+          IMAGE_TAGS="-var container_version_labels='[$tags]'"
+          packer build -on-error=abort $IMAGE_TAGS "-var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
         shell: bash
 
       # Now that we've built the container, built java-ewb in superpom repo

@@ -35,11 +35,12 @@ jobs:
           check_tag_exists "${ver_tag}"
 
           if [ ${GITHUB_REF_NAME} == "main" ]; then
-            echo "labels=[${ver_tag}, latest]" >> "${GITHUB_OUTPUT}"
+            labels="${ver_tag} latest"
+            echo "labels=$labels" >> "${GITHUB_OUTPUT}"
             echo "base_image=zepben/pipeline-java" >> "${GITHUB_OUTPUT}"
             echo "tag=${ver_tag}" >> "${GITHUB_OUTPUT}"
           else
-            echo "labels=[test]" >> "${GITHUB_OUTPUT}"
+            echo "labels=test" >> "${GITHUB_OUTPUT}"
             echo "base_image=zepben/pipeline-java:test" >> "${GITHUB_OUTPUT}"
             echo "tag=test" >> "${GITHUB_OUTPUT}"
           fi

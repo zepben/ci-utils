@@ -40,12 +40,15 @@ do
     fi
 done
 
-info "Clearing the 'release' branch if it exists"
-git branch | grep release
-if [ $? == 0 ]; then
-    # Found release branch, let's drop it
-    info "Found 'release' branch, removing it"
-    run git push origin -d release
+# In most cases the error here means that the "release" branch doesn't exist.
+# If that's not the case, one the following steps will fail, and will be handled
+# manually
+info "Clearing the 'release' branch if it exists, ignore errors"
+run git push origin -d release
+if [ $status -ne 0 ]; then
+    # Show the error and continue 
+    echo "Warning: There was an error deleting a release branch: "
+    cat "${output_file}"
 fi
 
 # Get user name

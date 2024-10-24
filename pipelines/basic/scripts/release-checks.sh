@@ -40,11 +40,11 @@ do
     fi
 done
 
-# In most cases the error here means that the "release" branch doesn't exist.
-# If that's not the case, one the following steps will fail, and will be handled
-# manually
 info "Clearing the 'release' branch if it exists, ignore errors"
 run git push origin -d release
+# In most cases the error here means that the "release" branch doesn't exist.
+# If that's not the case, one the following steps will fail, and will be handled
+# manually, so we ignore the error here and only showing it.
 if [ $status -ne 0 ]; then
     # Show the error and continue 
     echo "Warning: There was an error deleting a release branch: "

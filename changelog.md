@@ -1,13 +1,13 @@
 # CI-Utils
 ## [6.1.0] - UNRELEASED
 ### Breaking Changes
-* Rebuild the way containers are created - all containers are latest + tag; only tag if in testing.
+* None
 
 ### New Features
 * None.
 
 ### Enhancements
-* None.
+* Clear the release branch if it exists during release checks.
 
 ### Fixes
 * None.

@@ -22,7 +22,12 @@ jobs:
       - name: Create release branch
         run: |
           git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
-          git fetch --all
+          git fetch -v
+          git branch | grep release
+          if [ $? -eq 0 ]; then 
+            # Release branch already exists, remove it
+            git push origin -d release
+          fi
           git checkout -b release
         shell: bash
 

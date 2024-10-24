@@ -40,6 +40,14 @@ do
     fi
 done
 
+info "Clearing the 'release' branch if it exists"
+git branch | grep release
+if [ $? == 0 ]; then
+    # Found release branch, let's drop it
+    info "Found 'release' branch, removing it"
+    run git push origin -d release
+fi
+
 # Get user name
 if [[ -z "$BITBUCKET_STEP_TRIGGERER_UUID" ]]; then
   USERNAME=$(curl -s -X GET -g "https://api.bitbucket.org/2.0/users/${BITBUCKET_STEP_TRIGGERER_UUID}" | jq --raw-output '.display_name')

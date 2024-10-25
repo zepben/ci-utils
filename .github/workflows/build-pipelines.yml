@@ -22,7 +22,9 @@ jobs:
       - name: Create release branch
         run: |
           git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
-          git fetch --all
+          git fetch -v origin
+          # If the `release` branch already exists, remove it
+          run git push origin -d release
           git checkout -b release
         shell: bash
 
@@ -142,6 +144,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ env.GITHUB_TOKEN }}
+
       - name: Work around git permission issue
         run: |
           dname=$(echo ${{github.repository}} | cut -d'/' -f2)

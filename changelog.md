@@ -1,5 +1,21 @@
 # CI-Utils
-## [6.0.0] - UNRELEASED
+## [6.1.0] - UNRELEASED
+### Breaking Changes
+* None
+
+### New Features
+* None.
+
+### Enhancements
+* Clear the release branch if it exists during release checks.
+
+### Fixes
+* None.
+
+### Notes
+* None.
+
+## [6.0.0] - October 24, 2024
 ### Breaking Changes
 * Rebuild the way containers are created - all containers are latest + tag; only tag if in testing.
 

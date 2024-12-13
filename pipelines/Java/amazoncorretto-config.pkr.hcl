@@ -17,7 +17,7 @@ variable "dockerhub_user" {
   default = "${env("DOCKER_HUB_USER")}"
 }
 
-variable "container_version_labels" {
+variable "container_version_tags" {
   type = list(string)
   default = []
 }
@@ -25,6 +25,9 @@ variable "container_version_labels" {
 source "docker" "image" {
   commit = "true"
   image  = "debian:bookworm-20240701-slim"
+  changes = [
+    "LABEL ${var.version_label"
+  ]
 }
 
 build {
@@ -63,7 +66,7 @@ build {
     post-processor "docker-tag" {
       name       = "docker.tag"
       repository = "zepben/pipeline-java"
-      tags       = var.container_version_labels
+      tags       = var.container_version_tags
     }
     post-processor "docker-push" {
       name           = "docker.push"

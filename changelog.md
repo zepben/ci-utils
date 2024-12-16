@@ -8,6 +8,7 @@
 
 ### Enhancements
 * Clear the release branch if it exists during release checks.
+* Add labels to the pipeline containers
 
 ### Fixes
 * None.

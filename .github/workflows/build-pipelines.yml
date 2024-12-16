@@ -14,6 +14,7 @@ jobs:
     steps:
 
       - uses: actions/checkout@v4
+
       - name: Work around git permission issue
         run: |
           dname=$(echo ${{github.repository}} | cut -d'/' -f2)
@@ -39,16 +40,16 @@ jobs:
 
           if [ ${GITHUB_REF_NAME} == "main" ]; then
             tags="${version} latest"
-            labels="version=${version} commit=${GITHUB_REF}"
+            labels="version=${version} commit=${GITHUB_SHA}"
             echo "container_tags=$tags" >> "${GITHUB_OUTPUT}"
             echo "container_labels=$labels" >> "${GITHUB_OUTPUT}"
             echo "base_image=zepben/pipeline-java" >> "${GITHUB_OUTPUT}"
             echo "git_tag=${version}" >> "${GITHUB_OUTPUT}"
           else
-            echo "container_labels=test" >> "${GITHUB_OUTPUT}"
-            echo "container_tags=test" >> "${GITHUB_OUTPUT}"
+            echo "container_labels=test-${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
+            echo "container_tags=test-${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
             echo "base_image=zepben/pipeline-java:test" >> "${GITHUB_OUTPUT}"
-            echo "git_tag=test" >> "${GITHUB_OUTPUT}"
+            echo "git_tag=test-${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
           fi
 
       - name: Update changelog and commit release branch
@@ -91,12 +92,16 @@ jobs:
           packer init basic.pkr.hcl
           packer validate basic.pkr.hcl
 
-          # Split the passed values into an array
+          # Split the label values into an array
+          labels=(${{ needs.precheck.outputs.container_labels }})
+          container_labels=$(printf "\"LABEL %s\"," "${labels[@]}")
+
+          # Split the tag values into an array
           array=(${{ needs.precheck.outputs.container_tags }})
           # Print every array entry encased by double quotes
           tags=$(printf "\"%s\"," "${array[@]}")
           # Construct the list parameter for the container tags
-          packer build -on-error=abort -var container_version_tags="[$tags]" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN basic.pkr.hcl
+          packer build -on-error=abort -var container_version_labels="[$container_labels]" -var container_version_tags="[$tags]" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN basic.pkr.hcl
         shell: bash
 
   build-java-amazoncorretto:
@@ -122,12 +127,16 @@ jobs:
           packer init amazoncorretto-config.pkr.hcl
           packer validate amazoncorretto-config.pkr.hcl
 
+          # Split the label values into an array
+          labels=(${{ needs.precheck.outputs.container_labels }})
+          container_labels=$(printf "\"LABEL %s\"," "${labels[@]}")
+
           # Split the passed values into an array
           array=(${{ needs.precheck.outputs.container_tags }})
           # Print every array entry encased by double quotes
           tags=$(printf "\"%s\"," "${array[@]}")
           # Construct the list parameter for the container tags
-          packer build -on-error=abort -var container_version_tags="[$tags]" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
+          packer build -on-error=abort -var container_version_labels="[$container_labels]" -var container_version_tags="[$tags]" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
         shell: bash
 
       # Now that we've built the container, built java-ewb in superpom repo
@@ -137,7 +146,7 @@ jobs:
           token: ${{ secrets.CI_GITHUB_TOKEN }}
           repository: "zepben/evolve-super-pom"
           event-type: "build-container"
-          # TODO: if test, set flag to not push
+          # TODO: if test, set label to :test
           client-payload: '{"base_image": "${{ needs.precheck.outputs.base_image }}"}'
 
   finalise-version:

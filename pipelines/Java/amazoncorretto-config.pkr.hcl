@@ -17,6 +17,11 @@ variable "dockerhub_user" {
   default = "${env("DOCKER_HUB_USER")}"
 }
 
+variable "container_version_labels" {
+  type = list(string)
+  default = []
+}
+
 variable "container_version_tags" {
   type = list(string)
   default = []
@@ -25,9 +30,7 @@ variable "container_version_tags" {
 source "docker" "image" {
   commit = "true"
   image  = "debian:bookworm-20240701-slim"
-  changes = [
-    "LABEL ${var.version_label"
-  ]
+  changes = var.container_version_labels
 }
 
 build {

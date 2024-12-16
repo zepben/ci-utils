@@ -22,9 +22,15 @@ variable "container_version_labels" {
   default = []
 }
 
+variable "container_version_tags" {
+  type = list(string)
+  default = []
+}
+
 source "docker" "image" {
   commit = "true"
   image  = "alpine"
+  changes = var.container_version_labels
 }
 
 build {
@@ -72,7 +78,7 @@ build {
   post-processors {
     post-processor "docker-tag" {
       repository = "zepben/pipeline-basic"
-      tags       = var.container_version_labels
+      tags       = var.container_version_tags
     }
     post-processor "docker-push" {
       login          = true

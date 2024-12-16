@@ -26,7 +26,7 @@ jobs:
           git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
           git fetch -v origin
           # If the `release` branch already exists, remove it
-          run git push origin -d release
+          git push origin -d release
           git checkout -b release
         shell: bash
 

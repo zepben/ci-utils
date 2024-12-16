@@ -30,6 +30,7 @@ jobs:
           run git push origin -d release
           git checkout -b release
         shell: bash
+        continue-on-error: true
 
       - name: Figure out the tag for the build
         id: tags

@@ -26,8 +26,7 @@ jobs:
       - name: Delete release branch
         run: |
           # If the `release` branch already exists, remove it
-          source /scripts/common.sh
-          run git push origin -d release
+          git push origin -d release
         continue-on-error: true 
 
       - name: Create release branch

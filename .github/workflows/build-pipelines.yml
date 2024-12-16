@@ -98,6 +98,8 @@ jobs:
           packer init basic.pkr.hcl
           packer validate basic.pkr.hcl
 
+          echo "${{ needs.precheck.outputs.container_labels }}"
+
           # Split the tag values into an array
           tags=(${{ needs.precheck.outputs.container_tags }})
           # Print every array entry encased by double quotes
@@ -129,9 +131,7 @@ jobs:
           packer init amazoncorretto-config.pkr.hcl
           packer validate amazoncorretto-config.pkr.hcl
 
-          # Split the label values into an array
-          labels=(${{ needs.precheck.outputs.container_labels }})
-          container_labels=$(printf "\"LABEL %s\"," "${labels[@]}")
+          echo "${{ needs.precheck.outputs.container_labels }}"
 
           # Split the passed values into an array
           tags=(${{ needs.precheck.outputs.container_tags }})

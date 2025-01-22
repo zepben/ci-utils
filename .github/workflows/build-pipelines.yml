@@ -1,6 +1,13 @@
 name: Create basic and base java pipelines
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      release_pipeline_java_ewb:
+        description: 'Also release the pipeline-java-ewb container'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   precheck:
@@ -145,6 +152,7 @@ jobs:
 
       # Now that we've built the container, built java-ewb in superpom repo
       - name: Build java-ewb pipeline
+        if: ${{ inputs.release_pipeline_java_ewb }}
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.CI_GITHUB_TOKEN }}

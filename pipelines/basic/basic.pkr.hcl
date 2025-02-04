@@ -18,6 +18,11 @@ variable "dockerhub_user" {
 }
 
 variable "container_version_labels" {
+  type = string
+  default = ""
+}
+
+variable "container_version_tags" {
   type = list(string)
   default = []
 }
@@ -25,6 +30,7 @@ variable "container_version_labels" {
 source "docker" "image" {
   commit = "true"
   image  = "alpine"
+  changes = ["LABEL ${var.container_version_labels}"]
 }
 
 build {
@@ -72,7 +78,7 @@ build {
   post-processors {
     post-processor "docker-tag" {
       repository = "zepben/pipeline-basic"
-      tags       = var.container_version_labels
+      tags       = var.container_version_tags
     }
     post-processor "docker-push" {
       login          = true

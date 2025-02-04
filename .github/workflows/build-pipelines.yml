@@ -1,30 +1,45 @@
 name: Create basic and base java pipelines
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      release_pipeline_java_ewb:
+        description: 'Also release the pipeline-java-ewb container'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   precheck:
     runs-on: ubuntu-latest
-    container:  zepben/pipeline-basic:5.7.5
+    container:  zepben/pipeline-basic
     outputs:
       base_image: ${{ steps.tags.outputs.base_image }}
-      labels: ${{ steps.tags.outputs.labels }}
-      tag: ${{ steps.tags.outputs.tag }}
+      container_tags: ${{ steps.tags.outputs.container_tags }}
+      container_labels: ${{ steps.tags.outputs.container_labels }}
+      git_tag: ${{ steps.tags.outputs.git_tag }}
     steps:
 
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Work around git permission issue
         run: |
           dname=$(echo ${{github.repository}} | cut -d'/' -f2)
           git config --global --add safe.directory /__w/$dname/$dname
         shell: sh
 
+      - name: Delete release branch
+        run: |
+          # If the `release` branch already exists, remove it
+          git push origin -d release
+        continue-on-error: true 
+
       - name: Create release branch
         run: |
           git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
           git fetch -v origin
-          # If the `release` branch already exists, remove it
-          run git push origin -d release
           git checkout -b release
         shell: bash
 
@@ -32,36 +47,40 @@ jobs:
         id: tags
         shell: bash
         run: |
-          ver_tag=$(cat changelog.md | grep UNRELE | grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+")
+          version=$(cat changelog.md | grep UNRELE | grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+")
           source /scripts/common.sh
-          check_tag_exists "${ver_tag}"
+          check_tag_exists "${version}"
 
           if [ ${GITHUB_REF_NAME} == "main" ]; then
-            labels="${ver_tag} latest"
-            echo "labels=$labels" >> "${GITHUB_OUTPUT}"
+            tags="${version} latest"
+            labels="version=${version} commit=${GITHUB_SHA}"
+            echo "container_tags=$tags" >> "${GITHUB_OUTPUT}"
+            echo "container_labels=$labels" >> "${GITHUB_OUTPUT}"
             echo "base_image=zepben/pipeline-java" >> "${GITHUB_OUTPUT}"
-            echo "tag=${ver_tag}" >> "${GITHUB_OUTPUT}"
+            echo "git_tag=${version}" >> "${GITHUB_OUTPUT}"
           else
-            echo "labels=test" >> "${GITHUB_OUTPUT}"
-            echo "base_image=zepben/pipeline-java:test" >> "${GITHUB_OUTPUT}"
-            echo "tag=test" >> "${GITHUB_OUTPUT}"
+            tags="test-${GITHUB_REF_NAME}"
+            labels="version=test-${GITHUB_REF_NAME} commit=${GITHUB_SHA}"
+            echo "container_tags=$tags" >> "${GITHUB_OUTPUT}"
+            echo "container_labels=$labels" >> "${GITHUB_OUTPUT}"
+            echo "base_image=zepben/pipeline-java:test-${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
+            echo "git_tag=test-${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
           fi
 
       - name: Update changelog and commit release branch
         shell: bash
-        id: tag
         run: |
           source /scripts/common.sh
           sed -i "s/UNRELEASED/$(date +'%Y-%m-%d')/g" changelog.md
           # Update changelog version
-          incr_version minor ${{ steps.tags.outputs.tag }}
+          incr_version minor ${{ steps.tags.outputs.git_tag }}
           release_notes_template="### Breaking Changes\n* None.\n\n### New Features\n* None.\n\n### Enhancements\n* None.\n\n### Fixes\n* None.\n\n### Notes\n* None.\n"
           sed -i "/^# .*/a ## [${new_version}] - UNRELEASED\n$release_notes_template" changelog.md
 
           stage_file changelog.md
 
           # Reset new_version to the unreleased yet tag
-          new_version=${{ steps.tags.outputs.tag }}
+          new_version=${{ steps.tags.outputs.git_tag }}
           # Push release branch to repo
           commit_finalize_version
 
@@ -88,12 +107,14 @@ jobs:
           packer init basic.pkr.hcl
           packer validate basic.pkr.hcl
 
-          # Split the passed values into an array
-          array=(${{ needs.precheck.outputs.labels }})
+          echo "${{ needs.precheck.outputs.container_labels }}"
+
+          # Split the tag values into an array
+          tags=(${{ needs.precheck.outputs.container_tags }})
           # Print every array entry encased by double quotes
-          tags=$(printf "\"%s\"," "${array[@]}")
+          container_tags=$(printf "\"%s\"," "${tags[@]}")
           # Construct the list parameter for the container tags
-          packer build -on-error=abort -var container_version_labels="[$tags]" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN basic.pkr.hcl
+          packer build -on-error=abort -var container_version_labels="${{ needs.precheck.outputs.container_labels }}" -var container_version_tags="[$container_tags]" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN basic.pkr.hcl
         shell: bash
 
   build-java-amazoncorretto:
@@ -119,27 +140,31 @@ jobs:
           packer init amazoncorretto-config.pkr.hcl
           packer validate amazoncorretto-config.pkr.hcl
 
+          echo "${{ needs.precheck.outputs.container_labels }}"
+
           # Split the passed values into an array
-          array=(${{ needs.precheck.outputs.labels }})
+          tags=(${{ needs.precheck.outputs.container_tags }})
           # Print every array entry encased by double quotes
-          tags=$(printf "\"%s\"," "${array[@]}")
+          container_tags=$(printf "\"%s\"," "${tags[@]}")
           # Construct the list parameter for the container tags
-          packer build -on-error=abort -var container_version_labels="[$tags]" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
+          packer build -on-error=abort -var container_version_labels="${{ needs.precheck.outputs.container_labels }}" -var container_version_tags="[$container_tags]" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
         shell: bash
 
       # Now that we've built the container, built java-ewb in superpom repo
       - name: Build java-ewb pipeline
+        if: ${{ inputs.release_pipeline_java_ewb }}
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.CI_GITHUB_TOKEN }}
           repository: "zepben/evolve-super-pom"
           event-type: "build-container"
-          client-payload: '{"labels": "${{ needs.precheck.outputs.labels }}", "base_image": "${{ needs.precheck.outputs.base_image }}"}'
+          # TODO: if test, set tag to :test-*
+          client-payload: '{"base_image": "${{ needs.precheck.outputs.base_image }}"}'
 
   finalise-version:
     runs-on: ubuntu-latest
     if: ${{ github.ref_name == 'main' }}
-    container:  zepben/pipeline-basic:5.7.5
+    container:  zepben/pipeline-basic
     needs: [precheck, build-basic-pipeline, build-java-amazoncorretto]
 
     steps:
@@ -163,6 +188,6 @@ jobs:
           git branch -a
           git merge origin/release
           git push origin ${GITHUB_REF/refs\/heads\//}
-          git tag "${{ needs.precheck.outputs.tag }}"
+          git tag "${{ needs.precheck.outputs.git_tag }}"
           git push --tags
           git push origin -d release

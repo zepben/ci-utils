@@ -1,5 +1,21 @@
 # CI-Utils
-## [6.1.0] - UNRELEASED
+## [6.2.0] - UNRELEASED
+### Breaking Changes
+* None.
+
+### New Features
+* None.
+
+### Enhancements
+* None.
+
+### Fixes
+* None.
+
+### Notes
+* None.
+
+## [6.1.0] - 2025-02-05
 ### Breaking Changes
 * None
 

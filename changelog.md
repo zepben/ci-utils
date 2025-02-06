@@ -4,7 +4,7 @@
 * None.
 
 ### New Features
-* None.
+* Add libxml2-utils to java pipeline container
 
 ### Enhancements
 * None.

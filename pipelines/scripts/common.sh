@@ -99,6 +99,8 @@ enable_debug() {
 #   None
 #######################################
 run() {
+  # temporary allow continue on errors
+  set +e
   echo "$@"
   if [[ "$@" = "cd "* ]]; then
     "$@"
@@ -107,6 +109,8 @@ run() {
     "$@" | tee "$output_file"
   fi
   status=$?
+  # restore fail on errors
+  set -e
 }
 
 #######################################

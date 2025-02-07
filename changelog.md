@@ -7,7 +7,7 @@
 * None.
 
 ### Enhancements
-* None.
+* run() command (from `common.sh`) disables `set -e` temporarily for its run; it's needed so that it can proceed on errors.
 
 ### Fixes
 * None.

@@ -53,14 +53,14 @@ jobs:
 
           if [ ${GITHUB_REF_NAME} == "main" ]; then
             tags="${version} latest"
-            labels="version=${version} TYPE-commit=${GITHUB_SHA}"
+            labels="TYPE-version=${version} TYPE-commit=${GITHUB_SHA}"
             echo "container_tags=$tags" >> "${GITHUB_OUTPUT}"
             echo "container_labels=$labels" >> "${GITHUB_OUTPUT}"
             echo "base_image=zepben/pipeline-java" >> "${GITHUB_OUTPUT}"
             echo "git_tag=${version}" >> "${GITHUB_OUTPUT}"
           else
             tags="test-${GITHUB_REF_NAME}"
-            labels="version=test-${GITHUB_REF_NAME} TYPE-commit=${GITHUB_SHA}"
+            labels="TYPE-version=test-${GITHUB_REF_NAME} TYPE-commit=${GITHUB_SHA}"
             echo "container_tags=$tags" >> "${GITHUB_OUTPUT}"
             echo "container_labels=$labels" >> "${GITHUB_OUTPUT}"
             echo "base_image=zepben/pipeline-java:test-${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"

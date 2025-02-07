@@ -150,7 +150,7 @@ jobs:
           # Print every array entry encased by double quotes
           container_tags=$(printf "\"%s\"," "${tags[@]}")
           # Construct the list parameter for the container tags
-          packer build -on-error=abort -var container_version_labels="${{ needs.precheck.outputs.container_labels }}" -var container_version_tags="[$container_tags]" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
+          packer build -on-error=abort -var container_version_labels="${labels}" -var container_version_tags="[$container_tags]" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
         shell: bash
 
       # Now that we've built the container, built java-ewb in superpom repo

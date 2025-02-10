@@ -53,14 +53,14 @@ jobs:
 
           if [ ${GITHUB_REF_NAME} == "main" ]; then
             tags="${version} latest"
-            labels="version=${version} commit=${GITHUB_SHA}"
+            labels="TYPE-version=${version} TYPE-commit=${GITHUB_SHA}"
             echo "container_tags=$tags" >> "${GITHUB_OUTPUT}"
             echo "container_labels=$labels" >> "${GITHUB_OUTPUT}"
             echo "base_image=zepben/pipeline-java" >> "${GITHUB_OUTPUT}"
             echo "git_tag=${version}" >> "${GITHUB_OUTPUT}"
           else
             tags="test-${GITHUB_REF_NAME}"
-            labels="version=test-${GITHUB_REF_NAME} commit=${GITHUB_SHA}"
+            labels="TYPE-version=test-${GITHUB_REF_NAME} TYPE-commit=${GITHUB_SHA}"
             echo "container_tags=$tags" >> "${GITHUB_OUTPUT}"
             echo "container_labels=$labels" >> "${GITHUB_OUTPUT}"
             echo "base_image=zepben/pipeline-java:test-${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
@@ -107,14 +107,16 @@ jobs:
           packer init basic.pkr.hcl
           packer validate basic.pkr.hcl
 
-          echo "${{ needs.precheck.outputs.container_labels }}"
+          labels=$(echo "${{ needs.precheck.outputs.container_labels }}" | sed -e "s/TYPE/pipeline-basic/g")
+          echo "Will add labels: '$labels'"
+          
 
           # Split the tag values into an array
           tags=(${{ needs.precheck.outputs.container_tags }})
           # Print every array entry encased by double quotes
           container_tags=$(printf "\"%s\"," "${tags[@]}")
           # Construct the list parameter for the container tags
-          packer build -on-error=abort -var container_version_labels="${{ needs.precheck.outputs.container_labels }}" -var container_version_tags="[$container_tags]" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN basic.pkr.hcl
+          packer build -on-error=abort -var container_version_labels="${labels}" -var container_version_tags="[$container_tags]" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN basic.pkr.hcl
         shell: bash
 
   build-java-amazoncorretto:
@@ -140,14 +142,15 @@ jobs:
           packer init amazoncorretto-config.pkr.hcl
           packer validate amazoncorretto-config.pkr.hcl
 
-          echo "${{ needs.precheck.outputs.container_labels }}"
+          labels=$(echo "${{ needs.precheck.outputs.container_labels }}" | sed -e "s/TYPE/pipeline-java/g")
+          echo "Will add labels: '$labels'"
 
           # Split the passed values into an array
           tags=(${{ needs.precheck.outputs.container_tags }})
           # Print every array entry encased by double quotes
           container_tags=$(printf "\"%s\"," "${tags[@]}")
           # Construct the list parameter for the container tags
-          packer build -on-error=abort -var container_version_labels="${{ needs.precheck.outputs.container_labels }}" -var container_version_tags="[$container_tags]" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
+          packer build -on-error=abort -var container_version_labels="${labels}" -var container_version_tags="[$container_tags]" -var dockerhub_user=$DOCKER_HUB_USER -var dockerhub_pw=$DOCKER_HUB_ACCESS_TOKEN amazoncorretto-config.pkr.hcl
         shell: bash
 
       # Now that we've built the container, built java-ewb in superpom repo

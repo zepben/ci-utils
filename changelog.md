@@ -7,7 +7,7 @@
 * None.
 
 ### Enhancements
-* None.
+* Rename version and commit labels to include the type of the container; ie `pipeline-basic-commit` or `pipeline-java-version`.
 
 ### Fixes
 * None.

@@ -4,7 +4,7 @@
 * None.
 
 ### New Features
-* None.
+* Install GH on `pipeline-java`
 
 ### Enhancements
 * None.

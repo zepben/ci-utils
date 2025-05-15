@@ -10,9 +10,9 @@ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
             <id>zepben-maven</id>
         </server>
         <server>
-            <id>ossrh</id>
-            <username>${ossrh.server.username}</username>
-            <password>${ossrh.server.password}</password>
+            <id>maven-central</id>
+            <username>${maven-central.server.username}</username>
+            <password>${maven-central.server.password}</password>
         </server>
         <server>
             <id>${gpg.key}</id>
@@ -21,7 +21,7 @@ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     </servers>
     <profiles>
         <profile>
-            <id>ossrh</id>
+            <id>maven-central</id>
             <properties>
                 <gpg.keyname>${gpg.key}</gpg.keyname>
                 <gpg.executable>gpg</gpg.executable>
@@ -64,6 +64,6 @@ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     </profiles>
     <activeProfiles>
         <activeProfile>zepben-maven</activeProfile>
-        <activeProfile>ossrh</activeProfile>
+        <activeProfile>maven-central</activeProfile>
     </activeProfiles>
 </settings>

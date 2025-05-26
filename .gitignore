@@ -62,3 +62,9 @@ hs_err_pid*
 /site/
 site.zip
 site.7z
+
+ci-utils/src/ci_utils.egg-info/
+
+ci-utils/src/ci_utils/__pycache__/
+
+*.pyc

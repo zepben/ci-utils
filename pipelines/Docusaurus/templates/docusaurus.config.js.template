@@ -1,0 +1,95 @@
+/*
+ * Copyright 2021 Zeppelin Bend Pty Ltd
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
+import { defaultThemeConfig } from "@zepben/docusaurus-preset";
+const versions = require("./versions.json");
+
+module.exports = {
+    title: "{title}",
+    url: "https://zepben.github.io/",
+    baseUrl: "/evolve/docs/{slug}/",
+    onBrokenLinks: "throw",
+    favicon: "img/favicon.ico",
+    organizationName: "zepben",
+    future: {
+        v4: true,
+        experimental_faster: true,
+    },
+    themeConfig: {
+        colorMode: {
+            defaultMode: "light",
+            disableSwitch: false,
+            respectPrefersColorScheme: true,
+        },
+        navbar: {
+            logo: {
+                alt: "Zepben",
+                src: "img/logo.svg",
+                srcDark: "img/logo-dark.svg",
+                href: "https://www.zepben.com/",
+            },
+            items: [
+                {
+                    to: "https://zepben.github.io/evolve/docs",
+                    label: "Evolve",
+                    position: "left",
+                },
+                {
+                    to: "release-notes",
+                    activeBasePath: "release-notes",
+                    label: "Release Notes",
+                    position: "right",
+                },
+                {
+                    to: "/",
+                    activeBasePath: "/",
+                    label: "Docs",
+                    position: "left",
+                },
+                {
+                    type: "docsVersionDropdown",
+                    position: "right",
+                }
+            ],
+        },
+        footer: {
+            style: "dark",
+            links: [],
+            copyright: `Copyright © ${new Date().getFullYear()} Zeppelin Bend Pty. Ltd.`,
+        },
+        prism: {
+            additionalLanguages: ['kotlin', 'java'],
+        },
+        algolia: {
+            ...defaultThemeConfig.algolia,
+            searchParameters: {
+                facetFilters: ["project:{projectName}"]
+            }
+        },
+        metadata: [{name: 'docsearch:project', content: '{projectName}'}],
+    },
+    presets: [
+        [
+            "@zepben/docusaurus-preset",
+            {
+                gtag: { ...defaultThemeConfig.gtag },
+                docs: {
+                    routeBasePath: '/',
+                    sidebarPath: require.resolve("./sidebars.js"),
+                    versions: versions.reduce((acc, curr) => {
+                        acc[curr] = {label: curr, path: curr};
+                        return acc;
+                    }, {})
+                },
+                theme: {
+                    customCss: require.resolve("./src/css/custom.css"),
+                },
+            },
+        ],
+    ],
+};

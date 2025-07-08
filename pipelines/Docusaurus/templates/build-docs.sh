@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+scripts=$(dirname "$(realpath $0)")
+
+
 # We assume that the docs folder is mounted under current directory.
 # Container will try to use /docs (easy for local builds)
 # CI will use whatever . is
@@ -24,8 +27,8 @@ if [ -f site-config.json ]; then
 
     # parse templates
     eval "$(jq -r 'to_entries[] | "export \(.key)=\"\(.value)\""' site-config.json)"
-    sed -e "s/{title}/${title}/g" -e "s/{slug}/${slug}/g" -e "s/{projectName}/${projectName}/g" docusaurus.config.js.template > ./docusaurus.config.js
-    sed -e "s/{projectName}/${projectName}/g" package.json.template > ./package.json
+    sed -e "s/{title}/${title}/g" -e "s/{slug}/${slug}/g" -e "s/{projectName}/${projectName}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
+    sed -e "s/{projectName}/${projectName}/g" $scripts/package.json.template > ./package.json
 
     # cleanup
     rm -rf *template*

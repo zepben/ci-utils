@@ -11,5 +11,3 @@ RUN mkdir /templates
 COPY ./templates /templates
 
 WORKDIR /docs
-# ENTRYPOINT /templates/build_docs.sh
-# ENTRYPOINT /bin/bash

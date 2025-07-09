@@ -9,25 +9,25 @@ on:
         default: false
 
 jobs:
-  # checks:
-  #   runs-on: ubuntu-latest
-  #   container:  zepben/docusaurus
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         fetch-depth: 0
-  #
-  #     - name: Work around git permission issue
-  #       run: |
-  #         dname=$(echo ${{github.repository}} | cut -d'/' -f2)
-  #         git config --global --add safe.directory /__w/$dname/$dname
-  #       shell: sh
-  #
-  #     - name: Check that build works
-  #       run: |
-  #         # use templates from the current branch
-  #         cd docs
-  #         ../templates/build-docs.sh
+  checks:
+    runs-on: ubuntu-latest
+    container:  zepben/docusaurus
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Work around git permission issue
+        run: |
+          dname=$(echo ${{github.repository}} | cut -d'/' -f2)
+          git config --global --add safe.directory /__w/$dname/$dname
+        shell: sh
+
+      - name: Check that build works
+        run: |
+          # use templates from the current branch
+          cd docs
+          ../templates/build-docs.sh
 
   parse-inputs:
     # needs: [checks]
@@ -147,7 +147,7 @@ jobs:
   finalise-version:
     runs-on: ubuntu-latest
     if: ${{ github.ref_name == 'main' }}
-    container:  zepben/pipeline-basic
+    container: zepben/pipeline-basic
     needs: [build-docusaurus-pipeline]
     env:
       GITHUB_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}

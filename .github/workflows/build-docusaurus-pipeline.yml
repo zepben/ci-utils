@@ -147,7 +147,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.ref_name == 'main' }}
     container: zepben/pipeline-basic
-    needs: [build-docusaurus-pipeline]
+    needs: [build-docusaurus-pipeline, parse-inputs]
     env:
       GITHUB_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
     steps:
@@ -171,6 +171,6 @@ jobs:
           git branch -a
           git merge origin/release
           git push origin ${GITHUB_REF/refs\/heads\//}
-          git tag "${{ needs.precheck.outputs.git_tag }}"
+          git tag "${{ needs.parse-inputs.outputs.git_tag }}"
           git push --tags
           git push origin -d release

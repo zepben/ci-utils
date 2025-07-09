@@ -137,11 +137,10 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: pipelines/Docusaurus
+          context: "./pipelines/Docusaurus"
           push: ${{ inputs.push_image }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          file: 'Dockerfile'
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

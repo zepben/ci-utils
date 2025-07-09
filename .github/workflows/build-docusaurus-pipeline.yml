@@ -145,7 +145,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.ref_name == 'main' }}
     container:  zepben/pipeline-basic
-    needs: [precheck]
+    needs: [build-docusaurus-pipeline]
     env:
       GITHUB_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
     steps:

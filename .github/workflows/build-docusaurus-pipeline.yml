@@ -2,6 +2,11 @@ name: Create Docusaurus pipleine
 
 on:
   workflow_dispatch:
+    inputs:
+      push_image:
+        description: If the image should be pushed
+        type: boolean
+        default: false
 
 jobs:
   # checks:
@@ -125,8 +130,8 @@ jobs:
             org.opencontainers.image.vendor=Zepben
             org.opencontainers.image.version=${{ needs.parse-inputs.outputs.git_tag }}
           tags: |
-            type=raw,value=sha-${{ steps.sha.outputs.short_ref }},enable=true,priority=200
-            type=raw,value=${{ needs.parse-inputs.outputs.git_tag }},enable=true,priority=900
+            type=raw,value=sha-${{ steps.sha.outputs.short_ref }},priority=200
+            type=raw,value=${{ needs.parse-inputs.outputs.git_tag }},priority=900
             type=raw,value=latest,enable=${{ github.ref_name == 'main' }},priority=100
 
       - name: Build and push
@@ -139,7 +144,6 @@ jobs:
           file: pipelines/Docusaurus/Dockefile
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: ${{ inputs.build-args }}
 
   finalise-version:
     runs-on: ubuntu-latest

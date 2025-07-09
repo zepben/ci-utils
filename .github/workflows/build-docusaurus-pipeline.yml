@@ -125,8 +125,8 @@ jobs:
             org.opencontainers.image.vendor=Zepben
             org.opencontainers.image.version=${{ needs.parse-inputs.outputs.git_tag }}
           tags: |
-            type=raw,value=sha-${{ steps.sha.outputs.short_ref }},priority=200
-            type=raw,value=${{ needs.parse-inputs.outputs.git_tag }},priority=900
+            type=raw,value=sha-${{ steps.sha.outputs.short_ref }},enable=true,priority=200
+            type=raw,value=${{ needs.parse-inputs.outputs.git_tag }},enable=true,priority=900
             type=raw,value=latest,enable=${{ github.ref_name == 'main' }},priority=100
 
       - name: Build and push

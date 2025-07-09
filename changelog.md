@@ -4,7 +4,7 @@
 * None.
 
 ### New Features
-* None.
+* Add Docusaurus pipeline, workflow and test scripts.
 
 ### Enhancements
 * None.

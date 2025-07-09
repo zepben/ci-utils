@@ -141,7 +141,7 @@ jobs:
           push: ${{ inputs.push_image }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          file: Dockefile
+          file: Dockerfile
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

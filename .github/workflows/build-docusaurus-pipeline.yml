@@ -26,7 +26,7 @@ jobs:
       - name: Check that build works
         run: |
           # use templates from the current branch
-          cd docs
+          cd pipelines/Docusaurus/docs
           ../templates/build-docs.sh
 
   parse-inputs:

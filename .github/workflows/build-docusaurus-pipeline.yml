@@ -30,7 +30,7 @@ jobs:
           ../templates/build-docs.sh
 
   parse-inputs:
-    # needs: [checks]
+    needs: [checks]
     runs-on: ubuntu-latest
     container:  zepben/pipeline-basic
     outputs:

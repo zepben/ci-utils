@@ -33,9 +33,11 @@ if [ -f site-config.json ]; then
     # cleanup
     rm -rf *template*
     rm -rf build-docs.sh
+else
+    echo "Building Docusaurus2 site"
 fi
 
-if [ "$1" != "skip-build" ]; then 
+if [ "$1" != "--skip-build" ]; then 
     npm ci
     npm run build
 fi

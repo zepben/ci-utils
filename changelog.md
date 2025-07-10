@@ -7,7 +7,8 @@
 * None.
 
 ### Enhancements
-* None.
+* Added debug message to indicate we're building for Docusaurus2.
+* Change "skip-build" param to "--skip-build" 
 
 ### Fixes
 * None.

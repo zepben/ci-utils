@@ -24,7 +24,7 @@ java_build_tool() {
 java_build_tool "${options[@]}"
 
 info "Version: $version"
-sem_version=${version/-SNAPSHOT*/}
+sem_version=${version/b*/}
 info "Sem Version: $sem_version"
 
 run_build() {
@@ -32,7 +32,7 @@ run_build() {
 }
 
 deploy_lib(){
-    if [[ " ${options[@]} " =~ " --snapshot " && $version != *"-SNAPSHOT"* ]]; then
+    if [[ " ${options[@]} " =~ " --snapshot " && $version != *"b"* ]]; then
         info "--snapshot option is only for non finalized versions. Skipping deployment."
         exit 0
     fi
@@ -41,7 +41,7 @@ deploy_lib(){
 }
 
 package(){
-    if [[ " ${options[@]} " =~ " --snapshot " && $version != *"-SNAPSHOT"* ]]; then
+    if [[ " ${options[@]} " =~ " --snapshot " && $version != *"b"* ]]; then
         info "--snapshot option is only for non finalized versions. Skipping deployment."
         exit 0
     fi
@@ -61,27 +61,27 @@ write_new_version(){
 
 update_version(){
     incr_version $version_type $version
-    write_new_version $version "${new_version}-SNAPSHOT1"
+    write_new_version $version "${new_version}b1"
 }
 
 update_snapshot_version(){
-    new_version=${version%-SNAPSHOT*}
-    beta=${version##*-SNAPSHOT}
+    new_version=${version%b*}
+    beta=${version##*b}
     beta=$((++beta))
-    write_new_version $version "${new_version}-SNAPSHOT${beta}"
+    write_new_version $version "${new_version}b${beta}"
 }
 
 find_unreleased_version() {
-    unreleased_version=${new_version/-SNAPSHOT*/}
+    unreleased_version=${new_version/b*/}
 }
 
 finalize_version(){
-    new_version=${version/-SNAPSHOT*/}
-    sed -i "s/-SNAPSHOT[0-9]*//g" $file
+    new_version=${version/b*/}
+    sed -i "s/b[0-9]*//g; s/-SNAPSHOT[0-9]*//g" $file
 }
 
 check_release_version(){
-    if [[ $version == *"-SNAPSHOT" ]]; then
+    if [[ $version == *"b" ]]; then
         fail "Version cannot be snapshot."
     fi
 }

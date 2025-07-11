@@ -10,7 +10,7 @@
 * None.
 
 ### Fixes
-* None.
+* Fix sed pattern for removing 'b' from snapshots in maven builds.
 
 ### Notes
 * None.

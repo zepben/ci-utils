@@ -1,7 +1,7 @@
 # CI-Utils
 ## [6.10.0] - UNRELEASED
 ### Breaking Changes
-* None.
+* Change the `-SNAPSHOT` nomenclature for the snapshots in maven to `b`. This aligns with python pattern but breaks all maven snapshot builds.
 
 ### New Features
 * None.

@@ -1,5 +1,5 @@
 #!/bin/bash
-# * Finalize release version by removing SNAPSHOT, next, etc.
+# * Finalize release version by removing "b", "next", etc.
 # * Tag and push the commit to a branch named release.
 # * A new entry of changelog is added when command is specified.
 # Options:

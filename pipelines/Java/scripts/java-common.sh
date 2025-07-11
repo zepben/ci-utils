@@ -77,7 +77,8 @@ find_unreleased_version() {
 
 finalize_version(){
     new_version=${version/b*/}
-    sed -i "s/b[0-9]*//g; s/-SNAPSHOT[0-9]*//g" $file
+    sed -i "s/\(<version>.*\)b.*\(<\/version>\)/\1\2/g; s/-SNAPSHOT[0-9]*//g" $file
+
 }
 
 check_release_version(){

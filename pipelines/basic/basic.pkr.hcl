@@ -36,18 +36,23 @@ source "docker" "image" {
 build {
   sources = ["source.docker.image"]
 
-  provisioner "file" {
-    destination = "/scripts"
-    source      = "./scripts/"
-  }
-
   provisioner "shell" {
     scripts = ["install-dependencies.sh", "../init.sh"]
   }
 
   provisioner "file" {
     destination = "/scripts"
+    source      = "./scripts/"
+  }
+
+  provisioner "file" {
+    destination = "/scripts"
     source      = "../scripts/"
+  }
+
+  provisioner "file" {
+    source      = "gitleaks.toml"
+    destination = "/configs/gitleaks.toml"
   }
 
   provisioner "file" {

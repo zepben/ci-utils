@@ -17,6 +17,8 @@ apk add --no-cache \
 
 apk add --no-cache --upgrade bash
 
+mkdir -p /scripts
+mkdir -p /configs
 
 cat > /scripts/.bashrc << EOF
 alias release-checks="bash /scripts/release-checks.sh";

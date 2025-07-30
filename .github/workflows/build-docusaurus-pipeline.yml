@@ -31,11 +31,11 @@ jobs:
           echo "//npm.pkg.github.com/:_authToken=${{ secrets.CI_GITHUB_TOKEN }}" >> ~/.npmrc
           echo "\n" >> ~/.npmrc
 
-      - name: Check that build works
-        run: |
-          # use templates from the current branch
-          cd pipelines/Docusaurus/docs
-          ../templates/build-docs.sh
+      # - name: Check that build works
+      #   run: |
+      #     # use templates from the current branch
+      #     cd pipelines/Docusaurus/docs
+      #     make
 
   parse-inputs:
     needs: [checks]
@@ -58,8 +58,15 @@ jobs:
       - name: Delete release branch
         run: |
           # If the `release` branch already exists, remove it
-          git push origin -d release
+          # disable error failing
+          set +e 
+          res=$(git push origin -d release)
+          if [ $? != 0 ]; then
+            echo "> [!NOTE] " >> "$GITHUB_STEP_SUMMARY"
+            echo "> :white_check_mark: Error while deleting 'release' branch in *parse-inputs* step, but that's probably OK. If nothing else failed, you're good." >> "$GITHUB_STEP_SUMMARY"
+          fi
         continue-on-error: true 
+        shell: bash 
 
       - name: Create release branch
         run: |

@@ -3,7 +3,7 @@
 scripts=$(dirname "$(realpath $0)")
 
 
-# We assume that the docs folder is mounted under current directory.
+# We assume that the docs folder is mounted under CURRENT directory.
 # Container will try to use /docs (easy for local builds)
 # CI will use whatever . is
 
@@ -15,13 +15,15 @@ scripts=$(dirname "$(realpath $0)")
 release_notes="./src/pages/release-notes.md"
 if [ -f site-config.json ]; then
     # We're building Docusaurus 3
+    echo "Building docs with Docusaurus3"
 
+    # release-notes are now in the root of the docs
     if [ ! -f release-notes.md ]; then
-        echo "The file release-notes.json seems to be missing! Please check and try again!" 
+        echo "The file release-notes.json seems to be missing! Please check it's located in <repo>/docs folder and try again!" 
         exit 1
     fi
 
-    # Move the templates and place release-notes in src/pages
+    # Move the templates and place release-notes in src/pages for the build
     cp -r /templates/* .
     cp release-notes.md "${release_notes}"
 
@@ -34,7 +36,7 @@ if [ -f site-config.json ]; then
     rm -rf *template*
     rm -rf build-docs.sh
 else
-    echo "Building Docusaurus2 site"
+    echo "Building docs with Docusaurus2"
 fi
 
 if [ "$1" != "--skip-build" ]; then 

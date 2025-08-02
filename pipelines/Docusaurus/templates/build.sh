@@ -49,7 +49,7 @@ if [ -f site-config.json ]; then
 
     # cleanup
     rm -rf *template*
-    rm -rf build-docs.sh
+    rm -rf build.sh
 else
     echo "Building docs with Docusaurus2"
 fi

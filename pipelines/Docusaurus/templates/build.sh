@@ -2,8 +2,16 @@
 
 scripts=$(dirname "$(realpath $0)")
 
+# Lazily parse args
+if [[ "$1" == "--skip-build" || "$2" == "--skip-build" ]]; then 
+    skip_build="yes"
+fi
 
-# We assume that the docs folder is mounted under current directory.
+if [[ "$1" == "--skip-templates" || "$2" == "--skip-templates" ]]; then 
+    skip_template="yes"
+fi
+
+# We assume that the docs folder is mounted under CURRENT directory.
 # Container will try to use /docs (easy for local builds)
 # CI will use whatever . is
 
@@ -15,29 +23,38 @@ scripts=$(dirname "$(realpath $0)")
 release_notes="./src/pages/release-notes.md"
 if [ -f site-config.json ]; then
     # We're building Docusaurus 3
+    echo "Building docs with Docusaurus3"
 
+    # release-notes are now in the root of the docs
     if [ ! -f release-notes.md ]; then
-        echo "The file release-notes.json seems to be missing! Please check and try again!" 
+        echo "The file release-notes.json seems to be missing! Please check it's located in <repo>/docs folder and try again!" 
         exit 1
     fi
 
-    # Move the templates and place release-notes in src/pages
-    cp -r /templates/* .
+    # if running CI/local job, move the templates and place release-notes in src/pages for the build
+    if [[ -d /templates && "${skip_template}" != "yes" ]]; then
+        cp -r /templates/* .
+    fi
     cp release-notes.md "${release_notes}"
 
     # parse templates
+    # if testing, and you've forgot to copy templates, error out
+    if [ ! -f package.json.template ]; then
+        echo "If you're running locally, copy the templates here first and rerun. Otherwise, something went wrong, talk to CI people"
+        exit 1
+    fi
     eval "$(jq -r 'to_entries[] | "export \(.key)=\"\(.value)\""' site-config.json)"
     sed -e "s/{title}/${title}/g" -e "s/{slug}/${slug}/g" -e "s/{projectName}/${projectName}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
     sed -e "s/{projectName}/${projectName}/g" $scripts/package.json.template > ./package.json
 
     # cleanup
     rm -rf *template*
-    rm -rf build-docs.sh
+    rm -rf build.sh
 else
-    echo "Building Docusaurus2 site"
+    echo "Building docs with Docusaurus2"
 fi
 
-if [ "$1" != "--skip-build" ]; then 
+if [ "${skip_build}" != "yes" ]; then 
     npm ci
     npm run build
 fi

@@ -5,6 +5,8 @@ RUN apk add --no-cache \
  git \
  zip \
  bash \
+ make \
+ tar \
  jq 
  
 RUN mkdir /templates

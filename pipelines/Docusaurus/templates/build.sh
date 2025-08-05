@@ -8,7 +8,7 @@ if [[ "$1" == "--skip-build" || "$2" == "--skip-build" ]]; then
 fi
 
 if [[ "$1" == "--skip-templates" || "$2" == "--skip-templates" ]]; then 
-    skip_template="yes"
+    skip_templates="yes"
 fi
 
 # We assume that the docs folder is mounted under CURRENT directory.
@@ -39,7 +39,7 @@ if [ -f site-config.json ]; then
     mv "${release_notes}" release-notes.md
 
     # if running CI/local job, move the templates and place release-notes in src/pages for the build
-    if [[ -d /templates && "${skip_template}" != "yes" ]]; then
+    if [[ -d /templates && "${skip_templates}" != "yes" ]]; then
         cp -r /templates/* .
     fi
 

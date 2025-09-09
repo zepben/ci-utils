@@ -1,8 +1,9 @@
 default: test
 
 test: 
-	cp -r ../templates/* .
-	./build.sh --skip-templates
+	cp -r ../templates/* site-config/
+	./site-config/build.sh
 
 clean:
-	rm -rf package* docusaurus* node_modules* doc3.sh
+	rm -rf site-config/docs site-config/version*
+	rm -rf site-config/package* site-config/docusaurus* site-config/node_modules site-config/build.sh site-config/tsconfig.json

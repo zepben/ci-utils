@@ -20,8 +20,9 @@ fi
 # and the "project" meta tag. 
 
 # Check that site-config.json is provided
-release_notes="./src/pages/release-notes.md"
-if [ -f site-config.json ]; then
+release_notes="./site-config/release-notes.md"
+if [ -f ./site-config/site-config.json ]; then
+    docusaurus3="yes"
     # We're building Docusaurus 3
 
     echo 
@@ -29,36 +30,6 @@ if [ -f site-config.json ]; then
     echo "#  Building docs with Docusaurus3  #"
     echo "####################################"
     echo 
-
-
-    # we want to keep working with release-notes in src/pages/release-notes
-    # but also have stuff in src/ templated.
-    # so here we move release-notes aside, restore templates and move them back.
-
-    # save release-notes first
-    mv "${release_notes}" release-notes.md
-
-    # if running CI/local job, move the templates and place release-notes in src/pages for the build
-    if [[ -d /templates && "${skip_templates}" != "yes" ]]; then
-        cp -r /templates/* .
-    fi
-
-    # Move release-notes back
-    mv release-notes.md "${release_notes}"
-
-    # parse templates
-    # if testing, and you've forgot to copy templates, error out
-    if [ ! -f package.json.template ]; then
-        echo "If you're running locally, copy the templates here first and rerun. Otherwise, something went wrong, talk to CI people"
-        exit 1
-    fi
-    eval "$(jq -r 'to_entries[] | "export \(.key)=\"\(.value)\""' site-config.json)"
-    sed -e "s/{title}/${title}/g" -e "s/{slug}/${slug}/g" -e "s/{projectName}/${projectName}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
-    sed -e "s/{projectName}/${projectName}/g" $scripts/package.json.template > ./package.json
-
-    # cleanup
-    rm -rf *template*
-    rm -rf build.sh
 else
     echo 
     echo "####################################"
@@ -67,7 +38,55 @@ else
     echo 
 fi
 
+if [ "${docusaurus3}" = "yes" ]; then
+    cd site-config
+
+    # we want to keep working with release-notes in src/pages/release-notes
+    # but also have stuff in src/ templated.
+    # so here we move release-notes aside, restore templates and move them back.
+
+    # if running CI/local job, move the templates and place release-notes in src/pages for the build
+    if [[ -d /templates && "${skip_templates}" != "yes" ]]; then
+        cp -r /templates/* .
+    fi
+
+    # Move release-notes back
+    # mv release-notes.md "${release_notes}"
+
+    # parse templates
+    # if testing, and you've forgot to copy templates, error out
+    if [ ! -f package.json.template ]; then
+        echo "If you're running locally, copy the templates here first and rerun. Otherwise, something went wrong, talk to CI people"
+        exit 1
+    fi
+    eval "$(jq -r 'to_entries[] | "export \(.key)=\"\(.value)\""' site-config.json)"
+
+    # repo=$(gh repo view --json "name" -q '.name')
+    repo="mvn-lib-ci-test"
+    sed -e "s/{title}/${title}/g" -e "s/{slug}/${repo}/g" -e "s/{projectName}/${repo}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
+    sed -e "s/{projectName}/${repo}/g" $scripts/package.json.template > ./package.json
+
+    # link previous versions
+    ln -s ../archive/* .
+
+    # link the current docs
+    ln -s ../docs .
+
+    # Place release-notes
+    cp release-notes.md src/pages/release-notes.md
+
+    # cleanup
+    rm -rf *template*
+    rm -rf build.sh
+
+    # go pack to main docs
+    cd ..
+fi
+
 if [ "${skip_build}" != "yes" ]; then 
+    if [ "${docusaurus3}" = "yes" ]; then
+        cd site-config
+    fi
     npm ci
     npm run build
 fi

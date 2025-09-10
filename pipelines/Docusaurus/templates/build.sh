@@ -15,22 +15,18 @@ fi
 # Container will try to use /docs (easy for local builds)
 # CI will use whatever . is
 
-# site-config.json provides the values that we put into the package.json and docusaurus.config.js
-# These values in most cases are just the name of the project, slug (where to access it in the doco site) 
-# and the "project" meta tag. 
-
 # Check that site-config.json is provided
 release_notes="./site-config/release-notes.md"
-if [ -f ./site-config/site-config.json ]; then
+if [ -f "${release_notes}" ]; then
     docusaurus3="yes"
     # We're building Docusaurus 3
-
     echo 
     echo "####################################"
     echo "#  Building docs with Docusaurus3  #"
     echo "####################################"
     echo 
 else
+    # We're building Docusaurus 4
     echo 
     echo "####################################"
     echo "#  Building docs with Docusaurus2  #"
@@ -59,10 +55,16 @@ if [ "${docusaurus3}" = "yes" ]; then
         echo "If you're running locally, copy the templates here first and rerun. Otherwise, something went wrong, talk to CI people"
         exit 1
     fi
-    eval "$(jq -r 'to_entries[] | "export \(.key)=\"\(.value)\""' site-config.json)"
 
-    # repo=$(gh repo view --json "name" -q '.name')
-    repo="mvn-lib-ci-test"
+
+    # repo will be fetched from CI; for local we will use environment variable REPO_NAME (if there) or "local-test-docs"
+    if [ "$GITHUB_ACTIONS" = "true" ]; then
+        repo=$(gh repo view --json "name" -q '.name')
+    else
+        repo=${REPO_NAME:-"local-test-docs"}
+    fi
+    # title needs to be fetched from CI's repo environment, for local we'll use "Docs in test"
+    title=${REPO_DOCS_TITLE:-"Docs in test"}
     sed -e "s/{title}/${title}/g" -e "s/{slug}/${repo}/g" -e "s/{projectName}/${repo}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
     sed -e "s/{projectName}/${repo}/g" $scripts/package.json.template > ./package.json
 

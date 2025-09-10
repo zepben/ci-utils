@@ -26,7 +26,7 @@ if [ -f "${release_notes}" ]; then
     echo "####################################"
     echo 
 else
-    # We're building Docusaurus 4
+    # We're building Docusaurus 2
     echo 
     echo "####################################"
     echo "#  Building docs with Docusaurus2  #"

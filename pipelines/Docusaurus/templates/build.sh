@@ -57,14 +57,17 @@ if [ "${docusaurus3}" = "yes" ]; then
     fi
 
 
-    # repo will be fetched from CI; for local we will use environment variable REPO_NAME (if there) or "local-test-docs"
-    if [ "$GITHUB_ACTIONS" = "true" ]; then
-        repo=$(gh repo view --json "name" -q '.name')
+    # repo will be fetched from environment variable REPO_NAME (if there) or "local-test-docs"
+    if [ ! -z "${REPO_NAME}" ]; then
+        repo=$(echo ${REPO_NAME} | cut -f2 -d\/)
     else
-        repo=${REPO_NAME:-"local-test-docs"}
+        repo="local-test-docs"
     fi
+
     # title needs to be fetched from CI's repo environment, for local we'll use "Docs in test"
     title=${REPO_DOCS_TITLE:-"Docs in test"}
+
+    echo "Filling templates with title '$title' and repo name '$repo'"
     sed -e "s/{title}/${title}/g" -e "s/{slug}/${repo}/g" -e "s/{projectName}/${repo}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
     sed -e "s/{projectName}/${repo}/g" $scripts/package.json.template > ./package.json
 

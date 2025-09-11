@@ -35,6 +35,9 @@ else
 fi
 
 if [ "${docusaurus3}" = "yes" ]; then
+
+    parent=$(pwd)
+
     cd site-config
 
     # we want to keep working with release-notes in src/pages/release-notes
@@ -71,11 +74,13 @@ if [ "${docusaurus3}" = "yes" ]; then
     sed -e "s/{title}/${title}/g" -e "s/{slug}/${repo}/g" -e "s/{projectName}/${repo}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
     sed -e "s/{projectName}/${repo}/g" $scripts/package.json.template > ./package.json
 
-    # link previous versions
-    ln -s ../archive/* .
+    # cp previous versions
+    # docusaurus will create versioned_docs links instead of actual folders, so we'll need to copy them
+    # back to the archive folder with link dereference. We'll do this in docusaurus-action. That's why we can't use links here.
+    cp -r ${parent}/archive/* .
 
     # link the current docs
-    ln -s ../docs .
+    ln -s ${parent}/docs .
 
     # link the release-notes
     ln -s $(pwd)/release-notes.md src/pages/release-notes.md

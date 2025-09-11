@@ -5,5 +5,4 @@ test:
 	./site-config/build.sh
 
 clean:
-	rm -rf site-config/docs site-config/version*
-	rm -rf site-config/package* site-config/docusaurus* site-config/node_modules site-config/build.sh site-config/tsconfig.json
+	cd site-config; rm -rf docs version* package* docusaurus* node_modules build* tsconfig.json src

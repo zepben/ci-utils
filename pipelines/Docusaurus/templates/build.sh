@@ -65,7 +65,7 @@ if [ "${docusaurus3}" = "yes" ]; then
     fi
 
     # title needs to be fetched from CI's repo environment, for local we'll use "Docs in test"
-    title=${REPO_DOCS_TITLE:-"Docs in test"}
+    title=${DOCS_TITLE:-"Docs in test"}
 
     echo "Filling templates with title '$title' and repo name '$repo'"
     sed -e "s/{title}/${title}/g" -e "s/{slug}/${repo}/g" -e "s/{projectName}/${repo}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
@@ -77,8 +77,8 @@ if [ "${docusaurus3}" = "yes" ]; then
     # link the current docs
     ln -s ../docs .
 
-    # Place release-notes
-    cp release-notes.md src/pages/release-notes.md
+    # link the release-notes
+    ln -s $(pwd)/release-notes.md src/pages/release-notes.md
 
     # cleanup
     rm -rf *template*

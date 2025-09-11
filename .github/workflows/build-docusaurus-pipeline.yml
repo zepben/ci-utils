@@ -34,7 +34,6 @@ jobs:
         run: |
           # use templates from the current branch
           cd pipelines/Docusaurus/docs
-          cp -rf ~/.npmrc site-config/
           make
 
   parse-inputs:

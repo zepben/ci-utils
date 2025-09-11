@@ -7,6 +7,8 @@ if [[ "$1" == "--skip-build" || "$2" == "--skip-build" ]]; then
     skip_build="yes"
 fi
 
+# skip-templates could be used for local/CI testing of the actual pipeline,
+# as the files would be taken from the git repo and not the container.
 if [[ "$1" == "--skip-templates" || "$2" == "--skip-templates" ]]; then 
     skip_templates="yes"
 fi

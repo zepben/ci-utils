@@ -38,8 +38,6 @@ fi
 
 if [ "${docusaurus3}" = "yes" ]; then
 
-    parent=$(pwd)
-
     cd site-config
 
     # we want to keep working with release-notes in src/pages/release-notes
@@ -79,10 +77,10 @@ if [ "${docusaurus3}" = "yes" ]; then
     # cp previous versions
     # docusaurus will create versioned_docs links instead of actual folders, so we'll need to copy them
     # back to the archive folder with link dereference. We'll do this in docusaurus-action. That's why we can't use links here.
-    cp -r ${parent}/archive/* .
+    cp -r ../archive/* .
 
     # link the current docs
-    ln -s ${parent}/docs .
+    ln -s ../docs .
 
     # link the release-notes
     ln -s $(pwd)/release-notes.md src/pages/release-notes.md

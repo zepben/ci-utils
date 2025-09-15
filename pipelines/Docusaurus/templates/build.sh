@@ -2,55 +2,55 @@
 
 scripts=$(dirname "$(realpath $0)")
 
-# Lazily parse args
-if [[ "$1" == "--skip-build" || "$2" == "--skip-build" ]]; then 
-    skip_build="yes"
-fi
-
-# skip-templates could be used for local/CI testing of the actual pipeline,
-# as the files would be taken from the git repo and not the container.
-if [[ "$1" == "--skip-templates" || "$2" == "--skip-templates" ]]; then 
-    skip_templates="yes"
-fi
-
 # We assume that the docs folder is mounted under CURRENT directory.
 # Container will try to use /docs (easy for local builds)
 # CI will use whatever . is
 
-# Check that site-config.json is provided
-release_notes="./site-config/release-notes.md"
-if [ -f "${release_notes}" ]; then
-    docusaurus3="yes"
-    # We're building Docusaurus 3
-    echo 
-    echo "####################################"
-    echo "#  Building docs with Docusaurus3  #"
-    echo "####################################"
-    echo 
-else
-    # We're building Docusaurus 2
-    echo 
-    echo "####################################"
-    echo "#  Building docs with Docusaurus2  #"
-    echo "####################################"
-    echo 
-fi
+docs=$(pwd)
+site_dir=$(pwd)
+release_notes="${docs}/site-config/release-notes.md"
 
-if [ "${docusaurus3}" = "yes" ]; then
+# Lazily parse args
+for arg in "$@"; do
+  case "$arg" in
+    "--skip-build")
+      skip_build="yes"
+      ;;
+    "--skip-templates")
+      skip_templates="yes"
+      ;;
+  esac
+done
 
-    cd site-config
-
-    # we want to keep working with release-notes in src/pages/release-notes
-    # but also have stuff in src/ templated.
-    # so here we move release-notes aside, restore templates and move them back.
-
-    # if running CI/local job, move the templates and place release-notes in src/pages for the build
-    if [[ -d /templates && "${skip_templates}" != "yes" ]]; then
-        cp -r /templates/* .
+function detect_version() {
+    if [ -f "${release_notes}" ]; then
+        docusaurus3="yes"
+        site_dir="${docs}/site-config"
+        # We're building Docusaurus 3
+        echo 
+        echo "####################################"
+        echo "#  Building docs with Docusaurus3  #"
+        echo "####################################"
+        echo 
+    else
+        # We're building Docusaurus 2
+        echo 
+        echo "####################################"
+        echo "#  Building docs with Docusaurus2  #"
+        echo "####################################"
+        echo 
     fi
+}
 
-    # Move release-notes back
-    # mv release-notes.md "${release_notes}"
+function copy_templates() {
+    # if running on CI/local job, move the templates to the site-config
+    if [[ "${skip_templates}" != "yes" ]]; then
+        cp -r /templates/* ${site_dir}/
+    fi
+}
+
+function configure_site() {
+    pushd "${site_dir}"
 
     # parse templates
     # if testing, and you've forgot to copy templates, error out
@@ -62,41 +62,46 @@ if [ "${docusaurus3}" = "yes" ]; then
 
     # repo will be fetched from environment variable REPO_NAME (if there) or "local-test-docs"
     if [ ! -z "${REPO_NAME}" ]; then
-        repo=$(echo ${REPO_NAME} | cut -f2 -d\/)
+        # cut the ".*/" before the repo name, ie "octopus/zepben" becomes "zepben"
+        component=${REPO_NAME#*/}
     else
-        repo="local-test-docs"
+        component="local-test-docs"
     fi
 
     # title needs to be fetched from CI's repo environment, for local we'll use "Docs in test"
     title=${DOCS_TITLE:-"Docs in test"}
 
     echo "Filling templates with title '$title' and repo name '$repo'"
-    sed -e "s/{title}/${title}/g" -e "s/{slug}/${repo}/g" -e "s/{projectName}/${repo}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
-    sed -e "s/{projectName}/${repo}/g" $scripts/package.json.template > ./package.json
+    sed -e "s/{title}/${title}/g" -e "s/{slug}/${component}/g" -e "s/{projectName}/${component}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
+    sed -e "s/{projectName}/${component}/g" $scripts/package.json.template > ./package.json
 
     # cp previous versions
     # docusaurus will create versioned_docs links instead of actual folders, so we'll need to copy them
-    # back to the archive folder with link dereference. We'll do this in docusaurus-action. That's why we can't use links here.
+    # back to the archive folder with link dereference. We'll do this in docusaurus-action. That's why we don't use links here.
     cp -r ../archive/* .
 
-    # link the current docs
+    # link the current docs, it works fine
     ln -s ../docs .
 
-    # link the release-notes
-    ln -s $(pwd)/release-notes.md src/pages/release-notes.md
+    # link the release-notes, same
+    ln -s ${release_notes} src/pages/release-notes.md
 
     # cleanup
     rm -rf *template*
     rm -rf build.sh
 
     # go pack to main docs
-    cd ..
+    popd
+}
+
+detect_version
+if [ "${docusaurus3}" = "yes" ]; then
+    copy_templates
+    configure_site
 fi
 
 if [ "${skip_build}" != "yes" ]; then 
-    if [ "${docusaurus3}" = "yes" ]; then
-        cd site-config
-    fi
+    cd "${site_dir}"
     npm ci
     npm run build
 fi

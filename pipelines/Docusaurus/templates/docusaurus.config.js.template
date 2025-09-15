@@ -12,7 +12,7 @@ const versions = require("./versions.json");
 module.exports = {
     title: "{title}",
     url: "https://zepben.github.io/",
-    baseUrl: "/evolve/docs/{slug}/",
+    baseUrl: "/evolve/docs/{component}/",
     onBrokenLinks: "throw",
     favicon: "img/favicon.ico",
     organizationName: "zepben",
@@ -68,10 +68,10 @@ module.exports = {
         algolia: {
             ...defaultThemeConfig.algolia,
             searchParameters: {
-                facetFilters: ["project:{projectName}"]
+                facetFilters: ["project:{component}"]
             }
         },
-        metadata: [{name: 'docsearch:project', content: '{projectName}'}],
+        metadata: [{name: 'docsearch:project', content: '{component}'}],
     },
     presets: [
         [

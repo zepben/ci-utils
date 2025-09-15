@@ -72,8 +72,8 @@ function configure_site() {
     title=${DOCS_TITLE:-"Docs in test"}
 
     echo "Filling templates with title '$title' and repo name '$component'"
-    sed -e "s/{title}/${title}/g" -e "s/{slug}/${component}/g" -e "s/{projectName}/${component}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
-    sed -e "s/{projectName}/${component}/g" $scripts/package.json.template > ./package.json
+    sed -e "s/{title}/${title}/g" -e "s/{component}/${component}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
+    sed -e "s/{component}/${component}/g" $scripts/package.json.template > ./package.json
 
     # cp previous versions
     # docusaurus will create versioned_docs links instead of actual folders, so we'll need to copy them

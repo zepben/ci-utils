@@ -71,7 +71,7 @@ function configure_site() {
     # title needs to be fetched from CI's repo environment, for local we'll use "Docs in test"
     title=${DOCS_TITLE:-"Docs in test"}
 
-    echo "Filling templates with title '$title' and repo name '$repo'"
+    echo "Filling templates with title '$title' and repo name '$component'"
     sed -e "s/{title}/${title}/g" -e "s/{slug}/${component}/g" -e "s/{projectName}/${component}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
     sed -e "s/{projectName}/${component}/g" $scripts/package.json.template > ./package.json
 

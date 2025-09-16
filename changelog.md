@@ -7,7 +7,7 @@
 * None.
 
 ### Enhancements
-* None.
+* Few enhancements for the Docusaurus pipeline - build script improved.
 
 ### Fixes
 * None.

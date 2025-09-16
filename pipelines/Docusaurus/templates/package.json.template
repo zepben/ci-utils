@@ -1,5 +1,5 @@
 {
-  "name": "{projectName}-docs",
+  "name": "{component}",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@zepben/docusaurus-components": "0.9.4",
-    "@zepben/docusaurus-preset": "0.13.2"
+    "@zepben/docusaurus-preset": "0.13.4"
   },
   "browserslist": {
     "production": [

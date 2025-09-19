@@ -83,8 +83,10 @@ function configure_site() {
     # link the current docs, it works fine
     ln -s ../docs .
 
-    # link the release-notes, same
-    ln -s ${release_notes} src/pages/release-notes.md
+    # link the release-notes
+    pushd src/pages
+    ln -s ../../release-notes.md .
+    popd
 
     # cleanup
     rm -rf *template*

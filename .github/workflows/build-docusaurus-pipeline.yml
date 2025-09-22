@@ -53,7 +53,7 @@ jobs:
       # only update node_modules in the container if there's a change
       - name: Zip node_modules
         id: zip
-        if: ${{ steps.store.outputs.modules } == 'yes'
+        if: steps.store.outputs.modules  == 'yes'
         run: |
           cd pipelines/Docusaurus/docs/site-config
           zip -r node_modules.zip node_modules/ 

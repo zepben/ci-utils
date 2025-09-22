@@ -53,15 +53,10 @@ jobs:
           fi
         shell: bash
 
-      - name: Debug
-        run: |
-          echo "Modules: ${{ steps.store.modules }}"
-          echo "Env: ${{ env.modules }}"
-          exit 1
-
       # only update node_modules in the container if there's a change
       - name: Zip node_modules
-        if: steps.store.modules == 'yes'
+        id: zip
+        if: ${{ env.modules }} == 'yes'
         run: |
           cd pipelines/Docusaurus/docs/docs
           zip -r node_modules.zip node_modules/ 
@@ -69,7 +64,7 @@ jobs:
 
       - name: Upload node_modules
         uses: actions/upload-artifact@v4
-        if: steps.store.modules == 'yes'
+        if: steps.zip.outcome == 'success'
         with:
           name: pipelines/Docusaurus/docs/docs/node_modules.zip
           path: node_modules.zip

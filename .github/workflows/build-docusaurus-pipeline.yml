@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     container:  zepben/pipeline-docusaurus
     outputs:
-      store_modules: ${{ steps.store.modules }}
+      store_modules: ${{ steps.store.outputs.modules }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,19 +44,16 @@ jobs:
         if: steps.build.outcome == 'success'
         run: | 
           files=$(git diff "origin/${{ github.event.repository.default_branch }}" --name-only | paste -s -d,) 
-          echo $files
           # Check if package-lock.json is changed
           if [[ "$files" =~ "package-lock.json" ]]; then
-            echo "package-lock changed, save new modules"
             echo "modules=yes" >> "${GITHUB_OUTPUT}"
-            echo "modules=yes" >> "${GITHUB_ENV}"
           fi
         shell: bash
 
       # only update node_modules in the container if there's a change
       - name: Zip node_modules
         id: zip
-        if: ${{ env.modules }} == 'yes'
+        if: ${{ steps.store.outputs.modules } == 'yes'
         run: |
           cd pipelines/Docusaurus/docs/site-config
           zip -r node_modules.zip node_modules/ 
@@ -64,7 +61,6 @@ jobs:
 
       - name: Upload node_modules
         uses: actions/upload-artifact@v4
-        if: steps.zip.outcome == 'success'
         with:
           name: node_modules.zip
           path: pipelines/Docusaurus/docs/site-config/node_modules.zip

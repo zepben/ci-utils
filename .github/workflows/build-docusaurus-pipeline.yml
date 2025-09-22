@@ -46,7 +46,7 @@ jobs:
           files=$(git diff "origin/${{ github.event.repository.default_branch }}" --name-only | paste -s -d,) 
           echo $files
           # Check if package-lock.json is changed
-          if [[ "$files" =~ ".*package-lock\.json.*" ]]; then
+          if [[ "$files" =~ "package-lock.json" ]]; then
             echo "package-lock changed, save new modules"
             echo "modules=yes" >> "${GITHUB_OUTPUT}"
           fi

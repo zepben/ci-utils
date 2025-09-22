@@ -58,7 +58,7 @@ jobs:
         id: zip
         if: ${{ env.modules }} == 'yes'
         run: |
-          cd pipelines/Docusaurus/docs/docs
+          cd pipelines/Docusaurus/docs/site-config
           zip -r node_modules.zip node_modules/ 
         shell: sh
 

@@ -49,8 +49,15 @@ jobs:
           if [[ "$files" =~ "package-lock.json" ]]; then
             echo "package-lock changed, save new modules"
             echo "modules=yes" >> "${GITHUB_OUTPUT}"
+            echo "modules=yes" >> "${GITHUB_ENV}"
           fi
         shell: bash
+
+      - name: Debug
+        run: |
+          echo "Modules: ${{ steps.store.modules }}"
+          echo "Env: ${{ env.modules }}"
+          exit 1
 
       # only update node_modules in the container if there's a change
       - name: Zip node_modules

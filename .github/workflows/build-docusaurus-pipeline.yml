@@ -150,13 +150,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # TODO: restore node_modules if there was a change in package-lock.js
       - name: Download modules
-        if: ${{ needs.checks.store_modules == 'yes' }}
+        if: ${{ needs.checks.outputs.store_modules == 'yes' }}
         uses: actions/download-artifact@v4
         with:
           name: node_modules.zip
-          path: pipelines/Docusaurus/templates/node_modules.zip
+          path: pipelines/Docusaurus/templates/
         continue-on-error: false
 
       - name: Unzip modules

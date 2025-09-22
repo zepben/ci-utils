@@ -66,8 +66,8 @@ jobs:
         uses: actions/upload-artifact@v4
         if: steps.zip.outcome == 'success'
         with:
-          name: pipelines/Docusaurus/docs/site-config/node_modules.zip
-          path: node_modules.zip
+          name: node_modules.zip
+          path: pipelines/Docusaurus/docs/site-config/node_modules.zip
           if-no-files-found: error
 
 

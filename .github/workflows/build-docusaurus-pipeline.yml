@@ -161,7 +161,7 @@ jobs:
 
       - name: Unzip modules
         run: |
-          cd pipelines/Docusaurus/templates/node_modules.zip
+          cd pipelines/Docusaurus/templates/
           unzip node_modules.zip
           rm -rf node_modules.zip
 

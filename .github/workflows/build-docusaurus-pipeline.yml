@@ -48,7 +48,7 @@ jobs:
           if [[ "$files" =~ ".*package-lock\.json.*" ]]; then
             echo "modules=yes" >> "${GITHUB_OUTPUT}"
           fi
-        sh: bash
+        shell: bash
 
       - name: Zip node_modules
         if: steps.store.modules == 'yes'

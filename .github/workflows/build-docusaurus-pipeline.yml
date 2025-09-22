@@ -12,6 +12,8 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     container:  zepben/pipeline-docusaurus
+    outputs:
+      store_modules: ${{ steps.store.modules }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,10 +33,38 @@ jobs:
           echo "//npm.pkg.github.com/:_authToken=${{ secrets.CI_GITHUB_TOKEN }}" >> ~/.npmrc
 
       - name: Check that build works
+        id: build
         run: |
           # use templates from the current branch
           cd pipelines/Docusaurus/docs
           make
+
+      - name: Detect package-lock change
+        id: store
+        if: steps.build.outcome == 'success'
+        run: | 
+          files=$(git diff --name-only | | paste -s -d,) 
+          # Check if package-lock.json is changed
+          if [[ "$files" =~ ".*package-lock\.json.*" ]]; then
+            echo "modules=yes" >> "${GITHUB_OUTPUT}"
+          fi
+        sh: bash
+
+      - name: Zip node_modules
+        if: steps.store.modules == 'yes'
+        run: |
+          cd pipelines/Docusaurus/docs/docs
+          zip -r node_modules.zip node_modules/ 
+        shell: sh
+
+      - name: Upload node_modules
+        uses: actions/upload-artifact@v4
+        if: steps.store.modules == 'yes'
+        with:
+          name: pipelines/Docusaurus/docs/docs/node_modules.zip
+          path: node_modules.zip
+          if-no-files-found: error
+
 
   parse-inputs:
     needs: [checks]
@@ -108,12 +138,27 @@ jobs:
 
   build-docusaurus-pipeline:
     runs-on: ubuntu-latest
-    needs: [parse-inputs]
+    needs: [checks, parse-inputs]
     env:
       DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
       DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+
+      # TODO: restore node_modules if there was a change in package-lock.js
+      - name: Download modules
+        if: ${{ needs.checks.store_modules == 'yes' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: node_modules.zip
+          path: pipelines/Docusaurus/templates/node_modules.zip
+        continue-on-error: false
+
+      - name: Unzip modules
+        run: |
+          cd pipelines/Docusaurus/templates/node_modules.zip
+          unzip node_modules.zip
+          rm -rf node_modules.zip
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

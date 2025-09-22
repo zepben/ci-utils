@@ -11,5 +11,8 @@ RUN apk add --no-cache \
  
 RUN mkdir /templates
 COPY ./templates /templates
+COPY ./node_modules /node_modules
+
+EXPOSE 3000
 
 WORKDIR /docs

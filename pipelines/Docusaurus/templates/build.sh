@@ -46,6 +46,7 @@ function copy_templates() {
     # if running on CI/local job, move the templates to the site-config
     if [[ "${skip_templates}" != "yes" ]]; then
         cp -r /templates/* ${site_dir}/
+        ln -s /node_modules ${site_dir}/
     fi
 }
 
@@ -104,6 +105,5 @@ fi
 
 if [ "${skip_build}" != "yes" ]; then 
     cd "${site_dir}"
-    npm ci
     npm run build
 fi

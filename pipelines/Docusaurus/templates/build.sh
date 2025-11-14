@@ -72,8 +72,15 @@ function configure_site() {
     # title needs to be fetched from CI's repo environment, for local we'll use "Docs in test"
     title=${DOCS_TITLE:-"Docs in test"}
 
+    # The "product" is either evolve or ednar, so
+    product=${PRODUCT:-"evolve"}
+
     echo "Filling templates with title '$title' and repo name '$component'"
-    sed -e "s/{title}/${title}/g" -e "s/{component}/${component}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
+    sed -e "s/{product}/${product}/g" \
+        -e "s/{label}/${product^}/g" \
+        -e "s/{title}/${title}/g" \
+        -e "s/{component}/${component}/g" \
+        $scripts/docusaurus.config.js.template > ./docusaurus.config.js
     sed -e "s/{component}/${component}/g" $scripts/package.json.template > ./package.json
 
     # cp previous versions

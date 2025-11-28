@@ -62,8 +62,9 @@ function configure_site() {
 
 
     # repo will be fetched from environment variable REPO_NAME (if there) or "local-test-docs"
+    # usually, it's automatically captured in `docusaurus-action` or provided with the Makefile for local builds.
     if [ ! -z "${REPO_NAME}" ]; then
-        # cut the ".*/" before the repo name, ie "octopus/zepben" becomes "zepben"
+        # cut the ".*/" before the repo name, ie "zepben/energy-work-bench" becomes "energy-work-bench"
         component=${REPO_NAME#*/}
     else
         component="local-test-docs"

@@ -56,10 +56,10 @@ module.exports = {
                     position: "right",
                 },
                 {
-                    href: "https://github.com/zepben/{component}",
+                    href: "https://github.com/zepben/",
                     position: 'right',
                     className: 'header-github-link',
-                    'aria-label': 'GitHub repository',
+                    'aria-label': "Zepben's GitHub repository",
                 }
             ],
         },

@@ -76,7 +76,15 @@ function configure_site() {
     # The "product" is either evolve or ednar, so
     product=${PRODUCT:-"evolve"}
 
-    echo "Filling templates with title '$title' and repo name '$component'"
+    echo 
+    echo "############################################"
+    echo "Filling templates with: 
+    title: '$title' 
+    product: '$product'
+    repo name: '$component'"
+    echo "############################################"
+    echo 
+
     sed -e "s/{product}/${product}/g" \
         -e "s/{label}/${product^}/g" \
         -e "s/{title}/${title}/g" \

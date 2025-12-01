@@ -12,7 +12,7 @@ const versions = require("./versions.json");
 module.exports = {
     title: "{title}",
     url: "https://zepben.github.io/",
-    baseUrl: "/evolve/docs/{component}/",
+    baseUrl: "/{product}/docs/{component}/",
     onBrokenLinks: "throw",
     favicon: "img/favicon.ico",
     organizationName: "zepben",
@@ -35,8 +35,8 @@ module.exports = {
             },
             items: [
                 {
-                    to: "https://zepben.github.io/evolve/docs",
-                    label: "Evolve",
+                    to: "https://zepben.github.io/{product}/docs",
+                    label: "{label}",
                     position: "left",
                 },
                 {
@@ -54,6 +54,12 @@ module.exports = {
                 {
                     type: "docsVersionDropdown",
                     position: "right",
+                },
+                {
+                    href: "https://github.com/zepben/",
+                    position: 'right',
+                    className: 'header-github-link',
+                    'aria-label': "Zepben's GitHub repository",
                 }
             ],
         },

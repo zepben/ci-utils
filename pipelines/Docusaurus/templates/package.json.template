@@ -11,8 +11,9 @@
     "serve": "docusaurus serve"
   },
   "dependencies": {
-    "@zepben/docusaurus-components": "0.9.4",
-    "@zepben/docusaurus-preset": "0.13.4"
+    "@zepben/docusaurus-components": "0.9.5",
+    "@zepben/docusaurus-preset": "0.13.4",
+    "react-icons": "5.5.0"
   },
   "browserslist": {
     "production": [

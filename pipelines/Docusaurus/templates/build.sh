@@ -62,8 +62,9 @@ function configure_site() {
 
 
     # repo will be fetched from environment variable REPO_NAME (if there) or "local-test-docs"
+    # usually, it's automatically captured in `docusaurus-action` or provided with the Makefile for local builds.
     if [ ! -z "${REPO_NAME}" ]; then
-        # cut the ".*/" before the repo name, ie "octopus/zepben" becomes "zepben"
+        # cut the ".*/" before the repo name, ie "zepben/energy-work-bench" becomes "energy-work-bench"
         component=${REPO_NAME#*/}
     else
         component="local-test-docs"
@@ -72,8 +73,23 @@ function configure_site() {
     # title needs to be fetched from CI's repo environment, for local we'll use "Docs in test"
     title=${DOCS_TITLE:-"Docs in test"}
 
-    echo "Filling templates with title '$title' and repo name '$component'"
-    sed -e "s/{title}/${title}/g" -e "s/{component}/${component}/g" $scripts/docusaurus.config.js.template > ./docusaurus.config.js
+    # The "product" is either evolve or ednar, so
+    product=${PRODUCT:-"evolve"}
+
+    echo 
+    echo "############################################"
+    echo "Filling templates with: 
+    title: '$title' 
+    product: '$product'
+    repo name: '$component'"
+    echo "############################################"
+    echo 
+
+    sed -e "s/{product}/${product}/g" \
+        -e "s/{label}/${product^}/g" \
+        -e "s/{title}/${title}/g" \
+        -e "s/{component}/${component}/g" \
+        $scripts/docusaurus.config.js.template > ./docusaurus.config.js
     sed -e "s/{component}/${component}/g" $scripts/package.json.template > ./package.json
 
     # cp previous versions

@@ -182,6 +182,15 @@ tag_finalize_version() {
   run git push --tags
 }
 
+clear_release_branch() {
+    info "Clearing 'release' branch"
+
+    git ls-remote --exit-code --heads origin release >/dev/null 2>&1
+    if [[ $? == '0' ]]; then
+        run git push origin -d release
+    fi
+}
+
 check_tag_exists() {
   version=${1:? 'Version variable is missing.'}
   info "Checking remote tags if version exists..."

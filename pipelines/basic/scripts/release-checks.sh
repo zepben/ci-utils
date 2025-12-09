@@ -41,7 +41,7 @@ do
 done
 
 info "Clearing the 'release' branch if it exists"
-clear_release_breanch
+clear_release_branch
 
 # Get user name
 if [[ -z "$BITBUCKET_STEP_TRIGGERER_UUID" ]]; then

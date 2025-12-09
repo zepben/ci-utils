@@ -185,7 +185,7 @@ tag_finalize_version() {
 clear_release_branch() {
     info "Clearing 'release' branch"
 
-    git ls-remote --exit-code --heads origin release >/dev/null 2>&1
+    run git ls-remote --exit-code --heads origin release >/dev/null 2>&1
     if [[ $? == '0' ]]; then
         run git push origin -d release
     fi

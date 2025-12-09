@@ -74,11 +74,12 @@ jobs:
     container:  zepben/pipeline-basic
     outputs:
       git_tag: ${{ steps.tags.outputs.git_tag }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.CI_GITHUB_TOKEN }}
     steps:
-
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          token: ${{ env.GITHUB_TOKEN }}
 
       - name: Work around git permission issue
         run: |
@@ -88,15 +89,8 @@ jobs:
 
       - name: Delete release branch
         run: |
-          # If the `release` branch already exists, remove it
-          # disable error failing
-          set +e 
-          res=$(git push origin -d release)
-          if [ $? != 0 ]; then
-            echo "> [!NOTE] " >> "$GITHUB_STEP_SUMMARY"
-            echo "> :white_check_mark: Error while deleting 'release' branch in *parse-inputs* step, but that's probably OK. If nothing else failed, you're good." >> "$GITHUB_STEP_SUMMARY"
-          fi
-        continue-on-error: true 
+          source /scripts/common.sh
+          clear_release_branch
         shell: bash 
 
       - name: Create release branch

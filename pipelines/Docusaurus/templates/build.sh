@@ -9,6 +9,8 @@ scripts=$(dirname "$(realpath $0)")
 docs=$(pwd)
 site_dir=$(pwd)
 release_notes="${docs}/site-config/release-notes.md"
+docusaurus_config="${docs}/site-config/docusaurus.config.js"
+static="${docs}/site-config/static"
 
 # Lazily parse args
 for arg in "$@"; do
@@ -23,7 +25,7 @@ for arg in "$@"; do
 done
 
 function detect_version() {
-    if [ -f "${release_notes}" ]; then
+    if [[ -f "${release_notes}" || -f "${docusaurus_config}" || -f  "${static}" ]]; then
         docusaurus3="yes"
         site_dir="${docs}/site-config"
         # We're building Docusaurus 3

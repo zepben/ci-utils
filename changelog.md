@@ -1,5 +1,21 @@
 # CI-Utils
-## [6.28.0] - UNRELEASED
+## [6.29.0] - UNRELEASED
+### Breaking Changes
+* None.
+
+### New Features
+* None.
+
+### Enhancements
+* None.
+
+### Fixes
+* None.
+
+### Notes
+* None.
+
+## [6.28.0] - 2026-01-16
 ### Breaking Changes
 * None.
 

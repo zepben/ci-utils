@@ -8,10 +8,12 @@ RUN apk add --no-cache \
  make \
  tar \
  jq 
+
+# copy the templates first, as they rarily change
+COPY ./node_modules /node_modules
  
 RUN mkdir /templates
 COPY ./templates /templates
-COPY ./node_modules /node_modules
 
 EXPOSE 3000
 

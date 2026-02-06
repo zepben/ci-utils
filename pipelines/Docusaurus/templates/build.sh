@@ -100,15 +100,13 @@ function configure_site() {
     cp -r ../archive/* .
 
     # we're in site-config, so handle the spec files
-    if [ -d static/spec ]; then
-        # preserve the next spec
-        mv static/spec/next versioned_spec
-        rm -rf static/spec/*
-        mv versioned_spec/* static/spec/
-    else
-        # specs are not needed
-        echo "Spec files not needed"
-        rm -rf versioned_spec
+    if [ -d "${docs}/spec" ]; then
+        if [ ! -d "${static}/spec" ]; then
+            mkdir -p "${static}/spec"
+        fi
+
+        cp -r "${docs}/spec/" static/spec/next 
+        cp -r versioned_spec/* static/spec/
     fi
 
     # link the current docs, it works fine

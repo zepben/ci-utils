@@ -99,6 +99,16 @@ function configure_site() {
     # back to the archive folder with link dereference. We'll do this in docusaurus-action. That's why we don't use links here.
     cp -r ../archive/* .
 
+    # we're in site-config, so handle the spec files
+    if [ -d "${docs}/spec" ]; then
+        if [ ! -d "${static}/spec" ]; then
+            mkdir -p "${static}/spec"
+        fi
+
+        cp -r "${docs}/spec/" static/spec/next 
+        cp -r versioned_spec/* static/spec/
+    fi
+
     # link the current docs, it works fine
     ln -s ../docs .
 

@@ -29,7 +29,7 @@ variable "container_version_tags" {
 
 source "docker" "image" {
   commit = "true"
-  image  = "debian:bookworm-20240701-slim"
+  image  = "debian:bookworm-20260316-slim"
   changes = ["LABEL ${var.container_version_labels}"]
 }
 

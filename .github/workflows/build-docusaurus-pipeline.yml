@@ -26,7 +26,7 @@ jobs:
       - name: Login to NPM
         run: |
           rm -rf ~/.npmrc
-          echo "@zepben:registry=${{ secrets.NEXUS_NPM_REPO }}" >> ~/.npmrc
+          echo "@zepben:registry=${{ secrets.NPM_REPO }}" >> ~/.npmrc
           echo "//nexus.z.zepben.cloud/repository/zepben-npm/:_authToken=${{ secrets.CI_NPM_TOKEN }}" >> ~/.npmrc
           echo "//npm.pkg.github.com/:_authToken=${{ secrets.CI_GITHUB_TOKEN }}" >> ~/.npmrc
           echo "" >> ~/.npmrc
@@ -36,10 +36,6 @@ jobs:
         run: |
           # use templates from the current branch
           cd pipelines/Docusaurus/docs
-          cp ~/.npmrc site-config/
-
-          # Check that .npmrc is setup
-          cat site-config/.npmrc
           make
 
       - name: Detect package-lock change

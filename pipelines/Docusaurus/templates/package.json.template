@@ -11,9 +11,13 @@
     "serve": "docusaurus serve"
   },
   "dependencies": {
-    "@zepben/docusaurus-components": "0.9.5",
-    "@zepben/docusaurus-preset": "0.13.4",
+    "@zepben/docusaurus-components": "0.9.11",
+    "@zepben/docusaurus-preset": "0.13.6",
     "react-icons": "5.5.0"
+  },
+  "overrides": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "browserslist": {
     "production": [
@@ -29,7 +33,6 @@
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "3.8.1",
-    "@docusaurus/tsconfig": "3.8.1",
-    "@types/react": "^19.1.8"
+    "@docusaurus/tsconfig": "3.8.1"
   }
 }

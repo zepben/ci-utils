@@ -36,6 +36,7 @@ jobs:
         run: |
           # use templates from the current branch
           cd pipelines/Docusaurus/docs
+          cp ~/.npmrc site-config/
           make
 
       - name: Detect package-lock change

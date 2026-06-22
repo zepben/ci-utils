@@ -11,6 +11,7 @@ site_dir=$(pwd)
 release_notes="${docs}/site-config/release-notes.md"
 docusaurus_config="${docs}/site-config/docusaurus.config.js"
 static="${docs}/site-config/static"
+archive="${docs}/archive"
 
 # Lazily parse args
 for arg in "$@"; do
@@ -97,7 +98,7 @@ function configure_site() {
     # cp previous versions
     # docusaurus will create versioned_docs links instead of actual folders, so we'll need to copy them
     # back to the archive folder with link dereference. We'll do this in docusaurus-action. That's why we don't use links here.
-    cp -r ../archive/* .
+    cp -r ${archive}/* .
 
     # we're in site-config, so handle the spec files
     if [ -d "${docs}/spec" ]; then
@@ -106,7 +107,7 @@ function configure_site() {
         fi
 
         cp -r "${docs}/spec/" static/spec/next 
-        cp -r versioned_spec/* static/spec/
+        cp -r "${archive}/versioned_spec/*" static/spec/
     fi
 
     # link the current docs, it works fine

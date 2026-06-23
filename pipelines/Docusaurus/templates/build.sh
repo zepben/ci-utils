@@ -98,17 +98,23 @@ function configure_site() {
     # cp previous versions
     # docusaurus will create versioned_docs links instead of actual folders, so we'll need to copy them
     # back to the archive folder with link dereference. We'll do this in docusaurus-action. That's why we don't use links here.
+    echo "copying archive docs..."
     cp -r ${archive}/* .
 
     # we're in site-config, so handle the spec files
-    if [ -d "${docs}/spec" ]; then
+    echo "checking for spec files..."
+    if [ -d "${docs}/docs/spec" ]; then
         if [ ! -d "${static}/spec" ]; then
             mkdir -p "${static}/spec"
         fi
 
-        cp -r "${docs}/spec/" static/spec/next 
-        cp -r "${archive}/versioned_spec/*" static/spec/
+        echo "copying next spec..."
+        cp -r "${docs}/docs/spec/" static/spec/next
+        echo "copying archive specs..."
+        cp -r "${archive}/versioned_spec/." static/spec/
     fi
+
+    echo "preparing for build..."
 
     # link the current docs, it works fine
     ln -s ../docs .

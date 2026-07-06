@@ -1,0 +1,26 @@
+helm_repos:
+  argocd: "https://argoproj.github.io/argo-helm"
+cluster_components:
+  - name: argocd
+    chart: argocd/argo-cd
+    version: "10.0.1"
+    namespace: argocd
+    set:
+      applicationSet.replicas: "1"
+      configs.cm.admin.enabled: "true"
+      configs.params.server.insecure: "true"
+      controller.replicas: "1"
+      dex.enabled: "false"
+      global.affinity.nodeAffinity.type: "none"
+      global.affinity.podAntiAffinity: "none"
+      global.networkPolicy.create: "false"
+      notifications.enabled: "false"
+      redis-ha.enabled: "false"
+      repoServer.autoscaling.enabled: "false"
+      repoServer.replicas: "1"
+      server.autoscaling.enabled: "false"
+      server.ingress.enabled: "false"
+      server.replicas: "1"
+      # Expose to the host so we can browse without port-forwarding, see kind-cluster.yaml
+      server.service.nodePortHttp: "30080"
+      server.service.type: "NodePort"

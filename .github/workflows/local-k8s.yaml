@@ -1,0 +1,21 @@
+name: local-k8s
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "local-k8s/**"
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - name: Lint and test local-k8s
+        run: |
+          make check-local-k8s
+          make test-local-k8s

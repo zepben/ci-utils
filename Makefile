@@ -28,13 +28,16 @@ check-staged-formatted: reformat
 		exit 1; \
 	}
 
-setup-k8s: $(VENV)
+setup-k8s: install-tools
 	$(BIN)/local-k8s cluster create \
 		--kind-config local-k8s/examples/kind-cluster.yaml \
 		--components local-k8s/examples/components.yaml
 
-teardown-k8s: $(VENV)
+teardown-k8s: install-tools
 	$(BIN)/local-k8s cluster teardown
+
+install-tools: $(VENV)
+	$(BIN)/local-k8s tools install
 
 $(VENV): $(LOCAL_K8S)/pyproject.toml .python-version
 	$(PYTHON) -m venv $(VENV)

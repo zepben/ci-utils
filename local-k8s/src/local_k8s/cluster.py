@@ -104,7 +104,7 @@ def teardown_cluster() -> None:
     kind("delete", "cluster", "--name", CLUSTER_NAME)
 
 
-def take_debug_dump(filter_namespaces: list[str], out_dir: Path) -> None:
+def take_debug_dump(filter_namespaces: list[str], out_dir: Path | None) -> None:
     dir_decorator = (
         TemporaryDirectory(prefix="/var/tmp/debug-dump-")
         if out_dir is None

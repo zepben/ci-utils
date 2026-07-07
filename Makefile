@@ -5,6 +5,7 @@ PYTHON   ?= python3
 LOCAL_K8S ?= local-k8s
 
 reformat: format-local-k8s
+check: check-local-k8s check-staged-formatted
 
 format-local-k8s: $(VENV)
 	$(BIN)/ruff format $(LOCAL_K8S)

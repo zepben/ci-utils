@@ -1,3 +1,5 @@
+from contextlib import suppress
+from pathlib import Path
 from typing import Any, Self, TextIO
 
 import yaml
@@ -11,6 +13,25 @@ class ClusterComponent(BaseModel):
     version: str
     namespace: str
     set: dict[str, str] = Field(default_factory=dict)
+
+
+class RequiredTool(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    version: str
+    url: str
+    archive_member: str | None = None
+
+    def to_hash(self) -> str:
+        return f"{self.name}-{self.version}-{self.url}"
+
+    def exists(self, hash_dir: Path) -> bool:
+        with suppress(OSError):
+            return (hash_dir / self.name).read_text() == self.to_hash()
+        return False
+
+    def write_hash(self, hash_dir: Path) -> None:
+        (hash_dir / self.name).write_text(self.to_hash())
 
 
 class ClusterComponents(BaseModel):

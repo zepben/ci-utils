@@ -1,4 +1,5 @@
 import logging
+import platform
 import shutil
 import tarfile
 import urllib.request
@@ -63,6 +64,12 @@ def install_binary_tool(tool: RequiredTool, tools_dir: Path) -> Path:
 
 @click.command("install")
 def install() -> None:
+    system = platform.system()
+    if system != "Linux":
+        raise click.ClickException(
+            f"{system} is not a supported OS. Please contact #techops for assistance"
+        )
+
     bin_dir = get_bin_dir()
     bin_dir.mkdir(parents=True, exist_ok=True)
 

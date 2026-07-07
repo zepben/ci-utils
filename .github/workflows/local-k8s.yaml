@@ -2,8 +2,6 @@ name: local-k8s
 
 on:
   pull_request:
-    branches:
-      - main
     paths:
       - "local-k8s/**"
 
@@ -19,3 +17,5 @@ jobs:
         run: |
           make check-local-k8s
           make test-local-k8s
+          make setup-k8s
+          make teardown-k8s

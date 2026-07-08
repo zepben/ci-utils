@@ -3,6 +3,7 @@ import platform
 import shutil
 import tarfile
 import urllib.request
+from contextlib import suppress
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -87,7 +88,12 @@ def install() -> None:
 
 
 @click.command("uninstall")
-def uninstall() -> None:
+@click.option("--no-prompt", is_flag=True, help="Do the thing without asking")
+def uninstall(no_prompt: bool) -> None:
     tools_dir = get_tools_dir()
-    click.confirm(f"Are you sure you want to nuke: {tools_dir}?", abort=True)
-    shutil.rmtree(tools_dir)
+    if no_prompt or click.confirm(
+        f"Are you sure you want to nuke: {tools_dir}?", abort=True
+    ):
+        with suppress(FileNotFoundError):
+            shutil.rmtree(tools_dir)
+            LOG.info(f"Removed {tools_dir}")

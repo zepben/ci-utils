@@ -1,12 +1,12 @@
 import logging
 import os
-import subprocess
 from collections.abc import Generator
 from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from local_k8s.models import ClusterComponents
+from local_k8s.shared import execute
 
 CLUSTER_NAME = "test-cluster"
 
@@ -104,7 +104,7 @@ def teardown_cluster() -> None:
     kind("delete", "cluster", "--name", CLUSTER_NAME)
 
 
-def take_debug_dump(filter_namespaces: list[str], out_dir: Path) -> None:
+def take_debug_dump(filter_namespaces: list[str], out_dir: Path | None) -> None:
     dir_decorator = (
         TemporaryDirectory(prefix="/var/tmp/debug-dump-")
         if out_dir is None
@@ -140,19 +140,14 @@ def dump_to_stdout(filter_namespaces: list[str], out_dir: Path) -> None:
 
 
 def kind(*args: str) -> str:
-    return _exec("kind", *args)
+    return execute("kind", *args)
 
 
 def helm(*args: str) -> str:
     with kube_guard():
-        return _exec("helm", *args)
+        return execute("helm", *args)
 
 
 def kubectl(*args: str) -> str:
     with kube_guard():
-        return _exec("kubectl", *args)
-
-
-def _exec(*args: str) -> str:
-    LOG.debug("Executing: %s", args)
-    return subprocess.check_output(list(args), text=True)
+        return execute("kubectl", *args)

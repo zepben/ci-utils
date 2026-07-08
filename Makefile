@@ -5,6 +5,7 @@ PYTHON   ?= python3
 LOCAL_K8S ?= local-k8s
 
 reformat: format-local-k8s
+check: check-local-k8s check-staged-formatted
 
 format-local-k8s: $(VENV)
 	$(BIN)/ruff format $(LOCAL_K8S)
@@ -27,13 +28,16 @@ check-staged-formatted: reformat
 		exit 1; \
 	}
 
-setup-k8s: $(VENV)
-	$(BIN)/local-k8s create-cluster \
+setup-k8s: install-tools
+	$(BIN)/local-k8s cluster create \
 		--kind-config local-k8s/examples/kind-cluster.yaml \
 		--components local-k8s/examples/components.yaml
 
-teardown-k8s: $(VENV)
-	$(BIN)/local-k8s teardown-cluster
+teardown-k8s: install-tools
+	$(BIN)/local-k8s cluster teardown
+
+install-tools: $(VENV)
+	$(BIN)/local-k8s tools install
 
 $(VENV): $(LOCAL_K8S)/pyproject.toml .python-version
 	$(PYTHON) -m venv $(VENV)

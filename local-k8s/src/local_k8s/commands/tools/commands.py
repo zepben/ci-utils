@@ -13,7 +13,8 @@ from tempfile import TemporaryDirectory
 import click
 
 from local_k8s.models import RequiredTool
-from local_k8s.shared import TOOLS, execute, get_bin_dir, get_hash_dir, get_tools_dir
+from local_k8s.shared import execute, get_bin_dir, get_hash_dir, get_tools_dir
+from local_k8s.static import TOOLS
 
 LOG = logging.getLogger(__name__)
 

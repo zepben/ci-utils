@@ -1,6 +1,7 @@
+import os
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, Self, TextIO
+from typing import Any, Literal, Self, TextIO
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -43,3 +44,22 @@ class ClusterComponents(BaseModel):
     def from_text_io(cls, input_data: TextIO) -> Self:
         data: Any = yaml.safe_load(input_data.read())
         return cls.model_validate(data)
+
+
+class CiSecret(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    kind: Literal["env-file"]
+    env_var: str
+
+    def resolve_path(self) -> Path:
+        value = os.environ.get(self.env_var)
+        if value is None:
+            raise ValueError(f"{self.env_var} is not set. This is required ")
+        return Path(value).expanduser()
+
+
+class CiSecrets(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    secrets: list[CiSecret]

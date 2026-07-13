@@ -1,16 +1,20 @@
 import logging
 import platform
 import shutil
+import subprocess
+import sys
 import tarfile
 import urllib.request
 from contextlib import suppress
+from importlib.resources import as_file, files
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import click
 
 from local_k8s.models import RequiredTool
-from local_k8s.shared import TOOLS, get_bin_dir, get_hash_dir, get_tools_dir
+from local_k8s.shared import execute, get_bin_dir, get_hash_dir, get_tools_dir
+from local_k8s.static import TOOLS
 
 LOG = logging.getLogger(__name__)
 
@@ -63,14 +67,32 @@ def install_binary_tool(tool: RequiredTool, tools_dir: Path) -> Path:
     return dest
 
 
-@click.command("install")
-def install() -> None:
-    system = platform.system()
-    if system != "Linux":
-        raise click.ClickException(
-            f"{system} is not a supported OS. Please contact #techops for assistance"
+def install_helm_unit_tests() -> None:
+    plugins = execute("helm", "plugin", "list")
+    LOG.info("Installing helm unit test")
+    for line in plugins.splitlines():
+        if line.startswith("unittest"):
+            LOG.info("helm unittest already installed, skipping ")
+            return
+    execute(
+        "helm",
+        "plugin",
+        "install",
+        "https://github.com/helm-unittest/helm-unittest",
+        "--verify=false",
+    )
+
+
+def install_python_requirements() -> None:
+    LOG.info("Installing python requirements")
+    resource = files("local_k8s.resources").joinpath("python-requirements.txt")
+    with as_file(resource) as requirements:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "-r", str(requirements), "-qq"],
         )
 
+
+def install_binary_tools() -> None:
     bin_dir = get_bin_dir()
     bin_dir.mkdir(parents=True, exist_ok=True)
 
@@ -85,6 +107,19 @@ def install() -> None:
             tool.write_hash(hash_dir=hash_dir)
     LOG.info(f"Installed {len(TOOLS)} tool(s) to {bin_dir.resolve()}")
     LOG.info(f"export PATH={bin_dir.resolve()}:$PATH")
+
+
+@click.command("install")
+def install() -> None:
+    system = platform.system()
+    if system != "Linux":
+        raise click.ClickException(
+            f"{system} is not a supported OS. Please contact #techops for assistance"
+        )
+
+    install_binary_tools()
+    install_helm_unit_tests()
+    install_python_requirements()
 
 
 @click.command("uninstall")

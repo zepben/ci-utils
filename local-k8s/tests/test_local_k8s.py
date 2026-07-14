@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from local_k8s import cluster
 from local_k8s.cluster import (
     KUBECONF_PATH,
     kube_guard,
@@ -66,3 +67,16 @@ def test_kube_guard(
         assert os.environ["KUBECONFIG"] == str(KUBECONF_PATH)
 
     assert os.environ.get("KUBECONFIG") == og_kube
+
+
+def test_add_helm_repos_skips_all_helm_when_no_repos_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+
+    def fake_helm(*args: str) -> str:
+        raise AssertionError(f"unexpected helm invocation: {args}")
+
+    monkeypatch.setattr(cluster, "helm", fake_helm)
+    cluster._add_helm_repos(
+        ClusterComponents(helm_repos={}, cluster_components=[]),
+    )

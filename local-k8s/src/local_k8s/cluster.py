@@ -64,15 +64,16 @@ def _create_kind_cluster(kind_config: Path) -> None:
 
 
 def _add_helm_repos(components: ClusterComponents) -> None:
-    LOG.info("Adding helm repos")
-    repo_out = helm("repo", "list", "--no-headers")
-    existing_repos = [tuple(s.split()) for s in repo_out.splitlines()]
-    for name, repo in components.helm_repos.items():
-        if (name, repo) in existing_repos:
-            LOG.info("Not adding %s -> %s as already present", name, repo)
-        else:
-            helm("repo", "add", name, repo)
-    helm("repo", "update")
+    if components.helm_repos:
+        LOG.info("Adding helm repos")
+        repo_out = helm("repo", "list", "--no-headers")
+        existing_repos = [tuple(s.split()) for s in repo_out.splitlines()]
+        for name, repo in components.helm_repos.items():
+            if (name, repo) in existing_repos:
+                LOG.info("Not adding %s -> %s as already present", name, repo)
+            else:
+                helm("repo", "add", name, repo)
+        helm("repo", "update")
 
 
 def _install_helm_components(components: ClusterComponents) -> None:

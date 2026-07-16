@@ -37,7 +37,8 @@ def list_changed(helm_dir: Path, target_branch: str) -> None:
             "rev-parse",
             "--show-toplevel",
             skip_resolve=True,
-        ).strip()
+            capture_stdout=True,
+        ).stdout.strip()
     ).resolve()
 
     # ct list-changed operates a bit differently to the other CT commands.
@@ -55,8 +56,9 @@ def list_changed(helm_dir: Path, target_branch: str) -> None:
                 str((helm_dir / "charts").relative_to(repo_root)),
                 "--target-branch",
                 target_branch,
+                capture_stdout=True,
             )
         except CalledProcessError as e:
             raise ClickException(f"list-changed failed with rc={e.returncode}") from e
-        charts = [line.strip() for line in out.splitlines() if line.strip()]
+        charts = [line.strip() for line in out.stdout.splitlines() if line.strip()]
         click.echo(json.dumps(charts))

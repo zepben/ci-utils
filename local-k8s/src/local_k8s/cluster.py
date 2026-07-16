@@ -6,7 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from local_k8s.models import ClusterComponents
-from local_k8s.shared import execute
+from local_k8s.shared import CommandResult, execute
 
 CLUSTER_NAME = "test-cluster"
 
@@ -40,7 +40,9 @@ def create_cluster(kind_config: Path, components: ClusterComponents) -> None:
 
 def _create_kind_cluster(kind_config: Path) -> None:
     LOG.info("Creating kind cluster")
-    for line in kind("get", "clusters", "--quiet").splitlines():
+    for line in kind(
+        "get", "clusters", "--quiet", capture_stdout=True
+    ).stdout.splitlines():
         if line == CLUSTER_NAME:
             LOG.info("Reusing existing cluster: %s", CLUSTER_NAME)
             break
@@ -66,8 +68,8 @@ def _create_kind_cluster(kind_config: Path) -> None:
 def _add_helm_repos(components: ClusterComponents) -> None:
     if components.helm_repos:
         LOG.info("Adding helm repos")
-        repo_out = helm("repo", "list", "--no-headers")
-        existing_repos = [tuple(s.split()) for s in repo_out.splitlines()]
+        repo_out = helm("repo", "list", "--no-headers", capture_stdout=True)
+        existing_repos = [tuple(s.split()) for s in repo_out.stdout.splitlines()]
         for name, repo in components.helm_repos.items():
             if (name, repo) in existing_repos:
                 LOG.info("Not adding %s -> %s as already present", name, repo)
@@ -77,8 +79,8 @@ def _add_helm_repos(components: ClusterComponents) -> None:
 
 
 def _install_helm_components(components: ClusterComponents) -> None:
-    list_out = helm("list", "--all-namespaces", "--deployed", "-q")
-    installed = list_out.splitlines()
+    list_out = helm("list", "--all-namespaces", "--deployed", "-q", capture_stdout=True)
+    installed = list_out.stdout.splitlines()
     LOG.info("Installing cluster components")
     for desired in components.cluster_components:
         if desired.name in installed:
@@ -140,15 +142,15 @@ def dump_to_stdout(filter_namespaces: list[str], out_dir: Path) -> None:
                         print(log_file.read_text())
 
 
-def kind(*args: str) -> str:
-    return execute("kind", *args)
+def kind(*args: str, capture_stdout: bool = False) -> CommandResult:
+    return execute("kind", *args, capture_stdout=capture_stdout)
 
 
-def helm(*args: str) -> str:
+def helm(*args: str, capture_stdout: bool = False) -> CommandResult:
     with kube_guard():
-        return execute("helm", *args)
+        return execute("helm", *args, capture_stdout=capture_stdout)
 
 
-def kubectl(*args: str) -> str:
+def kubectl(*args: str, capture_stdout: bool = False) -> CommandResult:
     with kube_guard():
-        return execute("kubectl", *args)
+        return execute("kubectl", *args, capture_stdout=capture_stdout)

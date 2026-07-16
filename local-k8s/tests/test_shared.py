@@ -11,6 +11,7 @@ def bin_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     d = tmp_path / "bin"
     d.mkdir()
     monkeypatch.setattr(shared, "get_bin_dir", lambda: d)
+    monkeypatch.setenv("PATH", f"{d}:{tmp_path}")
     return d
 
 

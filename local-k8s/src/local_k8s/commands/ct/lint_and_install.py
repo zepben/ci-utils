@@ -46,8 +46,8 @@ def create_test_namespace(ct_yaml_path: Path) -> str:
     test_namespace: str | None = ct_yaml.get("namespace")
     if test_namespace is None:
         raise ClickException(f"namespace must be specified in {CT_YAML}")
-    namespaces = execute("kubectl", "get", "namespaces")
-    for line in namespaces.splitlines():
+    namespaces = execute("kubectl", "get", "namespaces", capture_stdout=True)
+    for line in namespaces.stdout.splitlines():
         ns, *_ = line.split()
         if ns == test_namespace:
             break
@@ -110,7 +110,6 @@ def create_image_pull_secret(namespace: str) -> None:
             f"--namespace={namespace}",
             f"--from-file=.dockerconfigjson={auth_json_path}",
             "--type=kubernetes.io/dockerconfigjson",
-            capture_stdout=False,
         )
 
 
@@ -121,8 +120,9 @@ def secret_exists(namespace: str, secret_name: str) -> bool:
         "secrets",
         f"--namespace={namespace}",
         "--no-headers",
+        capture_stdout=True,
     )
-    for line in existing_secrets.splitlines():
+    for line in existing_secrets.stdout.splitlines():
         existing_secret, *_ = line.split()
         if existing_secret == secret_name:
             return True
@@ -138,7 +138,6 @@ def execute_lint_and_install(ct_yaml_path: Path) -> None:
             str(ct_yaml_path),
             "--all",
             "--check-version-increment=false",
-            capture_stdout=False,
         )
     except CalledProcessError as e:
         raise ClickException(f"lint-and-install failed with rc={e.returncode}") from e

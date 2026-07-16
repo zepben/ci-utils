@@ -68,9 +68,9 @@ def install_binary_tool(tool: RequiredTool, tools_dir: Path) -> Path:
 
 
 def install_helm_unit_tests() -> None:
-    plugins = execute("helm", "plugin", "list")
+    plugins = execute("helm", "plugin", "list", capture_stdout=True)
     LOG.info("Installing helm unit test")
-    for line in plugins.splitlines():
+    for line in plugins.stdout.splitlines():
         if line.startswith("unittest"):
             LOG.info("helm unittest already installed, skipping ")
             return

@@ -6,6 +6,7 @@ from click.testing import CliRunner
 
 from local_k8s.cli import cli
 from local_k8s.commands.chart import list_changed as list_changed_module
+from local_k8s.shared import CommandResult
 
 
 def test_list_changed_passes_repo_relative_paths(
@@ -15,7 +16,12 @@ def test_list_changed_passes_repo_relative_paths(
     helm_dir.mkdir()
     (helm_dir / "ct.yaml").write_text("{}\n")
 
-    mock_execute = MagicMock(side_effect=[f"{tmp_path.resolve()}\n", ""])
+    mock_execute = MagicMock(
+        side_effect=[
+            CommandResult(0, f"{tmp_path.resolve()}\n", ""),
+            CommandResult(0, "", ""),
+        ]
+    )
     monkeypatch.setattr(list_changed_module, "execute", mock_execute)
 
     result = CliRunner().invoke(
@@ -31,6 +37,7 @@ def test_list_changed_passes_repo_relative_paths(
             "rev-parse",
             "--show-toplevel",
             skip_resolve=True,
+            capture_stdout=True,
         ),
         call(
             "ct",
@@ -41,5 +48,6 @@ def test_list_changed_passes_repo_relative_paths(
             "helm/charts",
             "--target-branch",
             "main",
+            capture_stdout=True,
         ),
     ]

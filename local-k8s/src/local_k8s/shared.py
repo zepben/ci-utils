@@ -2,12 +2,19 @@ import logging
 import os
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, overload
 
 from local_k8s.static import TOOLS_BY_NAME
 
 LOG = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class CommandResult:
+    returncode: int
+    stdout: str
+    stderr: str
 
 
 def get_repo_name() -> str:
@@ -44,31 +51,35 @@ def resolve(name: str) -> None:
         raise Exception(f"{name} not installed at {path}; run: local-k8s tools install")
 
 
-@overload
 def execute(
     *args: str,
-    capture_stdout: Literal[True] = True,
+    capture_stdout: bool = False,
+    capture_stderr: bool = False,
     skip_resolve: bool = False,
-) -> str: ...
-
-
-@overload
-def execute(
-    *args: str,
-    capture_stdout: Literal[False],
-    skip_resolve: bool = False,
-) -> int: ...
-
-
-def execute(
-    *args: str,
-    capture_stdout: bool = True,
-    skip_resolve: bool = False,
-) -> str | int:
+    check: bool = True,
+    input: str | None = None,
+) -> CommandResult:
     if not skip_resolve:
         resolve(args[0])
     LOG.debug("Executing: %s", list(args))
-    if capture_stdout:
-        return subprocess.check_output(list(args), text=True)
-    else:
-        return subprocess.check_call(list(args))
+    completed = subprocess.run(
+        list(args),
+        input=input,
+        text=True,
+        stdout=subprocess.PIPE if capture_stdout else None,
+        stderr=subprocess.PIPE if capture_stderr else None,
+        check=False,
+    )
+    result = CommandResult(
+        returncode=completed.returncode,
+        stdout=completed.stdout or "",
+        stderr=completed.stderr or "",
+    )
+    if check and result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            list(args),
+            output=result.stdout,
+            stderr=result.stderr,
+        )
+    return result

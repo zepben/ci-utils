@@ -43,7 +43,6 @@ def lint(helm_dir: Path, chart: Path) -> None:
                 str(CT_YAML),
                 "--charts",
                 str(chart),
-                capture_stdout=False,
             )
         except CalledProcessError as e:
             raise ClickException(f"lint failed with rc={e.returncode}") from e

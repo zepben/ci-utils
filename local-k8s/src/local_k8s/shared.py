@@ -45,15 +45,28 @@ def resolve(name: str) -> None:
 
 
 @overload
-def execute(*args: str, capture_stdout: Literal[True] = True) -> str: ...
+def execute(
+    *args: str,
+    capture_stdout: Literal[True] = True,
+    skip_resolve: bool = False,
+) -> str: ...
 
 
 @overload
-def execute(*args: str, capture_stdout: Literal[False]) -> int: ...
+def execute(
+    *args: str,
+    capture_stdout: Literal[False],
+    skip_resolve: bool = False,
+) -> int: ...
 
 
-def execute(*args: str, capture_stdout: bool = True) -> str | int:
-    resolve(args[0])
+def execute(
+    *args: str,
+    capture_stdout: bool = True,
+    skip_resolve: bool = False,
+) -> str | int:
+    if not skip_resolve:
+        resolve(args[0])
     LOG.debug("Executing: %s", list(args))
     if capture_stdout:
         return subprocess.check_output(list(args), text=True)

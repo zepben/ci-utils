@@ -6,8 +6,9 @@ from subprocess import CalledProcessError
 import click
 import yaml
 from click import ClickException
+from pydantic import ValidationError
 
-from local_k8s.models import CiSecrets
+from local_k8s.models import ChartMetadata, CiSecrets
 from local_k8s.shared import execute
 from local_k8s.static import CI_SECRETS_YAML, CT_YAML
 
@@ -20,7 +21,7 @@ IMAGE_SECRET_NAME = "github-registry"
 LOG = logging.getLogger(__name__)
 
 
-@click.command("lint-and-install")
+@click.command("test")
 @click.option(
     "--helm-dir",
     type=click.Path(
@@ -31,14 +32,49 @@ LOG = logging.getLogger(__name__)
     ),
     required=True,
 )
-def lint_and_install(helm_dir: Path) -> None:
-    with chdir(helm_dir.absolute()):
-        if not CT_YAML.exists():
-            raise ClickException(f"{CT_YAML} is required in the root of --helm-dir")
+@click.option(
+    "--chart",
+    type=click.Path(
+        exists=False,
+        file_okay=False,
+        dir_okay=True,
+        path_type=Path,
+    ),
+    default=None,
+)
+def test(helm_dir: Path, chart: Path | None) -> None:
+    helm_dir = helm_dir.absolute()
+    if not (helm_dir / CT_YAML).is_file():
+        raise ClickException(f"{CT_YAML} is required in the root of --helm-dir")
 
+    with chdir(helm_dir):
         namespace = create_test_namespace(CT_YAML)
         create_secrets(namespace=namespace)
-        execute_lint_and_install(CT_YAML)
+
+        if chart is not None:
+            test_chart(helm_dir, chart)
+        else:
+            for discovered in discover_charts(helm_dir):
+                test_chart(helm_dir, discovered)
+
+
+def discover_charts(helm_dir: Path) -> list[Path]:
+    return sorted(
+        p.parent.relative_to(helm_dir) for p in helm_dir.glob("charts/*/Chart.yaml")
+    )
+
+
+def test_chart(helm_dir: Path, chart: Path) -> None:
+    try:
+        meta = ChartMetadata.from_chart_dir(helm_dir / chart)
+    except (ValueError, ValidationError) as e:
+        raise ClickException(str(e)) from e
+
+    if meta.type == "library":
+        click.echo(f"Skipping install for library chart: {meta.name}")
+        return
+
+    execute_lint_and_install(CT_YAML, chart)
 
 
 def create_test_namespace(ct_yaml_path: Path) -> str:
@@ -129,14 +165,15 @@ def secret_exists(namespace: str, secret_name: str) -> bool:
     return False
 
 
-def execute_lint_and_install(ct_yaml_path: Path) -> None:
+def execute_lint_and_install(ct_yaml_path: Path, chart: Path) -> None:
     try:
         execute(
             "ct",
             "lint-and-install",
             "--config",
             str(ct_yaml_path),
-            "--all",
+            "--charts",
+            str(chart),
             "--check-version-increment=false",
         )
     except CalledProcessError as e:

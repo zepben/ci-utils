@@ -63,3 +63,19 @@ class CiSecret(BaseModel):
 class CiSecrets(BaseModel):
     model_config = ConfigDict(extra="forbid")
     secrets: list[CiSecret]
+
+
+class ChartMetadata(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    name: str = Field(min_length=1)
+    version: str = Field(min_length=1)
+    type: str = "application"
+    appVersion: str | None = None
+
+    @classmethod
+    def from_chart_dir(cls, chart_dir: Path) -> Self:
+        chart_yaml = chart_dir / "Chart.yaml"
+        if not chart_yaml.is_file():
+            raise ValueError(f"Chart.yaml not found at {chart_yaml}")
+        return cls.model_validate(yaml.safe_load(chart_yaml.read_text()))

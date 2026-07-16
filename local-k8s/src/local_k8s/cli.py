@@ -3,6 +3,7 @@ import os
 
 import click
 
+from local_k8s.groups.chart import chart
 from local_k8s.groups.cluster import cluster
 from local_k8s.groups.ct import ct
 from local_k8s.groups.tools import tools
@@ -40,3 +41,4 @@ def configure_logging(verbose: int) -> None:
 cli.add_command(cluster)
 cli.add_command(tools)
 cli.add_command(ct)
+cli.add_command(chart)

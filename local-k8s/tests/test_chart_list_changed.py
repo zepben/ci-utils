@@ -1,35 +1,30 @@
+from collections.abc import Callable
 from pathlib import Path
-from unittest.mock import MagicMock, call
+from types import ModuleType
+from unittest.mock import call
 
-import pytest
 from click.testing import CliRunner
 
+from _fake_execute import FakeExecute
 from local_k8s.cli import cli
 from local_k8s.commands.chart import list_changed as list_changed_module
-from local_k8s.shared import CommandResult
 
 
 def test_list_changed_passes_repo_relative_paths(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    helm_dir: Path,
+    fake_execute: Callable[[ModuleType], FakeExecute],
 ) -> None:
-    helm_dir = tmp_path / "helm"
-    helm_dir.mkdir()
-    (helm_dir / "ct.yaml").write_text("{}\n")
-
-    mock_execute = MagicMock(
-        side_effect=[
-            CommandResult(0, f"{tmp_path.resolve()}\n", ""),
-            CommandResult(0, "", ""),
-        ]
-    )
-    monkeypatch.setattr(list_changed_module, "execute", mock_execute)
+    fake = fake_execute(list_changed_module)
+    fake.on("git", stdout=f"{tmp_path.resolve()}\n")
+    fake.on("ct", "list-changed")
 
     result = CliRunner().invoke(
         cli, ["chart", "list-changed", "--helm-dir", str(helm_dir)]
     )
 
     assert result.exit_code == 0
-    assert mock_execute.call_args_list == [
+    assert fake.calls == [
         call(
             "git",
             "-C",

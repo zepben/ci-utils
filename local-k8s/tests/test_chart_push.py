@@ -1,26 +1,28 @@
+from collections.abc import Callable
 from pathlib import Path
-from unittest.mock import MagicMock, call
+from types import ModuleType
+from unittest.mock import call
 
-import pytest
 from click.testing import CliRunner
 
+from _charts import write_chart
+from _fake_execute import FakeExecute
 from local_k8s.cli import cli
 from local_k8s.commands.chart import push as push_module
-from local_k8s.shared import CommandResult
 
 
 def test_push_fail_if_exists_aborts_when_chart_present(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, fake_execute: Callable[[ModuleType], FakeExecute]
 ) -> None:
-    chart = tmp_path / "charts" / "ewb"
-    chart.mkdir(parents=True)
-    (chart / "Chart.yaml").write_text("name: ewb\nversion: 1.2.3\n")
+    chart = write_chart(
+        tmp_path / "charts" / "ewb", {"name": "ewb", "version": "1.2.3"}
+    )
 
     auth = tmp_path / "auth.json"
     auth.write_text("{}\n")
 
-    mock_execute = MagicMock(return_value=CommandResult(0, "", ""))
-    monkeypatch.setattr(push_module, "execute", mock_execute)
+    fake = fake_execute(push_module)
+    fake.on("helm", "show", "chart")
 
     result = CliRunner().invoke(
         cli,
@@ -39,7 +41,7 @@ def test_push_fail_if_exists_aborts_when_chart_present(
 
     assert result.exit_code != 0
     assert "already exists" in result.output
-    assert mock_execute.call_args_list == [
+    assert fake.calls == [
         call(
             "helm",
             "show",

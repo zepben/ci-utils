@@ -1,42 +1,24 @@
+from collections.abc import Callable
 from pathlib import Path
-from subprocess import CalledProcessError
-from unittest.mock import MagicMock, call
+from types import ModuleType
+from unittest.mock import call
 
 import pytest
-import yaml
 from click.testing import CliRunner
 
+from _charts import write_chart
+from _fake_execute import FakeExecute
 from local_k8s.cli import cli
 from local_k8s.commands.chart import test as test_module
-from local_k8s.shared import CommandResult
-
-# Standard execute() side effects for the namespace/secret setup that runs once
-# per `chart test` invocation, before any chart-specific work happens.
-SETUP_RESULTS = [
-    CommandResult(0, "test-ns\n", ""),  # kubectl get namespaces
-    CommandResult(0, "", ""),  # kubectl get secrets (image pull secret check)
-    CommandResult(0, "", ""),  # kubectl create secret (image pull secret)
-]
 
 
 def _write_chart(
     helm_dir: Path, chart_dir_name: str, chart_type: str | None = None
 ) -> Path:
-    chart_dir = helm_dir / "charts" / chart_dir_name
-    chart_dir.mkdir(parents=True)
-    chart_yaml: dict[str, str] = {"name": chart_dir_name, "version": "1.0.0"}
+    chart_yaml: dict[str, object] = {"name": chart_dir_name, "version": "1.0.0"}
     if chart_type is not None:
         chart_yaml["type"] = chart_type
-    (chart_dir / "Chart.yaml").write_text(yaml.dump(chart_yaml))
-    return chart_dir
-
-
-@pytest.fixture
-def helm_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "helm"
-    d.mkdir()
-    (d / "ct.yaml").write_text("namespace: test-ns\n")
-    return d
+    return write_chart(helm_dir / "charts" / chart_dir_name, chart_yaml)
 
 
 @pytest.fixture
@@ -46,18 +28,38 @@ def patched_image_secret(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(test_module, "IMAGE_SECRET_PATHS", [auth_json])
 
 
-@pytest.fixture
-def mock_execute(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
-    mock = MagicMock()
-    monkeypatch.setattr(test_module, "execute", mock)
-    return mock
+def _install_chart_execute(
+    fake_execute: Callable[[ModuleType], FakeExecute],
+) -> FakeExecute:
+    return (
+        fake_execute(test_module)
+        .on("kubectl", "get", "namespaces", stdout="test-ns\n")
+        .on("kubectl", "get", "secrets")
+        .on("kubectl", "create", "secret")
+    )
+
+
+def test_test_missing_ct_yaml_fails(tmp_path: Path) -> None:
+    helm_dir = tmp_path / "helm"
+    helm_dir.mkdir()
+    _write_chart(helm_dir, "mychart")
+
+    result = CliRunner().invoke(
+        cli,
+        ["chart", "test", "--helm-dir", str(helm_dir), "--chart", "charts/mychart"],
+    )
+
+    assert result.exit_code != 0
+    assert "ct.yaml" in result.output
 
 
 def test_library_chart_skips_install(
-    helm_dir: Path, patched_image_secret: None, mock_execute: MagicMock
+    helm_dir: Path,
+    patched_image_secret: None,
+    fake_execute: Callable[[ModuleType], FakeExecute],
 ) -> None:
     _write_chart(helm_dir, "mylib", chart_type="library")
-    mock_execute.side_effect = list(SETUP_RESULTS)
+    fake = _install_chart_execute(fake_execute)
 
     result = CliRunner().invoke(
         cli, ["chart", "test", "--helm-dir", str(helm_dir), "--chart", "charts/mylib"]
@@ -65,21 +67,24 @@ def test_library_chart_skips_install(
 
     assert result.exit_code == 0, result.output
     assert "Skipping install" in result.output
-    assert not any(c.args[0] == "ct" for c in mock_execute.call_args_list)
+    assert fake.calls_for("ct") == []
 
 
 def test_application_chart_runs_lint_and_install(
-    helm_dir: Path, patched_image_secret: None, mock_execute: MagicMock
+    helm_dir: Path,
+    patched_image_secret: None,
+    fake_execute: Callable[[ModuleType], FakeExecute],
 ) -> None:
     _write_chart(helm_dir, "myapp")
-    mock_execute.side_effect = [*SETUP_RESULTS, CommandResult(0, "", "")]
+    fake = _install_chart_execute(fake_execute)
+    fake.on("ct", "lint-and-install")
 
     result = CliRunner().invoke(
         cli, ["chart", "test", "--helm-dir", str(helm_dir), "--chart", "charts/myapp"]
     )
 
     assert result.exit_code == 0, result.output
-    assert mock_execute.call_args_list[-1] == call(
+    assert fake.calls_for("ct")[-1] == call(
         "ct",
         "lint-and-install",
         "--config",
@@ -91,13 +96,13 @@ def test_application_chart_runs_lint_and_install(
 
 
 def test_application_chart_lint_and_install_failure_raises(
-    helm_dir: Path, patched_image_secret: None, mock_execute: MagicMock
+    helm_dir: Path,
+    patched_image_secret: None,
+    fake_execute: Callable[[ModuleType], FakeExecute],
 ) -> None:
     _write_chart(helm_dir, "myapp")
-    mock_execute.side_effect = [
-        *SETUP_RESULTS,
-        CalledProcessError(returncode=3, cmd=["ct", "lint-and-install"]),
-    ]
+    fake = _install_chart_execute(fake_execute)
+    fake.on("ct", "lint-and-install", returncode=3)
 
     result = CliRunner().invoke(
         cli, ["chart", "test", "--helm-dir", str(helm_dir), "--chart", "charts/myapp"]
@@ -107,3 +112,43 @@ def test_application_chart_lint_and_install_failure_raises(
     assert "rc=3" in result.output
 
 
+def test_discovery_mode_processes_all_charts_and_skips_libraries(
+    helm_dir: Path,
+    patched_image_secret: None,
+    fake_execute: Callable[[ModuleType], FakeExecute],
+) -> None:
+    _write_chart(helm_dir, "app-a")
+    _write_chart(helm_dir, "app-b")
+    _write_chart(helm_dir, "lib-a", chart_type="library")
+    fake = _install_chart_execute(fake_execute)
+    fake.on("ct", "lint-and-install")
+
+    result = CliRunner().invoke(cli, ["chart", "test", "--helm-dir", str(helm_dir)])
+
+    assert result.exit_code == 0, result.output
+    assert "Skipping install" in result.output
+
+    assert len(fake.calls_for("kubectl", "get", "namespaces")) == 1, (
+        "namespace/secret setup must run once, not per chart"
+    )
+
+    assert fake.calls_for("ct") == [
+        call(
+            "ct",
+            "lint-and-install",
+            "--config",
+            "ct.yaml",
+            "--charts",
+            "charts/app-a",
+            "--check-version-increment=false",
+        ),
+        call(
+            "ct",
+            "lint-and-install",
+            "--config",
+            "ct.yaml",
+            "--charts",
+            "charts/app-b",
+            "--check-version-increment=false",
+        ),
+    ]

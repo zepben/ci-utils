@@ -109,7 +109,7 @@ function configure_site() {
         fi
 
         echo "copying next spec..."
-        cp -r "${docs}/docs/spec/" static/spec/next
+        cp -r "${docs}/docs/spec/." static/spec/next
         echo "copying archive specs..."
         cp -r "${archive}/versioned_spec/." static/spec/
     fi

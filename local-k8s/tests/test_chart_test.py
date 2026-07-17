@@ -42,11 +42,11 @@ def _install_chart_execute(
 def test_test_missing_ct_yaml_fails(tmp_path: Path) -> None:
     helm_dir = tmp_path / "helm"
     helm_dir.mkdir()
-    _write_chart(helm_dir, "mychart")
+    chart_dir = _write_chart(helm_dir, "mychart")
 
     result = CliRunner().invoke(
         cli,
-        ["chart", "test", "--helm-dir", str(helm_dir), "--chart", "charts/mychart"],
+        ["chart", "test", "--helm-dir", str(helm_dir), "--chart", str(chart_dir)],
     )
 
     assert result.exit_code != 0
@@ -58,11 +58,11 @@ def test_library_chart_skips_install(
     patched_image_secret: None,
     fake_execute: Callable[[ModuleType], FakeExecute],
 ) -> None:
-    _write_chart(helm_dir, "mylib", chart_type="library")
+    chart_dir = _write_chart(helm_dir, "mylib", chart_type="library")
     fake = _install_chart_execute(fake_execute)
 
     result = CliRunner().invoke(
-        cli, ["chart", "test", "--helm-dir", str(helm_dir), "--chart", "charts/mylib"]
+        cli, ["chart", "test", "--helm-dir", str(helm_dir), "--chart", str(chart_dir)]
     )
 
     assert result.exit_code == 0, result.output
@@ -71,16 +71,22 @@ def test_library_chart_skips_install(
 
 
 def test_application_chart_runs_lint_and_install(
+    tmp_path: Path,
     helm_dir: Path,
     patched_image_secret: None,
     fake_execute: Callable[[ModuleType], FakeExecute],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_chart(helm_dir, "myapp")
     fake = _install_chart_execute(fake_execute)
     fake.on("ct", "lint-and-install")
 
+    # Mirrors the real workflow contract: invoked from repo root with the
+    # repo-root-relative path that `chart list-changed` would emit.
+    monkeypatch.chdir(tmp_path)
     result = CliRunner().invoke(
-        cli, ["chart", "test", "--helm-dir", str(helm_dir), "--chart", "charts/myapp"]
+        cli,
+        ["chart", "test", "--helm-dir", "helm", "--chart", "helm/charts/myapp"],
     )
 
     assert result.exit_code == 0, result.output
@@ -91,7 +97,7 @@ def test_application_chart_runs_lint_and_install(
         "ct.yaml",
         "--charts",
         "charts/myapp",
-        "--check-version-increment=false",
+        "--check-version-increment=true",
     )
 
 
@@ -100,16 +106,33 @@ def test_application_chart_lint_and_install_failure_raises(
     patched_image_secret: None,
     fake_execute: Callable[[ModuleType], FakeExecute],
 ) -> None:
-    _write_chart(helm_dir, "myapp")
+    chart_dir = _write_chart(helm_dir, "myapp")
     fake = _install_chart_execute(fake_execute)
     fake.on("ct", "lint-and-install", returncode=3)
 
     result = CliRunner().invoke(
-        cli, ["chart", "test", "--helm-dir", str(helm_dir), "--chart", "charts/myapp"]
+        cli, ["chart", "test", "--helm-dir", str(helm_dir), "--chart", str(chart_dir)]
     )
 
     assert result.exit_code != 0
     assert "rc=3" in result.output
+
+
+def test_chart_outside_helm_dir_fails(
+    tmp_path: Path,
+    helm_dir: Path,
+    patched_image_secret: None,
+    fake_execute: Callable[[ModuleType], FakeExecute],
+) -> None:
+    outside_chart = _write_chart(tmp_path / "other", "myapp")
+
+    result = CliRunner().invoke(
+        cli,
+        ["chart", "test", "--helm-dir", str(helm_dir), "--chart", str(outside_chart)],
+    )
+
+    assert result.exit_code != 0
+    assert "not inside --helm-dir" in result.output
 
 
 def test_discovery_mode_processes_all_charts_and_skips_libraries(
@@ -140,7 +163,7 @@ def test_discovery_mode_processes_all_charts_and_skips_libraries(
             "ct.yaml",
             "--charts",
             "charts/app-a",
-            "--check-version-increment=false",
+            "--check-version-increment=true",
         ),
         call(
             "ct",
@@ -149,6 +172,6 @@ def test_discovery_mode_processes_all_charts_and_skips_libraries(
             "ct.yaml",
             "--charts",
             "charts/app-b",
-            "--check-version-increment=false",
+            "--check-version-increment=true",
         ),
     ]

@@ -9,7 +9,7 @@ from click import ClickException
 from pydantic import ValidationError
 
 from local_k8s.models import ChartMetadata, CiSecrets
-from local_k8s.shared import execute
+from local_k8s.shared import ResolvedChart, execute, resolve_chart
 from local_k8s.static import CI_SECRETS_YAML, CT_YAML
 
 IMAGE_SECRET_PATHS = [
@@ -43,19 +43,27 @@ LOG = logging.getLogger(__name__)
     default=None,
 )
 def test(helm_dir: Path, chart: Path | None) -> None:
-    helm_dir = helm_dir.absolute()
+    helm_dir = helm_dir.resolve()
     if not (helm_dir / CT_YAML).is_file():
         raise ClickException(f"{CT_YAML} is required in the root of --helm-dir")
+
+    if chart is not None:
+        resolved_charts = [resolve_chart(helm_dir, chart)]
+    else:
+        resolved_charts = [
+            ResolvedChart(
+                absolute_path=helm_dir / discovered_chart,
+                path_relative_to_helm_dir=discovered_chart,
+            )
+            for discovered_chart in discover_charts(helm_dir)
+        ]
 
     with chdir(helm_dir):
         namespace = create_test_namespace(CT_YAML)
         create_secrets(namespace=namespace)
 
-        if chart is not None:
-            test_chart(helm_dir, chart)
-        else:
-            for discovered in discover_charts(helm_dir):
-                test_chart(helm_dir, discovered)
+        for resolved_chart in resolved_charts:
+            test_chart(resolved_chart)
 
 
 def discover_charts(helm_dir: Path) -> list[Path]:
@@ -64,9 +72,9 @@ def discover_charts(helm_dir: Path) -> list[Path]:
     )
 
 
-def test_chart(helm_dir: Path, chart: Path) -> None:
+def test_chart(resolved_chart: ResolvedChart) -> None:
     try:
-        meta = ChartMetadata.from_chart_dir(helm_dir / chart)
+        meta = ChartMetadata.from_chart_dir(resolved_chart.absolute_path)
     except (ValueError, ValidationError) as e:
         raise ClickException(str(e)) from e
 
@@ -74,7 +82,7 @@ def test_chart(helm_dir: Path, chart: Path) -> None:
         click.echo(f"Skipping install for library chart: {meta.name}")
         return
 
-    execute_lint_and_install(CT_YAML, chart)
+    execute_lint_and_install(CT_YAML, resolved_chart.path_relative_to_helm_dir)
 
 
 def create_test_namespace(ct_yaml_path: Path) -> str:
@@ -165,7 +173,9 @@ def secret_exists(namespace: str, secret_name: str) -> bool:
     return False
 
 
-def execute_lint_and_install(ct_yaml_path: Path, chart: Path) -> None:
+def execute_lint_and_install(
+    ct_yaml_path: Path, chart_path_relative_to_helm_dir: Path
+) -> None:
     try:
         execute(
             "ct",
@@ -173,8 +183,8 @@ def execute_lint_and_install(ct_yaml_path: Path, chart: Path) -> None:
             "--config",
             str(ct_yaml_path),
             "--charts",
-            str(chart),
-            "--check-version-increment=false",
+            str(chart_path_relative_to_helm_dir),
+            "--check-version-increment=true",
         )
     except CalledProcessError as e:
         raise ClickException(f"lint-and-install failed with rc={e.returncode}") from e

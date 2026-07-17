@@ -5,6 +5,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from click import ClickException
+
 from local_k8s.static import TOOLS_BY_NAME
 
 LOG = logging.getLogger(__name__)
@@ -15,6 +17,31 @@ class CommandResult:
     returncode: int
     stdout: str
     stderr: str
+
+
+@dataclass(frozen=True)
+class ResolvedChart:
+    absolute_path: Path
+    path_relative_to_helm_dir: Path
+
+
+def resolve_chart(helm_dir: Path, chart: Path) -> ResolvedChart:
+    """
+    chart list-changed emits a relative path which we need to resolve for
+    other commands to accept. This ensures the CI workflow in .github can
+    operate without any funny string munging.
+    """
+    absolute_path = chart.resolve()
+    try:
+        path_relative_to_helm_dir = absolute_path.relative_to(helm_dir)
+    except ValueError as e:
+        raise ClickException(
+            f"--chart {chart} is not inside --helm-dir {helm_dir}"
+        ) from e
+    return ResolvedChart(
+        absolute_path=absolute_path,
+        path_relative_to_helm_dir=path_relative_to_helm_dir,
+    )
 
 
 def get_repo_name() -> str:

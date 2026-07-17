@@ -13,6 +13,14 @@ from local_k8s.shared import execute
 REGISTRY_HOST = "ghcr.io"
 
 
+def _detailed_failure_for(step: str, e: CalledProcessError) -> ClickException:
+    stdout = e.output if isinstance(e.output, str) else ""
+    msg = f"{step} failed with rc={e.returncode}"
+    if stdout.strip():
+        msg = f"{msg}\n{stdout.strip()}"
+    return ClickException(msg)
+
+
 @click.command("push")
 @click.option(
     "--chart",
@@ -86,9 +94,10 @@ def push(
             str(chart),
             "--registry-config",
             registry_config_arg,
+            capture_stdout=True,
         )
     except CalledProcessError as e:
-        raise ClickException(f"dependency build failed with rc={e.returncode}") from e
+        raise _detailed_failure_for("dependency build", e) from e
 
     with TemporaryDirectory() as tmp:
         package_args = [
@@ -101,7 +110,7 @@ def push(
         if beta is not None:
             package_args.extend(["--version", version])
         try:
-            execute(*package_args)
+            execute(*package_args, capture_stdout=True)
             execute(
                 "helm",
                 "push",
@@ -109,6 +118,7 @@ def push(
                 oci_base,
                 "--registry-config",
                 registry_config_arg,
+                capture_stdout=True,
             )
             execute(
                 "helm",
@@ -119,9 +129,10 @@ def push(
                 version,
                 "--registry-config",
                 registry_config_arg,
+                capture_stdout=True,
             )
         except CalledProcessError as e:
-            raise ClickException(f"push failed with rc={e.returncode}") from e
+            raise _detailed_failure_for("push", e) from e
 
         click.echo(
             json.dumps(

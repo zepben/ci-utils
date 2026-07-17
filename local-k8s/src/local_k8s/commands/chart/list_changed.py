@@ -22,7 +22,8 @@ from local_k8s.static import CT_YAML
     required=True,
 )
 @click.option("--target-branch", default="main", show_default=True)
-def list_changed(helm_dir: Path, target_branch: str) -> None:
+@click.option("--since", default=None)
+def list_changed(helm_dir: Path, target_branch: str, since: str | None) -> None:
     helm_dir = helm_dir.resolve()
     ct_path = helm_dir / CT_YAML
     if not ct_path.is_file():
@@ -46,18 +47,20 @@ def list_changed(helm_dir: Path, target_branch: str) -> None:
     # the chart-dir/config need to be relative not absolute. This is
     # why we convert to relative below, if that is not done, it asplodes.
     with chdir(repo_root):
+        args = [
+            "ct",
+            "list-changed",
+            "--config",
+            str(ct_path.relative_to(repo_root)),
+            "--chart-dirs",
+            str((helm_dir / "charts").relative_to(repo_root)),
+            "--target-branch",
+            target_branch,
+        ]
+        if since is not None:
+            args.extend(["--since", since])
         try:
-            out = execute(
-                "ct",
-                "list-changed",
-                "--config",
-                str(ct_path.relative_to(repo_root)),
-                "--chart-dirs",
-                str((helm_dir / "charts").relative_to(repo_root)),
-                "--target-branch",
-                target_branch,
-                capture_stdout=True,
-            )
+            out = execute(*args, capture_stdout=True)
         except CalledProcessError as e:
             raise ClickException(f"list-changed failed with rc={e.returncode}") from e
         charts = [line.strip() for line in out.stdout.splitlines() if line.strip()]

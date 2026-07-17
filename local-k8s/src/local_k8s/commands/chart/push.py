@@ -84,6 +84,8 @@ def push(
             "dependency",
             "build",
             str(chart),
+            "--registry-config",
+            registry_config_arg,
         )
     except CalledProcessError as e:
         raise ClickException(f"dependency build failed with rc={e.returncode}") from e

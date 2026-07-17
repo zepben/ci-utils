@@ -109,6 +109,11 @@ def install_binary_tools() -> None:
     LOG.info(f"export PATH={bin_dir.resolve()}:$PATH")
 
 
+@click.command("path")
+def path() -> None:
+    click.echo(str(get_bin_dir().resolve()))
+
+
 @click.command("install")
 def install() -> None:
     system = platform.system()

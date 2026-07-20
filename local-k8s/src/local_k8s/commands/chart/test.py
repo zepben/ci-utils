@@ -6,9 +6,10 @@ from subprocess import CalledProcessError
 import click
 import yaml
 from click import ClickException
+from pydantic import ValidationError
 
-from local_k8s.models import CiSecrets
-from local_k8s.shared import execute
+from local_k8s.models import ChartMetadata, CiSecrets
+from local_k8s.shared import ResolvedChart, execute, resolve_chart
 from local_k8s.static import CI_SECRETS_YAML, CT_YAML
 
 IMAGE_SECRET_PATHS = [
@@ -20,7 +21,7 @@ IMAGE_SECRET_NAME = "github-registry"
 LOG = logging.getLogger(__name__)
 
 
-@click.command("lint-and-install")
+@click.command("test")
 @click.option(
     "--helm-dir",
     type=click.Path(
@@ -31,14 +32,57 @@ LOG = logging.getLogger(__name__)
     ),
     required=True,
 )
-def lint_and_install(helm_dir: Path) -> None:
-    with chdir(helm_dir.absolute()):
-        if not CT_YAML.exists():
-            raise ClickException(f"{CT_YAML} is required in the root of --helm-dir")
+@click.option(
+    "--chart",
+    type=click.Path(
+        exists=False,
+        file_okay=False,
+        dir_okay=True,
+        path_type=Path,
+    ),
+    default=None,
+)
+def test(helm_dir: Path, chart: Path | None) -> None:
+    helm_dir = helm_dir.resolve()
+    if not (helm_dir / CT_YAML).is_file():
+        raise ClickException(f"{CT_YAML} is required in the root of --helm-dir")
 
+    if chart is not None:
+        resolved_charts = [resolve_chart(helm_dir, chart)]
+    else:
+        resolved_charts = [
+            ResolvedChart(
+                absolute_path=helm_dir / discovered_chart,
+                path_relative_to_helm_dir=discovered_chart,
+            )
+            for discovered_chart in discover_charts(helm_dir)
+        ]
+
+    with chdir(helm_dir):
         namespace = create_test_namespace(CT_YAML)
         create_secrets(namespace=namespace)
-        execute_lint_and_install(CT_YAML)
+
+        for resolved_chart in resolved_charts:
+            test_chart(resolved_chart)
+
+
+def discover_charts(helm_dir: Path) -> list[Path]:
+    return sorted(
+        p.parent.relative_to(helm_dir) for p in helm_dir.glob("charts/*/Chart.yaml")
+    )
+
+
+def test_chart(resolved_chart: ResolvedChart) -> None:
+    try:
+        meta = ChartMetadata.from_chart_dir(resolved_chart.absolute_path)
+    except (ValueError, ValidationError) as e:
+        raise ClickException(str(e)) from e
+
+    if meta.type == "library":
+        click.echo(f"Skipping install for library chart: {meta.name}")
+        return
+
+    execute_lint_and_install(CT_YAML, resolved_chart.path_relative_to_helm_dir)
 
 
 def create_test_namespace(ct_yaml_path: Path) -> str:
@@ -46,8 +90,8 @@ def create_test_namespace(ct_yaml_path: Path) -> str:
     test_namespace: str | None = ct_yaml.get("namespace")
     if test_namespace is None:
         raise ClickException(f"namespace must be specified in {CT_YAML}")
-    namespaces = execute("kubectl", "get", "namespaces")
-    for line in namespaces.splitlines():
+    namespaces = execute("kubectl", "get", "namespaces", capture_stdout=True)
+    for line in namespaces.stdout.splitlines():
         ns, *_ = line.split()
         if ns == test_namespace:
             break
@@ -110,7 +154,6 @@ def create_image_pull_secret(namespace: str) -> None:
             f"--namespace={namespace}",
             f"--from-file=.dockerconfigjson={auth_json_path}",
             "--type=kubernetes.io/dockerconfigjson",
-            capture_stdout=False,
         )
 
 
@@ -121,24 +164,27 @@ def secret_exists(namespace: str, secret_name: str) -> bool:
         "secrets",
         f"--namespace={namespace}",
         "--no-headers",
+        capture_stdout=True,
     )
-    for line in existing_secrets.splitlines():
+    for line in existing_secrets.stdout.splitlines():
         existing_secret, *_ = line.split()
         if existing_secret == secret_name:
             return True
     return False
 
 
-def execute_lint_and_install(ct_yaml_path: Path) -> None:
+def execute_lint_and_install(
+    ct_yaml_path: Path, chart_path_relative_to_helm_dir: Path
+) -> None:
     try:
         execute(
             "ct",
             "lint-and-install",
             "--config",
             str(ct_yaml_path),
-            "--all",
-            "--check-version-increment=false",
-            capture_stdout=False,
+            "--charts",
+            str(chart_path_relative_to_helm_dir),
+            "--check-version-increment=true",
         )
     except CalledProcessError as e:
         raise ClickException(f"lint-and-install failed with rc={e.returncode}") from e

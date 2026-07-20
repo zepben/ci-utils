@@ -2,12 +2,46 @@ import logging
 import os
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, overload
+
+from click import ClickException
 
 from local_k8s.static import TOOLS_BY_NAME
 
 LOG = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class CommandResult:
+    returncode: int
+    stdout: str
+    stderr: str
+
+
+@dataclass(frozen=True)
+class ResolvedChart:
+    absolute_path: Path
+    path_relative_to_helm_dir: Path
+
+
+def resolve_chart(helm_dir: Path, chart: Path) -> ResolvedChart:
+    """
+    chart list-changed emits a relative path which we need to resolve for
+    other commands to accept. This ensures the CI workflow in .github can
+    operate without any funny string munging.
+    """
+    absolute_path = chart.resolve()
+    try:
+        path_relative_to_helm_dir = absolute_path.relative_to(helm_dir)
+    except ValueError as e:
+        raise ClickException(
+            f"--chart {chart} is not inside --helm-dir {helm_dir}"
+        ) from e
+    return ResolvedChart(
+        absolute_path=absolute_path,
+        path_relative_to_helm_dir=path_relative_to_helm_dir,
+    )
 
 
 def get_repo_name() -> str:
@@ -44,18 +78,35 @@ def resolve(name: str) -> None:
         raise Exception(f"{name} not installed at {path}; run: local-k8s tools install")
 
 
-@overload
-def execute(*args: str, capture_stdout: Literal[True] = True) -> str: ...
-
-
-@overload
-def execute(*args: str, capture_stdout: Literal[False]) -> int: ...
-
-
-def execute(*args: str, capture_stdout: bool = True) -> str | int:
-    resolve(args[0])
+def execute(
+    *args: str,
+    capture_stdout: bool = False,
+    capture_stderr: bool = False,
+    skip_resolve: bool = False,
+    check: bool = True,
+    input: str | None = None,
+) -> CommandResult:
+    if not skip_resolve:
+        resolve(args[0])
     LOG.debug("Executing: %s", list(args))
-    if capture_stdout:
-        return subprocess.check_output(list(args), text=True)
-    else:
-        return subprocess.check_call(list(args))
+    completed = subprocess.run(
+        list(args),
+        input=input,
+        text=True,
+        stdout=subprocess.PIPE if capture_stdout else None,
+        stderr=subprocess.PIPE if capture_stderr else None,
+        check=False,
+    )
+    result = CommandResult(
+        returncode=completed.returncode,
+        stdout=completed.stdout or "",
+        stderr=completed.stderr or "",
+    )
+    if check and result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            list(args),
+            output=result.stdout,
+            stderr=result.stderr,
+        )
+    return result

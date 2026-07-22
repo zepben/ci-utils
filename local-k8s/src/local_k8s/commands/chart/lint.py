@@ -5,6 +5,7 @@ from subprocess import CalledProcessError
 import click
 from click import ClickException
 
+from local_k8s.models import ChartMetadata, ChartTestingConfig
 from local_k8s.shared import execute, resolve_chart
 from local_k8s.static import CT_YAML
 
@@ -32,11 +33,16 @@ from local_k8s.static import CT_YAML
 )
 def lint(helm_dir: Path, chart: Path) -> None:
     helm_dir = helm_dir.resolve()
-    if not (helm_dir / CT_YAML).is_file():
+    ct_path = helm_dir / CT_YAML
+    if not ct_path.is_file():
         raise ClickException(f"{CT_YAML} is required in the root of --helm-dir")
 
     resolved_chart = resolve_chart(helm_dir, chart)
-
+    ct_config = ChartTestingConfig.from_chart_dir(helm_dir)
+    chart_metadata = ChartMetadata.from_chart_dir(
+        resolved_chart.path_relative_to_helm_dir
+    )
+    validate_dependencies_present(chart_metadata, ct_config, ct_path)
     with chdir(helm_dir):
         try:
             execute(
@@ -50,3 +56,15 @@ def lint(helm_dir: Path, chart: Path) -> None:
             )
         except CalledProcessError as e:
             raise ClickException(f"lint failed with rc={e.returncode}") from e
+
+
+def validate_dependencies_present(
+    chart_metadata: ChartMetadata, ct_config: ChartTestingConfig, ct_path: Path
+) -> None:
+    # Syntax is <name>=<url>
+    chart_repos = [repo.split("=")[-1] for repo in ct_config.chart_repos]
+    for dependency in chart_metadata.dependencies:
+        if dependency.repository not in chart_repos:
+            raise ClickException(
+                f"{dependency.repository} not found in {ct_path}. It needs to be added under the chart_repos list, in the format <name>=<url>"
+            )

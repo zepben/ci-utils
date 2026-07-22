@@ -13,6 +13,7 @@ def test_metadata_full_fields(tmp_path: Path) -> None:
         "version": "1.2.3",
         "type": "library",
         "appVersion": "9.0",
+        "dependencies": [],
     }
     chart_dir = write_chart(tmp_path / "mychart", chart_yaml)
 

@@ -1,4 +1,12 @@
-This repo is for creating container and virtual machine images using Packer.
+This repo contains useful tools used in CI workflows at Zepben.
+
+# Local K8s
+
+Local Kind cluster tooling used for development as well as shared helm repos. See [README](local-k8s/README.md).
+
+# Pipelines
+
+Creating container and virtual machine images using Packer.
 
 #### Tools needed
 1. [Packer](https://www.packer.io/downloads.html)

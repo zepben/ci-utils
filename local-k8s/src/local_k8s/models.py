@@ -46,6 +46,29 @@ class ClusterComponents(BaseModel):
         return cls.model_validate(data)
 
 
+class ChartTestingConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    remote: str
+    target_branch: str = Field(alias="target-branch")
+    chart_dirs: list[Path] = Field(alias="chart-dirs")
+    chart_repos: list[str] = Field(default_factory=list, alias="chart-repos")
+    validate_maintainers: bool = Field(alias="validate-maintainers")
+    check_version_increment: bool = Field(alias="check-version-increment")
+    namespace: str
+    release_label: str = Field(alias="release-label")
+    additional_commands: list[str] = Field(
+        default_factory=list, alias="additional-commands"
+    )
+
+    @classmethod
+    def from_chart_dir(cls, chart_dir: Path) -> Self:
+        chart_yaml = chart_dir / "ct.yaml"
+        if not chart_yaml.is_file():
+            raise ValueError(f"ct.yaml not found at {chart_yaml}")
+        return cls.model_validate(yaml.safe_load(chart_yaml.read_text()))
+
+
 class CiSecret(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -65,6 +88,14 @@ class CiSecrets(BaseModel):
     secrets: list[CiSecret]
 
 
+class ChartDependency(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    name: str = Field(min_length=1)
+    version: str = Field(min_length=1)
+    repository: str = Field(min_length=1)
+
+
 class ChartMetadata(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -72,6 +103,7 @@ class ChartMetadata(BaseModel):
     version: str = Field(min_length=1)
     type: str = "application"
     appVersion: str | None = None
+    dependencies: list[ChartDependency] = Field(default_factory=list)
 
     @classmethod
     def from_chart_dir(cls, chart_dir: Path) -> Self:

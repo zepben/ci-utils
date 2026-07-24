@@ -10,6 +10,8 @@ dependencies = [
     "click>=8.4.2",
     "pydantic>=2.13.4",
     "pyyaml>=6.0.3",
+    "requests>=2.32.0",
+    "tenacity>=9.0.0",
 ]
 
 [tool.setuptools.package-data]
@@ -20,6 +22,7 @@ dev = [
     "ruff",
     "mypy",
     "types-PyYAML",
+    "types-requests",
     "pytest",
     "pytest-randomly",
 ]

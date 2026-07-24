@@ -4,13 +4,23 @@ import shutil
 import subprocess
 import sys
 import tarfile
-import urllib.request
 from contextlib import suppress
 from importlib.resources import as_file, files
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import click
+import requests
+from requests.exceptions import (
+    RequestException,
+)
+from tenacity import (
+    Retrying,
+    before_sleep_log,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from local_k8s.models import RequiredTool
 from local_k8s.shared import execute, get_bin_dir, get_hash_dir, get_tools_dir
@@ -19,13 +29,13 @@ from local_k8s.static import TOOLS
 LOG = logging.getLogger(__name__)
 
 DOWNLOAD_TIMEOUT_SECONDS = 60
+DOWNLOAD_ATTEMPTS = 5
 
 
-def download(url: str, dest: Path, *, label: str | None = None) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
-        total = int(response.headers.get("Content-Length", -1))
-        length = total if total > 0 else None
+def download_url(url: str, dest: Path, *, label: str | None = None) -> None:
+    with requests.get(url, stream=True, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
+        response.raise_for_status()
+        length = int(response.headers.get("Content-Length", 0)) or None
         with (
             open(dest, "wb") as out,
             click.progressbar(  # type: ignore[var-annotated]
@@ -34,9 +44,28 @@ def download(url: str, dest: Path, *, label: str | None = None) -> None:
                 show_eta=length is not None,
             ) as bar,
         ):
-            while chunk := response.read(8192):
+            for chunk in response.iter_content(chunk_size=8192):
+                if not chunk:
+                    continue
                 out.write(chunk)
                 bar.update(len(chunk))
+
+
+def download(url: str, dest: Path, *, label: str | None = None) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    for attempt in Retrying(
+        stop=stop_after_attempt(DOWNLOAD_ATTEMPTS),
+        wait=wait_exponential_jitter(initial=1, max=30),
+        retry=retry_if_exception_type(RequestException),
+        before_sleep=before_sleep_log(LOG, logging.WARNING),
+        reraise=True,
+    ):
+        with attempt:
+            try:
+                download_url(url, dest, label=label)
+            except Exception:
+                dest.unlink(missing_ok=True)
+                raise
 
 
 def extract_archive_member(archive: Path, member: str, dest_dir: Path) -> None:

@@ -39,9 +39,7 @@ def lint(helm_dir: Path, chart: Path) -> None:
 
     resolved_chart = resolve_chart(helm_dir, chart)
     ct_config = ChartTestingConfig.from_chart_dir(helm_dir)
-    chart_metadata = ChartMetadata.from_chart_dir(
-        resolved_chart.path_relative_to_helm_dir
-    )
+    chart_metadata = ChartMetadata.from_chart_dir(resolved_chart.absolute_path)
     validate_dependencies_present(chart_metadata, ct_config, ct_path)
     with chdir(helm_dir):
         try:
@@ -64,6 +62,10 @@ def validate_dependencies_present(
     # Syntax is <name>=<url>
     chart_repos = [repo.split("=")[-1] for repo in ct_config.chart_repos]
     for dependency in chart_metadata.dependencies:
+        # helm pulls OCI deps from the url in Chart.yaml during dependency build without helm repo add,
+        # so no need for us to validate it's existence in chart repos.
+        if dependency.repository.startswith("oci://ghcr.io"):
+            continue
         if dependency.repository not in chart_repos:
             raise ClickException(
                 f"{dependency.repository} not found in {ct_path}. It needs to be added under the chart_repos list, in the format <name>=<url>"

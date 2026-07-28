@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zep-dev"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "click>=8.4.2",
+    "pydantic>=2.13.4",
+    "pyyaml>=6.0.3",
+    "requests>=2.32.0",
+    "tenacity>=9.0.0",
+]
+
+[tool.setuptools.package-data]
+zep_dev = ["resources/*"]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "mypy",
+    "types-PyYAML",
+    "types-requests",
+    "pytest",
+    "pytest-randomly",
+]
+
+[project.scripts]
+zep-dev = "zep_dev.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+mypy_path = "src"
+explicit_package_bases = true

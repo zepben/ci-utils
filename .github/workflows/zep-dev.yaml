@@ -1,0 +1,21 @@
+name: zep-dev
+
+on:
+  pull_request:
+    paths:
+      - "zep-dev/**"
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - name: Lint and test zep-dev
+        run: |
+          make check-zep-dev
+          make test-zep-dev
+          make setup-k8s
+          make teardown-k8s

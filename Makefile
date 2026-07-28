@@ -2,22 +2,22 @@ VENV     := .venv
 BIN      := $(VENV)/bin
 ACTIVATE := . $(BIN)/activate &&
 PYTHON   ?= python3
-LOCAL_K8S ?= local-k8s
+ZEP_DEV ?= zep-dev
 
-reformat: format-local-k8s
-check: check-local-k8s check-staged-formatted
+reformat: format-zep-dev
+check: check-zep-dev check-staged-formatted
 
-format-local-k8s: $(VENV)
-	$(BIN)/ruff format $(LOCAL_K8S)
-	$(BIN)/ruff check --fix $(LOCAL_K8S)
+format-zep-dev: $(VENV)
+	$(BIN)/ruff format $(ZEP_DEV)
+	$(BIN)/ruff check --fix $(ZEP_DEV)
 
-check-local-k8s: $(VENV)
-	$(BIN)/ruff format --check $(LOCAL_K8S)
-	$(BIN)/ruff check $(LOCAL_K8S)
-	cd $(LOCAL_K8S) && ../$(BIN)/mypy -p local_k8s
+check-zep-dev: $(VENV)
+	$(BIN)/ruff format --check $(ZEP_DEV)
+	$(BIN)/ruff check $(ZEP_DEV)
+	cd $(ZEP_DEV) && ../$(BIN)/mypy -p zep_dev
 
-test-local-k8s: $(VENV)
-	cd $(LOCAL_K8S) && ../$(BIN)/pytest
+test-zep-dev: $(VENV)
+	cd $(ZEP_DEV) && ../$(BIN)/pytest
 
 check-staged-formatted: reformat
 	@set -eu; \
@@ -29,18 +29,18 @@ check-staged-formatted: reformat
 	}
 
 setup-k8s: install-tools
-	$(BIN)/local-k8s cluster create \
-		--kind-config local-k8s/examples/kind-cluster.yaml \
-		--components local-k8s/examples/components.yaml
+	$(BIN)/zep-dev cluster create \
+		--kind-config zep-dev/examples/kind-cluster.yaml \
+		--components zep-dev/examples/components.yaml
 
 teardown-k8s: install-tools
-	$(BIN)/local-k8s cluster teardown
+	$(BIN)/zep-dev cluster teardown
 
 install-tools: $(VENV)
-	$(BIN)/local-k8s tools install
+	$(BIN)/zep-dev tools install
 
-$(VENV): $(LOCAL_K8S)/pyproject.toml .python-version
+$(VENV): $(ZEP_DEV)/pyproject.toml .python-version
 	$(PYTHON) -m venv $(VENV)
 	$(ACTIVATE) pip install yamllint
-	$(ACTIVATE) pip install -e "./$(LOCAL_K8S)[dev]"
+	$(ACTIVATE) pip install -e "./$(ZEP_DEV)[dev]"
 	touch $(VENV)

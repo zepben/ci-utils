@@ -1,8 +1,8 @@
 This repo contains useful tools used in CI workflows at Zepben.
 
-# Local K8s
+# Zep Dev
 
-Local Kind cluster tooling used for development as well as shared helm repos. See [README](local-k8s/README.md).
+Local Kind cluster tooling used for development as well as shared helm repos. See [README](zep-dev/README.md).
 
 # Pipelines
 

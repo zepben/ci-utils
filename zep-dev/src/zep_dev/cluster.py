@@ -137,7 +137,7 @@ def _add_local_repos_to_argocd(components: ClusterComponents) -> None:
                        stringData:
                          type: git
                          name: {desired}
-                         url: file:///mnt/local-repos/${desired}
+                         url: file:///mnt/local-repos/{desired}
                     """
             kubectl("apply", "-f", "-", input=repo_secret_yaml)
 

@@ -1,3 +1,8 @@
+local_repos:
+  - ci-utils
+  - deployments
+  - helm-commons
+
 helm_repos:
   argocd: "https://argoproj.github.io/argo-helm"
 cluster_components:

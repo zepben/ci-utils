@@ -39,7 +39,7 @@ class ClusterComponents(BaseModel):
     model_config = ConfigDict(extra="forbid")
     helm_repos: dict[str, str]
     cluster_components: list[ClusterComponent]
-    # local_repos: list[str]
+    local_repos: list[str]
 
     @classmethod
     def from_text_io(cls, input_data: TextIO) -> Self:

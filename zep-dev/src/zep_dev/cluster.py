@@ -36,13 +36,13 @@ def create_cluster(kind_config: Path, components: ClusterComponents) -> None:
     _create_kind_cluster(kind_config)
     _add_helm_repos(components)
     _install_helm_components(components)
-    # _add_local_repos_to_argocd(components)
+    _add_local_repos_to_argocd(components)
 
 
 def _create_kind_cluster(kind_config: Path) -> None:
     LOG.info("Creating kind cluster")
     for line in kind(
-        "get", "clusters", "--quiet", capture_stdout=True
+            "get", "clusters", "--quiet", capture_stdout=True
     ).stdout.splitlines():
         if line == CLUSTER_NAME:
             LOG.info("Reusing existing cluster: %s", CLUSTER_NAME)
@@ -105,6 +105,7 @@ def _install_helm_components(components: ClusterComponents) -> None:
 
 def _add_local_repos_to_argocd(components: ClusterComponents) -> None:
     LOG.info("Adding local repos to ArgoCD")
+    # TODO: it looks like this is returning secrets/<name-of-the-secret> so the deployed vs desired comparison doesn't work
     list_out = kubectl(
         "get",
         "secrets",
@@ -121,29 +122,24 @@ def _add_local_repos_to_argocd(components: ClusterComponents) -> None:
         if desired in deployed:
             LOG.info("Skipping already available local repo: %s", desired)
         else:
-            kubectl(
-                "apply",
-                "-f",
-                f"""
-                   <<EOF
-                     apiVersion: v1
-                     kind: Secret
-                     metadata:
-                       name: ${desired}
-                       namespace: argocd
-                       labels:
-                         argocd.argoproj.io/secret-type: repository
-                         v1.kubernetes.zepben.com.repo-location=local
-                       annotations:
-                         managed-by: argocd.argoproj.io
-                     type: Opaque
-                     stringData:
-                       type: git
-                       name: ${desired}
-                       url: file:///mnt/local-repos/deployments
-                   EOF
-                """
-            )
+            repo_secret_yaml = f"""
+                       apiVersion: v1
+                       kind: Secret
+                       metadata:
+                         name: {desired}
+                         namespace: argocd
+                         labels:
+                           argocd.argoproj.io/secret-type: repository
+                           v1.kubernetes.zepben.com/repo-location: local
+                         annotations:
+                           managed-by: argocd.argoproj.io
+                       type: Opaque
+                       stringData:
+                         type: git
+                         name: {desired}
+                         url: file:///mnt/local-repos/${desired}
+                    """
+            kubectl("apply", "-f", "-", input=repo_secret_yaml)
 
 
 def teardown_cluster() -> None:
@@ -195,6 +191,6 @@ def helm(*args: str, capture_stdout: bool = False) -> CommandResult:
         return execute("helm", *args, capture_stdout=capture_stdout)
 
 
-def kubectl(*args: str, capture_stdout: bool = False) -> CommandResult:
+def kubectl(*args: str, capture_stdout: bool = False, input: str | None = None) -> CommandResult:
     with kube_guard():
-        return execute("kubectl", *args, capture_stdout=capture_stdout)
+        return execute("kubectl", *args, capture_stdout=capture_stdout, input=input)

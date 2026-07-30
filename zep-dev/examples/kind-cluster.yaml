@@ -8,6 +8,12 @@ nodes:
         hostPort: 8080
         protocol: TCP
   - role: worker
+    extraMounts:
+      # This is to make local repos available to ArgoCD
+      - hostPath: /home/roberto/Desktop/EVOLVE/repos
+        containerPath: /mnt/local-repos
+        readOnly: true
+
     kubeadmConfigPatches:
       - |
         kind: JoinConfiguration

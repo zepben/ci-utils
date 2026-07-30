@@ -36,6 +36,7 @@ def create_cluster(kind_config: Path, components: ClusterComponents) -> None:
     _create_kind_cluster(kind_config)
     _add_helm_repos(components)
     _install_helm_components(components)
+    # _add_local_repos_to_argocd(components)
 
 
 def _create_kind_cluster(kind_config: Path) -> None:
@@ -100,6 +101,49 @@ def _install_helm_components(components: ClusterComponents) -> None:
             for key, value in desired.set.items():
                 install_args.extend(["--set", f"{key}={value}"])
             helm(*install_args)
+
+
+def _add_local_repos_to_argocd(components: ClusterComponents) -> None:
+    LOG.info("Adding local repos to ArgoCD")
+    list_out = kubectl(
+        "get",
+        "secrets",
+        "-n",
+        "argocd",
+        "-l",
+        "argocd.argoproj.io/secret-type=repository,v1.kubernetes.zepben.com.repo-location=local",
+        "-o",
+        "jsonpath='{.items[*].metadata.name}'",
+        capture_stdout=True
+    )
+    deployed = list_out.stdout.splitlines()
+    for desired in components.local_repos:
+        if desired in deployed:
+            LOG.info("Skipping already available local repo: %s", desired)
+        else:
+            kubectl(
+                "apply",
+                "-f",
+                f"""
+                   <<EOF
+                     apiVersion: v1
+                     kind: Secret
+                     metadata:
+                       name: ${desired}
+                       namespace: argocd
+                       labels:
+                         argocd.argoproj.io/secret-type: repository
+                         v1.kubernetes.zepben.com.repo-location=local
+                       annotations:
+                         managed-by: argocd.argoproj.io
+                     type: Opaque
+                     stringData:
+                       type: git
+                       name: ${desired}
+                       url: file:///mnt/local-repos/deployments
+                   EOF
+                """
+            )
 
 
 def teardown_cluster() -> None:

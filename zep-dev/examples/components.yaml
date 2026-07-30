@@ -24,3 +24,12 @@ cluster_components:
       # Expose to the host so we can browse without port-forwarding, see kind-cluster.yaml
       server.service.nodePortHttp: "30080"
       server.service.type: "NodePort"
+
+
+      # Mount directory holding your local repos to make them visible to ArgoCD
+      repoServer.volumes[0].name: "local-repos"
+      repoServer.volumes[0].hostPath.path: "/mnt/local-repos"
+      repoServer.volumes[0].hostPath.type: "Directory"
+
+      repoServer.volumeMounts[0].name: "local-repos"
+      repoServer.volumeMounts[0].mountPath: "/mnt/local-repos"

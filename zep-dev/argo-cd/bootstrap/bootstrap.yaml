@@ -7,10 +7,15 @@ metadata:
     type: system
 spec:
   project: default
-  source:
-    repoURL: file:///mnt/local-repos/ci-utils
-    targetRevision: HEAD
-    path: zep-dev/argo-cd/bootstrap
+  sources:
+    - repoURL: file:///mnt/local-repos/ci-utils
+      targetRevision: HEAD
+      path: zep-dev/argo-cd/bootstrap
+
+    - repoURL: file:///mnt/local-repos/ci-utils
+      targetRevision: main
+      path: zep-dev/argo-cd/commons
+
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd

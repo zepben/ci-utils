@@ -13,7 +13,7 @@ spec:
       path: zep-dev/argo-cd/bootstrap
 
     - repoURL: file:///mnt/local-repos/ci-utils
-      targetRevision: main
+      targetRevision: HEAD
       path: zep-dev/argo-cd/commons
 
   destination:

@@ -13,7 +13,7 @@ class ClusterComponent(BaseModel):
     chart: str
     version: str
     namespace: str
-    set: dict[str, str] = Field(default_factory=dict)
+    values: dict[str, Any] = Field(default_factory=dict)
 
 
 class RequiredTool(BaseModel):

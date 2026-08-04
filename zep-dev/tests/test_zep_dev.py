@@ -21,28 +21,30 @@ def test_examples_components_yaml_parses() -> None:
     )
 
     assert components.helm_repos == {
-        "argocd": "https://argoproj.github.io/argo-helm",
+        "argo": "https://argoproj.github.io/argo-helm",
     }
     assert len(components.cluster_components) == 1
 
-    argocd = components.cluster_components[0]
-    assert argocd.name == "argocd"
-    assert argocd.chart == "argocd/argo-cd"
-    assert argocd.version == "10.0.1"
-    assert argocd.namespace == "argocd"
-    assert argocd.set["server.service.type"] == "NodePort"
+    argo_cd = components.cluster_components[0]
+    assert argo_cd.name == "argo-cd"
+    assert argo_cd.chart == "argo/argo-cd"
+    assert argo_cd.version == "9.5.0"
+    assert argo_cd.namespace == "argo-cd"
+    assert argo_cd.values["server"]["service"]["type"] == "NodePort"
+    assert argo_cd.values["configs"]["cm"]["admin.enabled"] is True
+    assert argo_cd.values["dex"]["enabled"] is False
 
 
 def test_empty_cluster_components_valid() -> None:
     yaml_input = """\
 helm_repos:
-  argocd: "https://argoproj.github.io/argo-helm"
+  argo: "https://argoproj.github.io/argo-helm"
 cluster_components: []
 """
     components = ClusterComponents.from_text_io(StringIO(yaml_input))
 
     assert components.helm_repos == {
-        "argocd": "https://argoproj.github.io/argo-helm",
+        "argo": "https://argoproj.github.io/argo-helm",
     }
     assert components.cluster_components == []
 

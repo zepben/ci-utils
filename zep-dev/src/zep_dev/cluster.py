@@ -5,6 +5,8 @@ from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import yaml
+
 from zep_dev.models import ClusterComponents
 from zep_dev.shared import CommandResult, execute
 
@@ -86,20 +88,26 @@ def _install_helm_components(components: ClusterComponents) -> None:
         if desired.name in installed:
             LOG.info("Skipping already installed chart: %s", desired.name)
         else:
-            install_args: list[str] = [
-                "install",
-                desired.name,
-                desired.chart,
-                "--namespace",
-                desired.namespace,
-                "--create-namespace",
-                "--version",
-                desired.version,
-                "--wait",
-            ]
-            for key, value in desired.set.items():
-                install_args.extend(["--set", f"{key}={value}"])
-            helm(*install_args)
+            with TemporaryDirectory() as tmpdir:
+                install_args: list[str] = [
+                    "install",
+                    desired.name,
+                    desired.chart,
+                    "--namespace",
+                    desired.namespace,
+                    "--create-namespace",
+                    "--version",
+                    desired.version,
+                    "--wait",
+                ]
+                if desired.values:
+                    values_path = Path(tmpdir) / "values.yaml"
+                    values_path.write_text(
+                        yaml.safe_dump(desired.values, default_flow_style=False),
+                        encoding="utf-8",
+                    )
+                    install_args.extend(["-f", str(values_path)])
+                helm(*install_args)
 
 
 def teardown_cluster() -> None:

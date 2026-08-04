@@ -1,13 +1,21 @@
+import json
 import logging
 import os
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager, nullcontext
 from pathlib import Path
+from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
+from typing import Any
 
 import yaml
+from click import ClickException
 
-from zep_dev.models import ClusterComponents
+from zep_dev.models import (
+    LOCAL_REPO_MOUNT_ROOT,
+    ClusterComponents,
+    LocalRepo,
+)
 from zep_dev.shared import CommandResult, execute
 
 CLUSTER_NAME = "test-cluster"
@@ -34,29 +42,77 @@ def kube_guard() -> Generator[None]:
         os.environ.pop("KUBECONFIG", None)
 
 
-def create_cluster(kind_config: Path, components: ClusterComponents) -> None:
-    _create_kind_cluster(kind_config)
+def create_cluster(
+    kind_config: Path,
+    components: ClusterComponents,
+    local_repos: Sequence[Path] = (),
+) -> None:
+    repos = _load_local_repos(local_repos)
+    _create_kind_cluster(kind_config, repos)
     _add_helm_repos(components)
     _install_helm_components(components)
 
 
-def _create_kind_cluster(kind_config: Path) -> None:
-    LOG.info("Creating kind cluster")
-    for line in kind(
-        "get", "clusters", "--quiet", capture_stdout=True
-    ).stdout.splitlines():
-        if line == CLUSTER_NAME:
-            LOG.info("Reusing existing cluster: %s", CLUSTER_NAME)
-            break
-    else:
-        kind(
-            "create",
-            "cluster",
-            "--name",
-            CLUSTER_NAME,
-            "--config",
-            str(kind_config),
+def _load_local_repos(paths: Sequence[Path]) -> tuple[LocalRepo, ...]:
+    repos = tuple(LocalRepo(path=path.resolve()) for path in paths)
+    seen: set[str] = set()
+    for repo in repos:
+        if repo.basename in seen:
+            raise ClickException(f"duplicate --local-repo basename: {repo.basename}")
+        seen.add(repo.basename)
+        _validate_repo(repo)
+    return repos
+
+
+def _validate_repo(repo: LocalRepo) -> None:
+    try:
+        toplevel = Path(
+            execute(
+                "git",
+                "-C",
+                str(repo.path),
+                "rev-parse",
+                "--show-toplevel",
+                skip_resolve=True,
+                capture_stdout=True,
+            ).stdout.strip()
+        ).resolve()
+    except CalledProcessError as e:
+        raise ClickException(f"--local-repo is not a Git work tree: {repo.path}") from e
+    if repo.path != toplevel:
+        raise ClickException(
+            f"--local-repo must be a Git repository toplevel: {repo.path} "
+            f"(toplevel is {toplevel})"
         )
+
+
+def _create_kind_cluster(kind_config: Path, local_repos: Sequence[LocalRepo]) -> None:
+    LOG.info("Creating kind cluster")
+    existing = kind(
+        "get", "clusters", "--quiet", capture_stdout=True
+    ).stdout.splitlines()
+    if CLUSTER_NAME in existing:
+        if local_repos:
+            # Ensure that if we have a running cluster, the mounts are the same
+            # as passed on the command line. Otherwise we would have a silent
+            # and confusing failure mode.
+            _validate_existing_worker_mounts(local_repos)
+        LOG.info("Reusing existing cluster: %s", CLUSTER_NAME)
+        return
+
+    rendered_config = _inject_repo_mounts(kind_config, local_repos)
+
+    config_path = Path("/tmp/kind-config.yaml")
+    config_path.write_text(rendered_config, encoding="utf-8")
+
+    kind(
+        "create",
+        "cluster",
+        "--name",
+        CLUSTER_NAME,
+        "--config",
+        str(config_path),
+    )
     kind(
         "export",
         "kubeconfig",
@@ -65,6 +121,86 @@ def _create_kind_cluster(kind_config: Path) -> None:
         "--kubeconfig",
         str(KUBECONF_PATH),
     )
+
+
+def _validate_existing_worker_mounts(local_repos: Sequence[LocalRepo]) -> None:
+    """
+    Call podman and extract the mounts our running kind cluster has configured.
+    If they are not the exact same set as we have passed on the command line --local-repos,
+    fail.
+    """
+    out = kind("get", "nodes", "--name", CLUSTER_NAME, capture_stdout=True)
+    workers = tuple(
+        name for name in out.stdout.splitlines() if not name.endswith("-control-plane")
+    )
+    if not workers:
+        raise ClickException("--local-repo requires at least one worker node.")
+
+    expected_mounts = {(str(repo.path), repo.container_path) for repo in local_repos}
+    for worker in workers:
+        existing_mounts = _inspect_live_mounts(worker)
+        if existing_mounts != expected_mounts:
+            raise ClickException(
+                "Existing cluster local-repo mounts do not match --local-repo. "
+                "Run: zep-dev cluster teardown"
+            )
+
+
+def _inspect_live_mounts(worker: str) -> set[tuple[str, str]]:
+    raw_mounts = podman(
+        "inspect",
+        worker,
+        "--format",
+        "{{json .Mounts}}",
+        capture_stdout=True,
+    ).stdout
+    mounts: Any = json.loads(raw_mounts)
+    if not isinstance(mounts, list):
+        raise ClickException(f"podman inspect returned invalid mounts for {worker}")
+
+    local_mounts = set()
+    for mount in mounts:
+        if not isinstance(mount, dict):
+            continue
+        if mount.get("Type") != "bind":
+            continue
+        source = mount.get("Source")
+        destination = mount.get("Destination")
+        if not isinstance(source, str) or not isinstance(destination, str):
+            continue
+        if not destination.startswith(f"{LOCAL_REPO_MOUNT_ROOT}/"):
+            continue
+        local_mounts.add((str(Path(source).resolve()), destination))
+
+    return local_mounts
+
+
+def _inject_repo_mounts(kind_config: Path, repos: Sequence[LocalRepo]) -> str:
+    config: Any = yaml.safe_load(kind_config.read_text(encoding="utf-8"))
+    if not isinstance(config, dict):
+        raise ClickException(f"kind config must be a mapping: {kind_config}")
+
+    nodes = config.get("nodes", [])
+    workers = [node for node in nodes if node.get("role") == "worker"]
+    if not workers:
+        raise ClickException(
+            "--local-repo requires at least one worker node in the kind config"
+        )
+
+    # Workers only: control-plane gets no extraMounts. The Argo overlay prevents
+    # Argo pods being scheduled on the control-plane nodes.
+    for worker in workers:
+        mounts = worker.setdefault("extraMounts", [])
+        mounts.extend(
+            {
+                "hostPath": str(repo.path),
+                "containerPath": repo.container_path,
+                "readOnly": True,
+            }
+            for repo in repos
+        )
+
+    return yaml.safe_dump(config, default_flow_style=False)
 
 
 def _add_helm_repos(components: ClusterComponents) -> None:
@@ -152,6 +288,15 @@ def dump_to_stdout(filter_namespaces: list[str], out_dir: Path) -> None:
 
 def kind(*args: str, capture_stdout: bool = False) -> CommandResult:
     return execute("kind", *args, capture_stdout=capture_stdout)
+
+
+def podman(*args: str, capture_stdout: bool = False) -> CommandResult:
+    return execute(
+        "podman",
+        *args,
+        capture_stdout=capture_stdout,
+        skip_resolve=True,
+    )
 
 
 def helm(*args: str, capture_stdout: bool = False) -> CommandResult:

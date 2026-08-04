@@ -5,6 +5,11 @@ cluster_components:
     chart: argo/argo-cd
     version: "9.5.0"
     namespace: argo-cd
+    # Signals to zep-dev to apply the extra ArgoCD values overlay
+    # that ensures we always schedule on a worker with the correct
+    # mounts, and that the expected env variables exist, etc.
+    local_repo_integration: argo-cd
+    # Complete values to be passed to helm.
     values:
       applicationSet:
         replicas: 1

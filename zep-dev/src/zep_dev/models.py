@@ -30,6 +30,7 @@ class ClusterComponent(BaseModel):
     chart: str
     version: str
     namespace: str
+    local_repo_integration: Literal["argo-cd"] | None = None
     values: dict[str, Any] = Field(default_factory=dict)
 
 

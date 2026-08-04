@@ -50,7 +50,7 @@ def create_cluster(
     repos = _load_local_repos(local_repos)
     _create_kind_cluster(kind_config, repos)
     _add_helm_repos(components)
-    _install_helm_components(components)
+    _install_helm_components(components, repos)
 
 
 def _load_local_repos(paths: Sequence[Path]) -> tuple[LocalRepo, ...]:
@@ -216,9 +216,76 @@ def _add_helm_repos(components: ClusterComponents) -> None:
         helm("repo", "update")
 
 
-def _install_helm_components(components: ClusterComponents) -> None:
+def _local_repos_overlay(local_repos: Sequence[LocalRepo]) -> dict[str, Any]:
+    """Helm values that expose --local-repo mounts to Argo CD.
+
+    kind extraMounts put the repos on workers under LOCAL_REPO_MOUNT_ROOT.
+    We hostPath that dir into repo-server, register each as a file:// git
+    repo, and set safe.directory=* so git accepts the bind-mounted ownership.
+    Affinity keeps repo-server off the control-plane, which has no mounts.
+    """
+    if not local_repos:
+        return {}
+
+    repositories = {
+        f"local-{repo.basename}": {
+            "name": repo.basename,
+            "type": "git",
+            "url": f"file://{repo.container_path}",
+        }
+        for repo in local_repos
+    }
+    return {
+        "configs": {"repositories": repositories},
+        "repoServer": {
+            "affinity": {
+                "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                        "nodeSelectorTerms": [
+                            {
+                                "matchExpressions": [
+                                    {
+                                        "key": "node-role.kubernetes.io/control-plane",
+                                        "operator": "DoesNotExist",
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            "env": [
+                {"name": "GIT_CONFIG_COUNT", "value": "1"},
+                {"name": "GIT_CONFIG_KEY_0", "value": "safe.directory"},
+                {"name": "GIT_CONFIG_VALUE_0", "value": "*"},
+            ],
+            "volumeMounts": [
+                {
+                    "name": "local-repos",
+                    "mountPath": LOCAL_REPO_MOUNT_ROOT,
+                    "readOnly": True,
+                }
+            ],
+            "volumes": [
+                {
+                    "name": "local-repos",
+                    "hostPath": {
+                        "path": LOCAL_REPO_MOUNT_ROOT,
+                        "type": "Directory",
+                    },
+                }
+            ],
+        },
+    }
+
+
+def _install_helm_components(
+    components: ClusterComponents,
+    local_repos: Sequence[LocalRepo] = (),
+) -> None:
     list_out = helm("list", "--all-namespaces", "--deployed", "-q", capture_stdout=True)
     installed = list_out.stdout.splitlines()
+    local_repos_overlay = _local_repos_overlay(local_repos)
     LOG.info("Installing cluster components")
     for desired in components.cluster_components:
         if desired.name in installed:
@@ -243,6 +310,13 @@ def _install_helm_components(components: ClusterComponents) -> None:
                         encoding="utf-8",
                     )
                     install_args.extend(["-f", str(values_path)])
+                if desired.local_repo_integration == "argo-cd" and local_repos_overlay:
+                    overlay_path = Path(tmpdir) / "local-repos-overlay.yaml"
+                    overlay_path.write_text(
+                        yaml.safe_dump(local_repos_overlay, default_flow_style=False),
+                        encoding="utf-8",
+                    )
+                    install_args.extend(["-f", str(overlay_path)])
                 helm(*install_args)
 
 

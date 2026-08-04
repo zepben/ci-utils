@@ -52,6 +52,5 @@ testpaths = ["tests"]
 python_version = "3.14"
 strict = true
 warn_unused_configs = true
-files = ["src/zep_dev"]
 mypy_path = "src"
 explicit_package_bases = true

@@ -1,3 +1,5 @@
+import base64
+import json
 import logging
 from pathlib import Path
 
@@ -12,6 +14,26 @@ IMAGE_SECRET_PATHS = [
 IMAGE_SECRET_NAME = "github-registry"
 
 LOG = logging.getLogger(__name__)
+
+
+def resolve_registry_credential(registry: str) -> tuple[str, str]:
+    try:
+        for path in IMAGE_SECRET_PATHS:
+            if not path.is_file():
+                continue
+            entry = json.loads(path.read_text(encoding="utf-8"))["auths"].get(registry)
+            if entry is None:
+                continue
+            decoded = base64.b64decode(entry["auth"], validate=True).decode("utf-8")
+            username, password = decoded.split(":", 1)
+            if not username or not password:
+                raise ValueError("credential contains an empty username or password")
+            return username, password
+        raise LookupError("credential was not found in local container auth")
+    except Exception as error:
+        raise ClickException(
+            f"Failed to resolve local credential for {registry}: {type(error).__name__}"
+        ) from error
 
 
 def create_image_pull_secret(namespace: str) -> None:

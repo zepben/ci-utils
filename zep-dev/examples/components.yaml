@@ -8,7 +8,8 @@ cluster_components:
     # Signals to zep-dev to apply the extra ArgoCD values overlay
     # that ensures we always schedule on a worker with the correct
     # mounts, and that the expected env variables exist, etc.
-    local_repo_integration: argo-cd
+    local_repo_integration:
+      type: argo-cd
     # Complete values to be passed to helm.
     values:
       applicationSet:

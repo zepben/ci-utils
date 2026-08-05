@@ -15,7 +15,13 @@ from zep_dev.k8s import (
     KUBECONF_PATH,
     kube_guard,
 )
-from zep_dev.models import ClusterComponent, ClusterComponents, LocalRepo
+from zep_dev.models import (
+    ClusterComponent,
+    ClusterComponents,
+    LocalRepo,
+    LocalRepoIntegration,
+    OciRepository,
+)
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 
@@ -33,7 +39,7 @@ def test_examples_components_yaml_parses() -> None:
     assert argo_cd.chart == "argo/argo-cd"
     assert argo_cd.version == "9.5.0"
     assert argo_cd.namespace == "argo-cd"
-    assert argo_cd.local_repo_integration == "argo-cd"
+    assert argo_cd.local_repo_integration == LocalRepoIntegration(type="argo-cd")
     assert argo_cd.values["server"]["service"]["type"] == "NodePort"
     assert argo_cd.values["configs"]["cm"]["admin.enabled"] is True
     assert argo_cd.values["dex"]["enabled"] is False
@@ -91,8 +97,10 @@ def test_add_helm_repos_skips_all_helm_when_no_repos_configured(
 def test_install_helm_components_applies_local_repo_integration_only_to_selected_component(
     fake_execute: Callable[[ModuleType], FakeExecute],
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     installed_values: dict[str, list[object]] = {}
+    reconciled_components: list[str] = []
 
     def capture_values(args: tuple[str, ...], kwargs: dict[str, object]) -> None:
         _, _, release, *_ = args
@@ -105,6 +113,11 @@ def test_install_helm_components_applies_local_repo_integration_only_to_selected
     fake.on("helm", "list", stdout="")
     fake.on("helm", "install", "argo", hook=capture_values)
     fake.on("helm", "install", "other", hook=capture_values)
+    monkeypatch.setattr(
+        cluster,
+        "_apply_argo_oci_repository_secrets",
+        lambda namespace, _repositories: reconciled_components.append(namespace),
+    )
     components = ClusterComponents(
         helm_repos={},
         cluster_components=[
@@ -113,7 +126,7 @@ def test_install_helm_components_applies_local_repo_integration_only_to_selected
                 chart="example/argo",
                 version="1.0.0",
                 namespace="argo",
-                local_repo_integration="argo-cd",
+                local_repo_integration=LocalRepoIntegration(type="argo-cd"),
                 values={"base": "argo"},
             ),
             ClusterComponent(
@@ -132,6 +145,7 @@ def test_install_helm_components_applies_local_repo_integration_only_to_selected
     )
 
     assert installed_values["other"] == [{"base": "other"}]
+    assert reconciled_components == ["argo"]
     base_values, overlay = installed_values["argo"]
     assert base_values == {"base": "argo"}
     assert overlay == {

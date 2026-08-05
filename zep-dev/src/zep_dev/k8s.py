@@ -23,9 +23,13 @@ def kube_guard() -> Generator[None]:
         os.environ.pop("KUBECONFIG", None)
 
 
-def kubectl(*args: str, capture_stdout: bool = False) -> CommandResult:
+def kubectl(
+    *args: str,
+    capture_stdout: bool = False,
+    input: str | None = None,
+) -> CommandResult:
     with kube_guard():
-        return execute("kubectl", *args, capture_stdout=capture_stdout)
+        return execute("kubectl", *args, capture_stdout=capture_stdout, input=input)
 
 
 def resource_exists(

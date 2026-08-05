@@ -46,6 +46,23 @@ TOOLS: list[RequiredTool] = [
         ),
         archive_member="shellcheck-{version}/shellcheck",
     ),
+    RequiredTool(
+        name="chainsaw",
+        version="0.2.15",
+        url=(
+            "https://github.com/kyverno/chainsaw/releases/download/"
+            "v{version}/chainsaw_linux_amd64.tar.gz"
+        ),
+        archive_member="chainsaw",
+    ),
+    RequiredTool(
+        name="argocd",
+        version="v3.3.6",
+        url=(
+            "https://github.com/argoproj/argo-cd/releases/download/"
+            "{version}/argocd-linux-amd64"
+        ),
+    ),
 ]
 TOOLS_BY_NAME = {tool.name: tool for tool in TOOLS}
 

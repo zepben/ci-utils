@@ -56,10 +56,11 @@ class RequiredTool(BaseModel):
     name: str
     version: str
     url: str
+    sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
     archive_member: str | None = None
 
     def to_hash(self) -> str:
-        return f"{self.name}-{self.version}-{self.url}"
+        return f"{self.name}-{self.version}-{self.url}-{self.sha256}"
 
     def exists(self, hash_dir: Path) -> bool:
         with suppress(OSError):

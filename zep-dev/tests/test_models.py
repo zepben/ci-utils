@@ -11,6 +11,7 @@ def tool() -> RequiredTool:
         name="ct",
         version="1.0",
         url="http://example/{version}",
+        sha256="0" * 64,
         archive_member="ct",
     )
 

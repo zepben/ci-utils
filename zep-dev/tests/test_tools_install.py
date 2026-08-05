@@ -37,6 +37,7 @@ def test_install_binary_tool_from_archive(
         name="test-tool",
         version="3.14.0",
         url="http://unused/{version}",
+        sha256="0" * 64,
         archive_member="ct",
     )
     dest = install_binary_tool(tool, tools_dir)
@@ -51,11 +52,17 @@ def test_download_cleans_up_after_exhausted_retries(
 ) -> None:
     dest = tmp_path / "tool"
 
-    def write_then_fail(url: str, dest: Path, *, label: str | None = None) -> None:
+    def write_then_fail(
+        url: str,
+        dest: Path,
+        *,
+        expected_sha256: str,
+        label: str | None = None,
+    ) -> None:
         dest.write_bytes(b"partial")
         raise RequestException("fail")
 
     monkeypatch.setattr(install_module, "download_url", write_then_fail)
     with pytest.raises(RequestException):
-        download("http://example/tool", dest)
+        download("http://example/tool", dest, expected_sha256="0" * 64)
     assert not dest.exists()

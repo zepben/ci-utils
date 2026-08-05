@@ -3,7 +3,7 @@ from pathlib import Path
 
 from click import ClickException
 
-from zep_dev.cluster import kubectl
+from zep_dev.k8s import kubectl, resource_exists
 
 IMAGE_SECRET_PATHS = [
     Path("~/.config/containers/auth.json").expanduser(),
@@ -25,7 +25,7 @@ def create_image_pull_secret(namespace: str) -> None:
             f"at paths: {IMAGE_SECRET_PATHS}"
         )
 
-    if not secret_exists(namespace=namespace, secret_name=IMAGE_SECRET_NAME):
+    if not resource_exists("secret", IMAGE_SECRET_NAME, namespace=namespace):
         kubectl(
             "create",
             "secret",
@@ -35,18 +35,3 @@ def create_image_pull_secret(namespace: str) -> None:
             f"--from-file=.dockerconfigjson={auth_json_path}",
             "--type=kubernetes.io/dockerconfigjson",
         )
-
-
-def secret_exists(namespace: str, secret_name: str) -> bool:
-    existing_secrets = kubectl(
-        "get",
-        "secrets",
-        f"--namespace={namespace}",
-        "--no-headers",
-        capture_stdout=True,
-    )
-    for line in existing_secrets.stdout.splitlines():
-        existing_secret, *_ = line.split()
-        if existing_secret == secret_name:
-            return True
-    return False

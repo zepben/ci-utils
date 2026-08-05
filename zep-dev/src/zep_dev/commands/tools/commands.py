@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import platform
 import shutil
@@ -32,7 +33,14 @@ DOWNLOAD_TIMEOUT_SECONDS = 60
 DOWNLOAD_ATTEMPTS = 5
 
 
-def download_url(url: str, dest: Path, *, label: str | None = None) -> None:
+def download_url(
+    url: str,
+    dest: Path,
+    *,
+    expected_sha256: str,
+    label: str | None = None,
+) -> None:
+    hasher = hashlib.sha256()
     with requests.get(url, stream=True, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
         response.raise_for_status()
         length = int(response.headers.get("Content-Length", 0)) or None
@@ -48,10 +56,24 @@ def download_url(url: str, dest: Path, *, label: str | None = None) -> None:
                 if not chunk:
                     continue
                 out.write(chunk)
+                hasher.update(chunk)
                 bar.update(len(chunk))
+    actual = hasher.hexdigest()
+    if actual != expected_sha256:
+        dest.unlink(missing_ok=True)
+        raise click.ClickException(
+            f"SHA256 mismatch for {label or dest.name}: "
+            f"expected {expected_sha256}, got {actual}"
+        )
 
 
-def download(url: str, dest: Path, *, label: str | None = None) -> None:
+def download(
+    url: str,
+    dest: Path,
+    *,
+    expected_sha256: str,
+    label: str | None = None,
+) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     for attempt in Retrying(
         stop=stop_after_attempt(DOWNLOAD_ATTEMPTS),
@@ -62,7 +84,7 @@ def download(url: str, dest: Path, *, label: str | None = None) -> None:
     ):
         with attempt:
             try:
-                download_url(url, dest, label=label)
+                download_url(url, dest, expected_sha256=expected_sha256, label=label)
             except Exception:
                 dest.unlink(missing_ok=True)
                 raise
@@ -81,13 +103,13 @@ def install_binary_tool(tool: RequiredTool, tools_dir: Path) -> Path:
     url = tool.url.format(version=tool.version)
     dest = tools_dir / tool.name
     if tool.archive_member is None:
-        download(url, dest, label=tool.name)
+        download(url, dest, expected_sha256=tool.sha256, label=tool.name)
     else:
         member = tool.archive_member.format(version=tool.version)
         with TemporaryDirectory() as tmp:
             work = Path(tmp)
             archive = work / "archive.tar.gz"
-            download(url, archive, label=tool.name)
+            download(url, archive, expected_sha256=tool.sha256, label=tool.name)
             extract_archive_member(archive, member, work)
             shutil.copy2(work / member, dest)
 

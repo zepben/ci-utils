@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from _fake_execute import FakeExecute
 from zep_dev import cluster
-from zep_dev.cluster import (
+from zep_dev.k8s import (
     KUBECONF_PATH,
     kube_guard,
 )

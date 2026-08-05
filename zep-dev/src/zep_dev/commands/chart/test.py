@@ -8,8 +8,8 @@ import yaml
 from click import ClickException
 from pydantic import ValidationError
 
-from zep_dev.cluster import kubectl
-from zep_dev.k8s_secrets import create_image_pull_secret, secret_exists
+from zep_dev.k8s import kubectl, resource_exists
+from zep_dev.k8s_secrets import create_image_pull_secret
 from zep_dev.models import ChartMetadata, CiSecrets
 from zep_dev.shared import ResolvedChart, execute, resolve_chart
 from zep_dev.static import CI_SECRETS_YAML, CT_YAML
@@ -86,12 +86,7 @@ def create_test_namespace(ct_yaml_path: Path) -> str:
     test_namespace: str | None = ct_yaml.get("namespace")
     if test_namespace is None:
         raise ClickException(f"namespace must be specified in {CT_YAML}")
-    namespaces = kubectl("get", "namespaces", capture_stdout=True)
-    for line in namespaces.stdout.splitlines():
-        ns, *_ = line.split()
-        if ns == test_namespace:
-            break
-    else:
+    if not resource_exists("namespace", test_namespace):
         kubectl("create", "namespace", test_namespace)
     return test_namespace
 
@@ -119,7 +114,7 @@ def create_additional_secrets(namespace: str) -> None:
                     f"Secret {secret.name}:{secret.env_var} "
                     f"points to non-existent path: {secret_path}"
                 )
-            if not secret_exists(namespace=namespace, secret_name=secret.name):
+            if not resource_exists("secret", secret.name, namespace=namespace):
                 kubectl(
                     f"--namespace={namespace}",
                     "create",

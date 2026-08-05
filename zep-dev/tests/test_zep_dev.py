@@ -20,7 +20,6 @@ from zep_dev.models import (
     ClusterComponents,
     LocalRepo,
     LocalRepoIntegration,
-    OciRepository,
 )
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"

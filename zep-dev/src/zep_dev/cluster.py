@@ -296,7 +296,9 @@ def _install_helm_components(
                     # TODO: If we add any more of these, don't just add more if conditionals, refactor
                     # how this works. It will get spaghetti real fast otherwise.
                     if desired.local_repo_integration.type != "argo-cd":
-                        raise ClickException("Only argo-cd is supported for local_repo_integration.type")
+                        raise ClickException(
+                            "Only argo-cd is supported for local_repo_integration.type"
+                        )
                     overlay_path = Path(tmpdir) / "local-repos-overlay.yaml"
                     overlay_path.write_text(
                         yaml.safe_dump(local_repos_overlay, default_flow_style=False),

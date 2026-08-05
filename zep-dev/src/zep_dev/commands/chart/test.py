@@ -8,15 +8,11 @@ import yaml
 from click import ClickException
 from pydantic import ValidationError
 
+from zep_dev.cluster import kubectl
+from zep_dev.k8s_secrets import create_image_pull_secret, secret_exists
 from zep_dev.models import ChartMetadata, CiSecrets
 from zep_dev.shared import ResolvedChart, execute, resolve_chart
 from zep_dev.static import CI_SECRETS_YAML, CT_YAML
-
-IMAGE_SECRET_PATHS = [
-    Path("~/.config/containers/auth.json").expanduser(),
-    Path("~/.docker/config.json").expanduser(),
-]
-IMAGE_SECRET_NAME = "github-registry"
 
 LOG = logging.getLogger(__name__)
 
@@ -90,13 +86,13 @@ def create_test_namespace(ct_yaml_path: Path) -> str:
     test_namespace: str | None = ct_yaml.get("namespace")
     if test_namespace is None:
         raise ClickException(f"namespace must be specified in {CT_YAML}")
-    namespaces = execute("kubectl", "get", "namespaces", capture_stdout=True)
+    namespaces = kubectl("get", "namespaces", capture_stdout=True)
     for line in namespaces.stdout.splitlines():
         ns, *_ = line.split()
         if ns == test_namespace:
             break
     else:
-        execute("kubectl", "create", "namespace", test_namespace)
+        kubectl("create", "namespace", test_namespace)
     return test_namespace
 
 
@@ -124,8 +120,7 @@ def create_additional_secrets(namespace: str) -> None:
                     f"points to non-existent path: {secret_path}"
                 )
             if not secret_exists(namespace=namespace, secret_name=secret.name):
-                execute(
-                    "kubectl",
+                kubectl(
                     f"--namespace={namespace}",
                     "create",
                     "secret",
@@ -133,44 +128,6 @@ def create_additional_secrets(namespace: str) -> None:
                     secret.name,
                     f"--from-env-file={secret_path}",
                 )
-
-
-def create_image_pull_secret(namespace: str) -> None:
-    LOG.info("Creating imagePullSecret")
-    auth_json_path = next((path for path in IMAGE_SECRET_PATHS if path.exists()), None)
-    if auth_json_path is None:
-        raise ClickException(
-            f"Failed to locate auth.json to populate {IMAGE_SECRET_NAME} "
-            f"at paths: {IMAGE_SECRET_PATHS}"
-        )
-
-    if not secret_exists(namespace=namespace, secret_name=IMAGE_SECRET_NAME):
-        execute(
-            "kubectl",
-            "create",
-            "secret",
-            "generic",
-            IMAGE_SECRET_NAME,
-            f"--namespace={namespace}",
-            f"--from-file=.dockerconfigjson={auth_json_path}",
-            "--type=kubernetes.io/dockerconfigjson",
-        )
-
-
-def secret_exists(namespace: str, secret_name: str) -> bool:
-    existing_secrets = execute(
-        "kubectl",
-        "get",
-        "secrets",
-        f"--namespace={namespace}",
-        "--no-headers",
-        capture_stdout=True,
-    )
-    for line in existing_secrets.stdout.splitlines():
-        existing_secret, *_ = line.split()
-        if existing_secret == secret_name:
-            return True
-    return False
 
 
 def execute_lint_and_install(

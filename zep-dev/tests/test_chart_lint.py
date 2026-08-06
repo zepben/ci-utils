@@ -73,7 +73,12 @@ def test_lint_dependency_repository_present_runs_ct(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     write_chart_testing_config(chart_testing_config)
-    fake = fake_execute(lint_module).on("ct", "lint")
+    fake = (
+        fake_execute(lint_module)
+        .on("ct", "lint")
+        .on("helm", "template")
+        .on("kubeconform")
+    )
 
     monkeypatch.chdir(helm_dir)
     result = CliRunner().invoke(
@@ -93,6 +98,36 @@ def test_lint_dependency_repository_present_runs_ct(
             "--check-version-increment=true",
         )
     ]
+
+
+def test_lint_library_chart_skips_kubeconform(
+    helm_dir: Path,
+    chart_testing_config: ChartTestingConfig,
+    write_chart_testing_config: Callable[[ChartTestingConfig], None],
+    fake_execute: Callable[[ModuleType], FakeExecute],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    write_chart_testing_config(chart_testing_config)
+    write_chart(
+        helm_dir / "charts" / "common",
+        {
+            "apiVersion": "v2",
+            "name": "common",
+            "version": "0.2.0",
+            "type": "library",
+        },
+    )
+    fake = fake_execute(lint_module).on("ct", "lint")
+
+    monkeypatch.chdir(helm_dir)
+    result = CliRunner().invoke(
+        cli,
+        ["chart", "lint", "--helm-dir", ".", "--chart", "charts/common"],
+    )
+
+    assert result.exit_code == 0
+    assert fake.calls_for("helm", "template") == []
+    assert fake.calls_for("kubeconform") == []
 
 
 def test_lint_dependency_repository_missing_from_ct_config_fails(

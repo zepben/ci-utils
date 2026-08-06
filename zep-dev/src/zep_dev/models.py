@@ -1,10 +1,27 @@
 import os
 from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Self, TextIO
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
+
+# Path inside kind workers. Argo file:// URLs and repo-server hostPath both assume it.
+LOCAL_REPO_MOUNT_ROOT = "/mnt/local-repos"
+
+
+@dataclass(frozen=True)
+class LocalRepo:
+    path: Path
+
+    @property
+    def basename(self) -> str:
+        return self.path.name
+
+    @property
+    def container_path(self) -> str:
+        return f"{LOCAL_REPO_MOUNT_ROOT}/{self.basename}"
 
 
 class ClusterComponent(BaseModel):
@@ -13,7 +30,8 @@ class ClusterComponent(BaseModel):
     chart: str
     version: str
     namespace: str
-    set: dict[str, str] = Field(default_factory=dict)
+    local_repo_integration: Literal["argo-cd"] | None = None
+    values: dict[str, Any] = Field(default_factory=dict)
 
 
 class RequiredTool(BaseModel):

@@ -51,5 +51,6 @@ testpaths = ["tests"]
 [tool.mypy]
 python_version = "3.14"
 strict = true
+warn_unused_configs = true
 mypy_path = "src"
 explicit_package_bases = true

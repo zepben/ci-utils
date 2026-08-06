@@ -8,7 +8,7 @@ from zep_dev.cli import cli
 
 
 def test_metadata_full_fields(tmp_path: Path) -> None:
-    chart_yaml = {
+    chart_yaml: dict[str, object] = {
         "name": "mychart",
         "version": "1.2.3",
         "type": "library",

@@ -5,6 +5,7 @@ import click
 
 from zep_dev.groups.chart import chart
 from zep_dev.groups.cluster import cluster
+from zep_dev.groups.secrets import secrets
 from zep_dev.groups.tools import tools
 from zep_dev.shared import get_bin_dir
 
@@ -40,3 +41,4 @@ def configure_logging(verbose: int) -> None:
 cli.add_command(cluster)
 cli.add_command(tools)
 cli.add_command(chart)
+cli.add_command(secrets)

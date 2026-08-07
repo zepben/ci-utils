@@ -9,13 +9,15 @@ from click import ClickException
 from pydantic import ValidationError
 
 from zep_dev.models import ChartMetadata, CiSecrets
-from zep_dev.shared import ResolvedChart, execute, resolve_chart
+from zep_dev.shared import (
+    REGISTRY_CONFIG_PATHS,
+    ResolvedChart,
+    execute,
+    resolve_chart,
+    resolve_registry_config,
+)
 from zep_dev.static import CI_SECRETS_YAML, CT_YAML
 
-IMAGE_SECRET_PATHS = [
-    Path("~/.config/containers/auth.json").expanduser(),
-    Path("~/.docker/config.json").expanduser(),
-]
 IMAGE_SECRET_NAME = "github-registry"
 
 LOG = logging.getLogger(__name__)
@@ -137,11 +139,11 @@ def create_additional_secrets(namespace: str) -> None:
 
 def create_image_pull_secret(namespace: str) -> None:
     LOG.info("Creating imagePullSecret")
-    auth_json_path = next((path for path in IMAGE_SECRET_PATHS if path.exists()), None)
+    auth_json_path = resolve_registry_config()
     if auth_json_path is None:
         raise ClickException(
             f"Failed to locate auth.json to populate {IMAGE_SECRET_NAME} "
-            f"at paths: {IMAGE_SECRET_PATHS}"
+            f"at paths: {REGISTRY_CONFIG_PATHS}"
         )
 
     if not secret_exists(namespace=namespace, secret_name=IMAGE_SECRET_NAME):

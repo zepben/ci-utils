@@ -25,7 +25,7 @@ def _write_chart(
 def patched_image_secret(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     auth_json = tmp_path / "auth.json"
     auth_json.write_text("{}\n")
-    monkeypatch.setattr(test_module, "IMAGE_SECRET_PATHS", [auth_json])
+    monkeypatch.setattr(test_module, "resolve_registry_config", lambda: auth_json)
 
 
 def _install_chart_execute(

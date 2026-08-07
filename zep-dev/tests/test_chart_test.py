@@ -9,9 +9,10 @@ from click.testing import CliRunner
 
 from _charts import write_chart
 from _fake_execute import FakeExecute
-from zep_dev import k8s_secrets
+from zep_dev import k8s, k8s_secrets
 from zep_dev.cli import cli
 from zep_dev.commands.chart import test as test_module
+from zep_dev.k8s_secrets import IMAGE_SECRET_NAME
 
 
 @dataclass(frozen=True)
@@ -35,10 +36,11 @@ def _install_chart_fakes(
 ) -> ChartTestFakes:
     kubectl_fake = (
         FakeExecute()
-        .on("get", "namespaces", stdout="test-ns\n")
-        .on("get", "secrets")
+        .on("get", "namespace", "test-ns", stdout="namespace/test-ns\n")
+        .on("get", "secret", IMAGE_SECRET_NAME)
         .on("create", "secret")
     )
+    monkeypatch.setattr(k8s, "kubectl", kubectl_fake)
     monkeypatch.setattr(test_module, "kubectl", kubectl_fake)
     monkeypatch.setattr(k8s_secrets, "kubectl", kubectl_fake)
     return ChartTestFakes(
@@ -160,7 +162,7 @@ def test_discovery_mode_processes_all_charts_and_skips_libraries(
     assert result.exit_code == 0, result.output
     assert "Skipping install" in result.output
 
-    assert len(fakes.kubectl.calls_for("get", "namespaces")) == 1, (
+    assert len(fakes.kubectl.calls_for("get", "namespace", "test-ns")) == 1, (
         "namespace/secret setup must run once, not per chart"
     )
 

@@ -4,7 +4,7 @@ from pathlib import Path
 import click
 
 from zep_dev import cluster
-from zep_dev.cluster import KUBECONF_PATH
+from zep_dev.k8s import KUBECONF_PATH
 from zep_dev.models import LOCAL_REPO_MOUNT_ROOT, ClusterComponents
 
 

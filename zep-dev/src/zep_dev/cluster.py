@@ -1,8 +1,7 @@
 import json
 import logging
-import os
-from collections.abc import Generator, Sequence
-from contextlib import contextmanager, nullcontext
+from collections.abc import Sequence
+from contextlib import nullcontext
 from pathlib import Path
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
@@ -11,6 +10,7 @@ from typing import Any
 import yaml
 from click import ClickException
 
+from zep_dev.k8s import KUBECONF_PATH, kube_guard, kubectl
 from zep_dev.models import (
     LOCAL_REPO_MOUNT_ROOT,
     ClusterComponents,
@@ -19,27 +19,7 @@ from zep_dev.models import (
 from zep_dev.shared import CommandResult, execute
 
 CLUSTER_NAME = "test-cluster"
-
-# Write this to a file in /tmp to avoid clashes with whatever the
-# user may have configured. Also is a safety issue, don't want to
-# accidentlly target production clusters
-KUBECONF_PATH = Path("/tmp/kind-k8s-conf.yaml")
 LOG = logging.getLogger(__name__)
-
-
-@contextmanager
-def kube_guard() -> Generator[None]:
-    """
-    Ensure when we run commands, we are using our kind KUBECONFIG.
-    This is to prevent accidentally a production cluster.
-    """
-    og_conf = os.environ.get("KUBECONFIG")
-    os.environ["KUBECONFIG"] = str(KUBECONF_PATH)
-    yield
-    if og_conf is not None:
-        os.environ["KUBECONFIG"] = og_conf
-    else:
-        os.environ.pop("KUBECONFIG", None)
 
 
 def create_cluster(
@@ -376,8 +356,3 @@ def podman(*args: str, capture_stdout: bool = False) -> CommandResult:
 def helm(*args: str, capture_stdout: bool = False) -> CommandResult:
     with kube_guard():
         return execute("helm", *args, capture_stdout=capture_stdout)
-
-
-def kubectl(*args: str, capture_stdout: bool = False) -> CommandResult:
-    with kube_guard():
-        return execute("kubectl", *args, capture_stdout=capture_stdout)

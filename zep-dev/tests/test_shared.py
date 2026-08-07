@@ -3,7 +3,11 @@ from pathlib import Path
 import pytest
 
 import zep_dev.shared as shared
-from zep_dev.shared import ResolvedChart, resolve, resolve_chart
+from zep_dev.shared import (
+    ResolvedChart,
+    resolve,
+    resolve_chart,
+)
 
 
 @pytest.fixture

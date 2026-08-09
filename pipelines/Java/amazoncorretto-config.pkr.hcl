@@ -56,11 +56,6 @@ build {
   }
 
   provisioner "file" {
-    destination = "/root/.mvn"
-    source      = ".mvn"
-  }
-
-  provisioner "file" {
     destination = "/scripts"
     source      = "./scripts/"
   }

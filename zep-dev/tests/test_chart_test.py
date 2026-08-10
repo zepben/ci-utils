@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import call
@@ -8,8 +9,16 @@ from click.testing import CliRunner
 
 from _charts import write_chart
 from _fake_execute import FakeExecute
+from zep_dev import k8s, k8s_secrets
 from zep_dev.cli import cli
 from zep_dev.commands.chart import test as test_module
+from zep_dev.k8s_secrets import IMAGE_SECRET_NAME
+
+
+@dataclass(frozen=True)
+class ChartTestFakes:
+    kubectl: FakeExecute
+    execute: FakeExecute
 
 
 def _write_chart(
@@ -21,21 +30,22 @@ def _write_chart(
     return write_chart(helm_dir / "charts" / chart_dir_name, chart_yaml)
 
 
-@pytest.fixture
-def patched_image_secret(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    auth_json = tmp_path / "auth.json"
-    auth_json.write_text("{}\n")
-    monkeypatch.setattr(test_module, "IMAGE_SECRET_PATHS", [auth_json])
-
-
-def _install_chart_execute(
+def _install_chart_fakes(
     fake_execute: Callable[[ModuleType], FakeExecute],
-) -> FakeExecute:
-    return (
-        fake_execute(test_module)
-        .on("kubectl", "get", "namespaces", stdout="test-ns\n")
-        .on("kubectl", "get", "secrets")
-        .on("kubectl", "create", "secret")
+    monkeypatch: pytest.MonkeyPatch,
+) -> ChartTestFakes:
+    kubectl_fake = (
+        FakeExecute()
+        .on("get", "namespace", "test-ns", stdout="namespace/test-ns\n")
+        .on("get", "secret", IMAGE_SECRET_NAME)
+        .on("create", "secret")
+    )
+    monkeypatch.setattr(k8s, "kubectl", kubectl_fake)
+    monkeypatch.setattr(test_module, "kubectl", kubectl_fake)
+    monkeypatch.setattr(k8s_secrets, "kubectl", kubectl_fake)
+    return ChartTestFakes(
+        kubectl=kubectl_fake,
+        execute=fake_execute(test_module),
     )
 
 
@@ -55,11 +65,12 @@ def test_test_missing_ct_yaml_fails(tmp_path: Path) -> None:
 
 def test_library_chart_skips_install(
     helm_dir: Path,
-    patched_image_secret: None,
+    auth_json: Path,
     fake_execute: Callable[[ModuleType], FakeExecute],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     chart_dir = _write_chart(helm_dir, "mylib", chart_type="library")
-    fake = _install_chart_execute(fake_execute)
+    fakes = _install_chart_fakes(fake_execute, monkeypatch)
 
     result = CliRunner().invoke(
         cli, ["chart", "test", "--helm-dir", str(helm_dir), "--chart", str(chart_dir)]
@@ -67,19 +78,19 @@ def test_library_chart_skips_install(
 
     assert result.exit_code == 0, result.output
     assert "Skipping install" in result.output
-    assert fake.calls_for("ct") == []
+    assert fakes.execute.calls_for("ct") == []
 
 
 def test_application_chart_runs_lint_and_install(
     tmp_path: Path,
     helm_dir: Path,
-    patched_image_secret: None,
+    auth_json: Path,
     fake_execute: Callable[[ModuleType], FakeExecute],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_chart(helm_dir, "myapp")
-    fake = _install_chart_execute(fake_execute)
-    fake.on("ct", "lint-and-install")
+    fakes = _install_chart_fakes(fake_execute, monkeypatch)
+    fakes.execute.on("ct", "lint-and-install")
 
     # Mirrors the real workflow contract: invoked from repo root with the
     # repo-root-relative path that `chart list-changed` would emit.
@@ -90,7 +101,7 @@ def test_application_chart_runs_lint_and_install(
     )
 
     assert result.exit_code == 0, result.output
-    assert fake.calls_for("ct")[-1] == call(
+    assert fakes.execute.calls_for("ct")[-1] == call(
         "ct",
         "lint-and-install",
         "--config",
@@ -103,12 +114,13 @@ def test_application_chart_runs_lint_and_install(
 
 def test_application_chart_lint_and_install_failure_raises(
     helm_dir: Path,
-    patched_image_secret: None,
+    auth_json: Path,
     fake_execute: Callable[[ModuleType], FakeExecute],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     chart_dir = _write_chart(helm_dir, "myapp")
-    fake = _install_chart_execute(fake_execute)
-    fake.on("ct", "lint-and-install", returncode=3)
+    fakes = _install_chart_fakes(fake_execute, monkeypatch)
+    fakes.execute.on("ct", "lint-and-install", returncode=3)
 
     result = CliRunner().invoke(
         cli, ["chart", "test", "--helm-dir", str(helm_dir), "--chart", str(chart_dir)]
@@ -121,8 +133,6 @@ def test_application_chart_lint_and_install_failure_raises(
 def test_chart_outside_helm_dir_fails(
     tmp_path: Path,
     helm_dir: Path,
-    patched_image_secret: None,
-    fake_execute: Callable[[ModuleType], FakeExecute],
 ) -> None:
     outside_chart = _write_chart(tmp_path / "other", "myapp")
 
@@ -137,25 +147,26 @@ def test_chart_outside_helm_dir_fails(
 
 def test_discovery_mode_processes_all_charts_and_skips_libraries(
     helm_dir: Path,
-    patched_image_secret: None,
+    auth_json: Path,
     fake_execute: Callable[[ModuleType], FakeExecute],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_chart(helm_dir, "app-a")
     _write_chart(helm_dir, "app-b")
     _write_chart(helm_dir, "lib-a", chart_type="library")
-    fake = _install_chart_execute(fake_execute)
-    fake.on("ct", "lint-and-install")
+    fakes = _install_chart_fakes(fake_execute, monkeypatch)
+    fakes.execute.on("ct", "lint-and-install")
 
     result = CliRunner().invoke(cli, ["chart", "test", "--helm-dir", str(helm_dir)])
 
     assert result.exit_code == 0, result.output
     assert "Skipping install" in result.output
 
-    assert len(fake.calls_for("kubectl", "get", "namespaces")) == 1, (
+    assert len(fakes.kubectl.calls_for("get", "namespace", "test-ns")) == 1, (
         "namespace/secret setup must run once, not per chart"
     )
 
-    assert fake.calls_for("ct") == [
+    assert fakes.execute.calls_for("ct") == [
         call(
             "ct",
             "lint-and-install",

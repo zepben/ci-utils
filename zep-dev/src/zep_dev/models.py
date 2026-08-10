@@ -24,13 +24,30 @@ class LocalRepo:
         return f"{LOCAL_REPO_MOUNT_ROOT}/{self.basename}"
 
 
+class OciRepository(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1)
+    registry: str = Field(min_length=1)
+    repository: str = Field(min_length=1)
+
+    @property
+    def url(self) -> str:
+        return f"{self.registry}/{self.repository}"
+
+
+class LocalRepoIntegration(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["argo-cd"]
+    oci_repositories: list[OciRepository] = Field(default_factory=list)
+
+
 class ClusterComponent(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
     chart: str
     version: str
     namespace: str
-    local_repo_integration: Literal["argo-cd"] | None = None
+    local_repo_integration: LocalRepoIntegration | None = None
     values: dict[str, Any] = Field(default_factory=dict)
 
 

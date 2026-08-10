@@ -1,8 +1,7 @@
 import json
 import logging
-import os
-from collections.abc import Generator, Sequence
-from contextlib import contextmanager, nullcontext
+from collections.abc import Sequence
+from contextlib import nullcontext
 from pathlib import Path
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
@@ -11,35 +10,18 @@ from typing import Any
 import yaml
 from click import ClickException
 
+from zep_dev.k8s import KUBECONF_PATH, kube_guard, kubectl
+from zep_dev.k8s_secrets import resolve_registry_credential
 from zep_dev.models import (
     LOCAL_REPO_MOUNT_ROOT,
     ClusterComponents,
     LocalRepo,
+    OciRepository,
 )
 from zep_dev.shared import CommandResult, execute
 
 CLUSTER_NAME = "test-cluster"
-
-# Write this to a file in /tmp to avoid clashes with whatever the
-# user may have configured. Also is a safety issue, don't want to
-# accidentlly target production clusters
-KUBECONF_PATH = Path("/tmp/kind-k8s-conf.yaml")
 LOG = logging.getLogger(__name__)
-
-
-@contextmanager
-def kube_guard() -> Generator[None]:
-    """
-    Ensure when we run commands, we are using our kind KUBECONFIG.
-    This is to prevent accidentally a production cluster.
-    """
-    og_conf = os.environ.get("KUBECONFIG")
-    os.environ["KUBECONFIG"] = str(KUBECONF_PATH)
-    yield
-    if og_conf is not None:
-        os.environ["KUBECONFIG"] = og_conf
-    else:
-        os.environ.pop("KUBECONFIG", None)
 
 
 def create_cluster(
@@ -310,14 +292,68 @@ def _install_helm_components(
                         encoding="utf-8",
                     )
                     install_args.extend(["-f", str(values_path)])
-                if desired.local_repo_integration == "argo-cd" and local_repos_overlay:
+                if desired.local_repo_integration is not None and local_repos_overlay:
+                    # TODO: If we add any more of these, don't just add more if conditionals, refactor
+                    # how this works. It will get spaghetti real fast otherwise.
+                    if desired.local_repo_integration.type != "argo-cd":
+                        raise ClickException(
+                            "Only argo-cd is supported for local_repo_integration.type"
+                        )
                     overlay_path = Path(tmpdir) / "local-repos-overlay.yaml"
                     overlay_path.write_text(
                         yaml.safe_dump(local_repos_overlay, default_flow_style=False),
                         encoding="utf-8",
                     )
                     install_args.extend(["-f", str(overlay_path)])
+
+                # Install the component.
                 helm(*install_args)
+
+        # Apply OCI repo secrets even when Argo is already installed so
+        # credentials stay current across repeated cluster create runs.
+        if desired.local_repo_integration is not None:
+            _apply_argo_oci_repository_secrets(
+                desired.namespace,
+                desired.local_repo_integration.oci_repositories,
+            )
+
+
+def _apply_argo_oci_repository_secrets(
+    namespace: str,
+    repositories: Sequence[OciRepository],
+) -> None:
+    """Apply Argo CD repository Secrets for Helm OCI registries.
+
+    Argo CD discovers private Helm OCI repos from Secrets labeled
+    argocd.argoproj.io/secret-type=repository; see
+    https://argo-cd.readthedocs.io/en/stable/operator-manual/secret-argocd-repo-credentials/
+    """
+    for repository in repositories:
+        username, password = resolve_registry_credential(repository.registry)
+        manifest = {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {
+                "name": repository.name,
+                "namespace": namespace,
+                "labels": {"argocd.argoproj.io/secret-type": "repository"},
+            },
+            "stringData": {
+                "type": "helm",
+                "name": repository.name,
+                "enableOCI": "true",
+                "url": repository.url,
+                "username": username,
+                "password": password,
+            },
+        }
+        LOG.info("Applying Argo OCI repository secret: %s", repository.url)
+        kubectl(
+            "apply",
+            "-f",
+            "-",
+            input=yaml.safe_dump(manifest, default_flow_style=False),
+        )
 
 
 def teardown_cluster() -> None:
@@ -376,8 +412,3 @@ def podman(*args: str, capture_stdout: bool = False) -> CommandResult:
 def helm(*args: str, capture_stdout: bool = False) -> CommandResult:
     with kube_guard():
         return execute("helm", *args, capture_stdout=capture_stdout)
-
-
-def kubectl(*args: str, capture_stdout: bool = False) -> CommandResult:
-    with kube_guard():
-        return execute("kubectl", *args, capture_stdout=capture_stdout)

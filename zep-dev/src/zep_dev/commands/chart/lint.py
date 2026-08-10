@@ -5,6 +5,7 @@ from subprocess import CalledProcessError
 import click
 from click import ClickException
 
+from zep_dev.commands.chart.utils import execute_ct_lint
 from zep_dev.models import ChartMetadata, ChartTestingConfig
 from zep_dev.shared import ResolvedChart, execute, resolve_chart
 from zep_dev.static import CT_YAML
@@ -54,8 +55,7 @@ def lint(helm_dir: Path, chart: Path) -> None:
 
 def run_chart_testing_lint(resolved_chart: ResolvedChart) -> None:
     try:
-        execute(
-            "ct",
+        execute_ct_lint(
             "lint",
             "--config",
             str(CT_YAML),

@@ -11,6 +11,12 @@ from zep_dev.static import TOOLS_BY_NAME
 
 LOG = logging.getLogger(__name__)
 
+REGISTRY_CONFIG_PATHS = (
+    Path.home() / ".config" / "helm" / "registry" / "config.json",
+    Path.home() / ".config" / "containers" / "auth.json",
+    Path.home() / ".docker" / "config.json",
+)
+
 
 @dataclass(frozen=True)
 class CommandResult:
@@ -23,6 +29,10 @@ class CommandResult:
 class ResolvedChart:
     absolute_path: Path
     path_relative_to_helm_dir: Path
+
+
+def resolve_registry_config() -> Path | None:
+    return next((path for path in REGISTRY_CONFIG_PATHS if path.is_file()), None)
 
 
 def resolve_chart(helm_dir: Path, chart: Path) -> ResolvedChart:

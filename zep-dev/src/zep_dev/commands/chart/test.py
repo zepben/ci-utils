@@ -11,7 +11,11 @@ from pydantic import ValidationError
 from zep_dev.k8s import kubectl, resource_exists
 from zep_dev.k8s_secrets import create_image_pull_secret
 from zep_dev.models import ChartMetadata, CiSecrets
-from zep_dev.shared import ResolvedChart, execute, resolve_chart
+from zep_dev.shared import (
+    ResolvedChart,
+    execute,
+    resolve_chart,
+)
 from zep_dev.static import CI_SECRETS_YAML, CT_YAML
 
 LOG = logging.getLogger(__name__)

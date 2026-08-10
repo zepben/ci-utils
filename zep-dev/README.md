@@ -19,6 +19,9 @@ make check-zep-dev test-zep-dev
 
 To execute the linters and tests. 
 
+`zep-dev chart lint` and `zep-dev chart test` enforce the chart metadata schema
+and YAML lint policy bundled with `zep-dev`.
+
 To create a local kind cluster, you can run:
 ```shell
 make setup-k8s

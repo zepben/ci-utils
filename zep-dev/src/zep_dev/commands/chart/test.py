@@ -8,12 +8,12 @@ import yaml
 from click import ClickException
 from pydantic import ValidationError
 
+from zep_dev.commands.chart.utils import execute_ct_lint
 from zep_dev.k8s import kubectl, resource_exists
 from zep_dev.k8s_secrets import create_image_pull_secret
 from zep_dev.models import ChartMetadata, CiSecrets
 from zep_dev.shared import (
     ResolvedChart,
-    execute,
     resolve_chart,
 )
 from zep_dev.static import CI_SECRETS_YAML, CT_YAML
@@ -133,8 +133,7 @@ def execute_lint_and_install(
     ct_yaml_path: Path, chart_path_relative_to_helm_dir: Path
 ) -> None:
     try:
-        execute(
-            "ct",
+        execute_ct_lint(
             "lint-and-install",
             "--config",
             str(ct_yaml_path),

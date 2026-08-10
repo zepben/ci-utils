@@ -11,6 +11,7 @@ from _charts import write_chart
 from _fake_execute import FakeExecute
 from zep_dev.cli import cli
 from zep_dev.commands.chart import lint as lint_module
+from zep_dev.commands.chart import utils as ct_module
 from zep_dev.models import ChartTestingConfig
 
 
@@ -79,6 +80,7 @@ def test_lint_dependency_repository_present_runs_ct(
         .on("helm", "template")
         .on("kubeconform")
     )
+    monkeypatch.setattr(ct_module, "execute", fake)
 
     monkeypatch.chdir(helm_dir)
     result = CliRunner().invoke(
@@ -87,17 +89,20 @@ def test_lint_dependency_repository_present_runs_ct(
     )
 
     assert result.exit_code == 0
-    assert fake.calls_for("ct") == [
-        call(
-            "ct",
-            "lint",
-            "--config",
-            "ct.yaml",
-            "--charts",
-            "charts/example-chart",
-            "--check-version-increment=true",
-        )
-    ]
+    [ct_call] = fake.calls_for("ct")
+    assert ct_call == call(
+        "ct",
+        "lint",
+        "--config",
+        "ct.yaml",
+        "--charts",
+        "charts/example-chart",
+        "--check-version-increment=true",
+        "--chart-yaml-schema",
+        str(ct_module.files("zep_dev.resources").joinpath("chart_schema.yaml")),
+        "--lint-conf",
+        str(ct_module.files("zep_dev.resources").joinpath("lintconf.yaml")),
+    )
 
 
 def test_lint_library_chart_skips_kubeconform(
@@ -118,6 +123,7 @@ def test_lint_library_chart_skips_kubeconform(
         },
     )
     fake = fake_execute(lint_module).on("ct", "lint")
+    monkeypatch.setattr(ct_module, "execute", fake)
 
     monkeypatch.chdir(helm_dir)
     result = CliRunner().invoke(
@@ -140,7 +146,8 @@ def test_lint_dependency_repository_missing_from_ct_config_fails(
 ) -> None:
     chart_testing_config.chart_repos = ["other-repo=https://other.example.com/charts"]
     write_chart_testing_config(chart_testing_config)
-    fake = fake_execute(lint_module).on("ct", "lint")
+    fake = fake_execute(lint_module)
+    monkeypatch.setattr(ct_module, "execute", fake)
 
     monkeypatch.chdir(helm_dir)
     result = CliRunner().invoke(

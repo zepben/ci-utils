@@ -12,6 +12,7 @@ from _fake_execute import FakeExecute
 from zep_dev import k8s, k8s_secrets
 from zep_dev.cli import cli
 from zep_dev.commands.chart import test as test_module
+from zep_dev.commands.chart import utils as ct_module
 from zep_dev.k8s_secrets import IMAGE_SECRET_NAME
 
 
@@ -45,7 +46,7 @@ def _install_chart_fakes(
     monkeypatch.setattr(k8s_secrets, "kubectl", kubectl_fake)
     return ChartTestFakes(
         kubectl=kubectl_fake,
-        execute=fake_execute(test_module),
+        execute=fake_execute(ct_module),
     )
 
 
@@ -109,6 +110,10 @@ def test_application_chart_runs_lint_and_install(
         "--charts",
         "charts/myapp",
         "--check-version-increment=true",
+        "--chart-yaml-schema",
+        str(ct_module.files("zep_dev.resources").joinpath("chart_schema.yaml")),
+        "--lint-conf",
+        str(ct_module.files("zep_dev.resources").joinpath("lintconf.yaml")),
     )
 
 
@@ -175,6 +180,10 @@ def test_discovery_mode_processes_all_charts_and_skips_libraries(
             "--charts",
             "charts/app-a",
             "--check-version-increment=true",
+            "--chart-yaml-schema",
+            str(ct_module.files("zep_dev.resources").joinpath("chart_schema.yaml")),
+            "--lint-conf",
+            str(ct_module.files("zep_dev.resources").joinpath("lintconf.yaml")),
         ),
         call(
             "ct",
@@ -184,5 +193,9 @@ def test_discovery_mode_processes_all_charts_and_skips_libraries(
             "--charts",
             "charts/app-b",
             "--check-version-increment=true",
+            "--chart-yaml-schema",
+            str(ct_module.files("zep_dev.resources").joinpath("chart_schema.yaml")),
+            "--lint-conf",
+            str(ct_module.files("zep_dev.resources").joinpath("lintconf.yaml")),
         ),
     ]

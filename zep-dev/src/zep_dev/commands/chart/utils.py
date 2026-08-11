@@ -1,6 +1,10 @@
 from importlib.resources import as_file, files
+from pathlib import Path
 from typing import Literal
 
+from click import ClickException
+
+from zep_dev.models import ChartMetadata, ChartTestingConfig
 from zep_dev.shared import CommandResult, execute
 
 
@@ -21,3 +25,20 @@ def execute_ct_lint(
             "--lint-conf",
             str(lint_config),
         )
+
+
+def validate_dependencies_present(
+    chart_metadata: ChartMetadata,
+    ct_config: ChartTestingConfig,
+    ct_path: Path,
+) -> None:
+    chart_repos = [repo.split("=")[-1] for repo in ct_config.chart_repos]
+    for dependency in chart_metadata.dependencies:
+        if dependency.repository.startswith("oci://ghcr.io"):
+            continue
+        if dependency.repository not in chart_repos:
+            raise ClickException(
+                f"{dependency.repository} not found in {ct_path}. "
+                "It needs to be added under the chart_repos list, "
+                "in the format <name>=<url>"
+            )

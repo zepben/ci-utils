@@ -5,7 +5,7 @@ from subprocess import CalledProcessError
 import click
 from click import ClickException
 
-from zep_dev.commands.chart.utils import execute_ct_lint
+from zep_dev.commands.chart.utils import execute_ct_lint, validate_dependencies_present
 from zep_dev.models import ChartMetadata, ChartTestingConfig
 from zep_dev.shared import ResolvedChart, execute, resolve_chart
 from zep_dev.static import CT_YAML
@@ -123,19 +123,3 @@ def execute_kubeconform(helm_args: list[str], variant: str) -> None:
         raise ClickException(
             f"kubeconform failed for {variant} with rc={e.returncode}"
         ) from e
-
-
-def validate_dependencies_present(
-    chart_metadata: ChartMetadata, ct_config: ChartTestingConfig, ct_path: Path
-) -> None:
-    # Syntax is <name>=<url>
-    chart_repos = [repo.split("=")[-1] for repo in ct_config.chart_repos]
-    for dependency in chart_metadata.dependencies:
-        # helm pulls OCI deps from the url in Chart.yaml during dependency build without helm repo add,
-        # so no need for us to validate it's existence in chart repos.
-        if dependency.repository.startswith("oci://ghcr.io"):
-            continue
-        if dependency.repository not in chart_repos:
-            raise ClickException(
-                f"{dependency.repository} not found in {ct_path}. It needs to be added under the chart_repos list, in the format <name>=<url>"
-            )

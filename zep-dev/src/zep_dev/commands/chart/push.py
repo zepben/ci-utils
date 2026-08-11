@@ -7,8 +7,10 @@ import click
 from click import ClickException
 from pydantic import ValidationError
 
-from zep_dev.models import ChartMetadata
+from zep_dev.commands.chart.utils import validate_dependencies_present
+from zep_dev.models import ChartMetadata, ChartTestingConfig
 from zep_dev.shared import execute
+from zep_dev.static import CT_YAML
 
 REGISTRY_HOST = "ghcr.io"
 
@@ -52,6 +54,7 @@ def push(
     beta: str | None,
     fail_if_exists: bool,
 ) -> None:
+    chart = chart.resolve()
     try:
         meta = ChartMetadata.from_chart_dir(chart)
     except (ValueError, ValidationError) as e:
@@ -85,6 +88,32 @@ def push(
             raise ClickException(
                 f"exist check failed (rc={result.returncode}): {result.stderr.strip()}"
             )
+
+    # We count on our standard structure being:
+    # helm -> charts -> chart-name
+    helm_dir = chart.parent.parent
+    ct_path = helm_dir / CT_YAML
+    ct_config = ChartTestingConfig.from_chart_dir(helm_dir)
+    validate_dependencies_present(meta, ct_config, ct_path)
+
+    try:
+        for repo in ct_config.chart_repos:
+            name, url = repo.split("=", 1)
+            # OCI repos don't need to be explicitly added in the same way
+            # as HTTPS ones.
+            if url.startswith("oci://"):
+                continue
+            execute(
+                "helm",
+                "repo",
+                "add",
+                name,
+                url,
+                "--force-update",
+                capture_stdout=True,
+            )
+    except CalledProcessError as e:
+        raise _detailed_failure_for("repository setup", e) from e
 
     try:
         execute(

@@ -15,11 +15,15 @@ ExecuteHook = Callable[[tuple[str, ...], dict[str, object]], None]
 class _Rule:
     prefix: tuple[str, ...]
     result: CommandResult
+    match_kwargs: dict[str, object] | None = None
     raises: BaseException | None = None
     hook: ExecuteHook | None = None
 
-    def matches(self, args: tuple[str, ...]) -> bool:
-        return args[: len(self.prefix)] == self.prefix
+    def matches(self, args: tuple[str, ...], kwargs: dict[str, object]) -> bool:
+        return args[: len(self.prefix)] == self.prefix and (
+            self.match_kwargs is None
+            or all(kwargs.get(key) == value for key, value in self.match_kwargs.items())
+        )
 
 
 @dataclass
@@ -33,6 +37,7 @@ class FakeExecute:
         stdout: str = "",
         stderr: str = "",
         returncode: int = 0,
+        match_kwargs: dict[str, object] | None = None,
         raises: BaseException | None = None,
         hook: ExecuteHook | None = None,
     ) -> FakeExecute:
@@ -40,6 +45,7 @@ class FakeExecute:
             _Rule(
                 prefix=prefix,
                 result=CommandResult(returncode, stdout, stderr),
+                match_kwargs=match_kwargs,
                 raises=raises,
                 hook=hook,
             )
@@ -52,7 +58,7 @@ class FakeExecute:
     def __call__(self, *args: str, **kwargs: object) -> CommandResult:
         self.calls.append(call(*args, **kwargs))
         for rule in self._rules:
-            if rule.matches(args):
+            if rule.matches(args, kwargs):
                 result, raises, hook = rule.result, rule.raises, rule.hook
                 break
         else:

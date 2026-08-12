@@ -139,6 +139,7 @@ class ChartMetadata(BaseModel):
     version: str = Field(min_length=1)
     type: str = "application"
     appVersion: str | None = None
+    annotations: dict[str, str] = Field(default_factory=dict)
     dependencies: list[ChartDependency] = Field(default_factory=list)
 
     @classmethod

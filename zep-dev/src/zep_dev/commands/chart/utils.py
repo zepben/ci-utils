@@ -4,6 +4,11 @@ from typing import Literal
 
 from click import ClickException
 
+from zep_dev.commands.chart.version import (
+    git_describe,
+    parse_git_describe,
+    to_chart_version,
+)
 from zep_dev.models import ChartMetadata, ChartTestingConfig
 from zep_dev.shared import CommandResult, execute
 
@@ -42,3 +47,7 @@ def validate_dependencies_present(
                 "It needs to be added under the chart_repos list, "
                 "in the format <name>=<url>"
             )
+
+
+def calculate_chart_version() -> str:
+    return to_chart_version(parse_git_describe(git_describe()))

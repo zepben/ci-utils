@@ -34,11 +34,18 @@ def test_push_adds_configured_repo_before_building_dependencies(
     )
     fake = (
         fake_execute(push_module)
+        .on(
+            "helm",
+            "show",
+            "chart",
+            returncode=1,
+            stderr="manifest unknown",
+            match_kwargs={"check": False},
+        )
         .on("helm", "repo", "add")
         .on("helm", "dependency", "build")
         .on("helm", "package")
         .on("helm", "push")
-        .on("helm", "show", "chart")
     )
 
     result = CliRunner().invoke(
@@ -77,7 +84,7 @@ def test_push_adds_configured_repo_before_building_dependencies(
     assert fake.calls.index(repo_call) < fake.calls.index(dependency_call)
 
 
-def test_push_fail_if_exists_aborts_when_chart_present(
+def test_push_is_idempotent_when_chart_present(
     tmp_path: Path, fake_execute: Callable[[ModuleType], FakeExecute]
 ) -> None:
     chart = write_chart(
@@ -101,12 +108,12 @@ def test_push_fail_if_exists_aborts_when_chart_present(
             str(auth),
             "--oci-repo",
             "org/repo",
-            "--fail-if-exists",
         ],
     )
 
-    assert result.exit_code != 0
-    assert "already exists" in result.output
+    assert result.exit_code == 0
+    assert result.stdout == ""
+    assert result.stderr == "ewb:1.2.3 already exists in registry, skipping push\n"
     assert fake.calls == [
         call(
             "helm",

@@ -16,14 +16,23 @@ def tool() -> RequiredTool:
     )
 
 
-def test_ci_secret_resolve_path_missing_env_raises(
+def test_ci_secret_resolve_value_missing_env_raises(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    secret = CiSecret(name="aws-creds", kind="env-file", env_var="AWS_CREDS_FILE")
-    monkeypatch.delenv("AWS_CREDS_FILE", raising=False)
+    secret = CiSecret(name="aws-creds", env_var="AWS_ACCESS_KEY_ID")
+    monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
 
-    with pytest.raises(ValueError, match="AWS_CREDS_FILE is not set"):
-        secret.resolve_path()
+    with pytest.raises(ValueError, match="AWS_ACCESS_KEY_ID is not set"):
+        secret.resolve_value()
+
+
+def test_ci_secret_resolve_value_reads_environment_variable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = CiSecret(name="aws-creds", env_var="AWS_ACCESS_KEY_ID")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-access-key")
+
+    assert secret.resolve_value() == "test-access-key"
 
 
 def test_exists_when_hash_matches(tmp_path: Path, tool: RequiredTool) -> None:

@@ -112,12 +112,7 @@ def create_additional_secrets(namespace: str) -> None:
         config = CiSecrets.model_validate(yaml.safe_load(CI_SECRETS_YAML.read_text()))
         for secret in config.secrets:
             LOG.info("Creating additional secret: %s", secret.name)
-            secret_path = secret.resolve_path()
-            if not secret_path.is_file():
-                raise ClickException(
-                    f"Secret {secret.name}:{secret.env_var} "
-                    f"points to non-existent path: {secret_path}"
-                )
+            value = secret.resolve_value()
             if not resource_exists("secret", secret.name, namespace=namespace):
                 kubectl(
                     f"--namespace={namespace}",
@@ -125,7 +120,8 @@ def create_additional_secrets(namespace: str) -> None:
                     "secret",
                     "generic",
                     secret.name,
-                    f"--from-env-file={secret_path}",
+                    "--from-env-file=/dev/stdin",
+                    input=value,
                 )
 
 

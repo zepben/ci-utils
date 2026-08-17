@@ -109,14 +109,13 @@ class CiSecret(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    kind: Literal["env-file"]
     env_var: str
 
-    def resolve_path(self) -> Path:
+    def resolve_value(self) -> str:
         value = os.environ.get(self.env_var)
         if value is None:
             raise ValueError(f"{self.env_var} is not set. This is required ")
-        return Path(value).expanduser()
+        return value
 
 
 class CiSecrets(BaseModel):

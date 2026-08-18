@@ -14,6 +14,7 @@ from zep_dev.k8s import KUBECONF_PATH, kube_guard, kubectl
 from zep_dev.k8s_secrets import resolve_registry_credential
 from zep_dev.models import (
     LOCAL_REPO_MOUNT_ROOT,
+    ClusterComponent,
     ClusterComponents,
     LocalRepo,
     OciRepository,
@@ -270,52 +271,69 @@ def install_helm_components(
     repos_overlay = local_repos_overlay(local_repos)
     LOG.info("Installing cluster components")
     for desired in components.cluster_components:
-        if desired.name in installed:
-            LOG.info("Skipping already installed chart: %s", desired.name)
-        else:
-            with TemporaryDirectory() as tmpdir:
-                install_args: list[str] = [
-                    "install",
-                    desired.name,
-                    desired.chart,
-                    "--namespace",
-                    desired.namespace,
-                    "--create-namespace",
-                    "--version",
-                    desired.version,
-                    "--wait",
-                ]
-                if desired.values:
-                    values_path = Path(tmpdir) / "values.yaml"
-                    values_path.write_text(
-                        yaml.safe_dump(desired.values, default_flow_style=False),
-                        encoding="utf-8",
-                    )
-                    install_args.extend(["-f", str(values_path)])
-                if desired.local_repo_integration is not None and repos_overlay:
-                    # TODO: If we add any more of these, don't just add more if conditionals, refactor
-                    # how this works. It will get spaghetti real fast otherwise.
-                    if desired.local_repo_integration.type != "argo-cd":
-                        raise ClickException(
-                            "Only argo-cd is supported for local_repo_integration.type"
-                        )
-                    overlay_path = Path(tmpdir) / "local-repos-overlay.yaml"
-                    overlay_path.write_text(
-                        yaml.safe_dump(repos_overlay, default_flow_style=False),
-                        encoding="utf-8",
-                    )
-                    install_args.extend(["-f", str(overlay_path)])
+        reconcile_helm_component(
+            desired,
+            installed=installed,
+            local_repos_overlay=repos_overlay,
+        )
 
-                # Install the component.
-                helm(*install_args)
 
-        # Apply OCI repo secrets even when Argo is already installed so
-        # credentials stay current across repeated cluster create runs.
-        if desired.local_repo_integration is not None:
-            apply_argo_oci_repository_secrets(
-                desired.namespace,
-                desired.local_repo_integration.oci_repositories,
+def reconcile_helm_component(
+    desired: ClusterComponent,
+    *,
+    installed: Sequence[str],
+    local_repos_overlay: dict[str, Any],
+) -> None:
+    if desired.name in installed:
+        LOG.info("Skipping already installed chart: %s", desired.name)
+    else:
+        value_layers = helm_value_layers(desired, local_repos_overlay)
+        install_helm_component(desired, value_layers)
+
+    if desired.local_repo_integration:
+        apply_argo_oci_repository_secrets(
+            desired.namespace,
+            desired.local_repo_integration.oci_repositories,
+        )
+
+
+def helm_value_layers(
+    desired: ClusterComponent,
+    local_repos_overlay: dict[str, Any],
+) -> list[tuple[str, dict[str, Any]]]:
+    value_layers = []
+    if desired.values:
+        value_layers.append(("values.yaml", desired.values))
+    if desired.local_repo_integration is not None and local_repos_overlay:
+        value_layers.append(("local-repos-overlay.yaml", local_repos_overlay))
+    return value_layers
+
+
+def install_helm_component(
+    desired: ClusterComponent,
+    value_layers: Sequence[tuple[str, dict[str, Any]]],
+) -> None:
+    with TemporaryDirectory() as tmpdir:
+        install_args: list[str] = [
+            "install",
+            desired.name,
+            desired.chart,
+            "--namespace",
+            desired.namespace,
+            "--create-namespace",
+            "--version",
+            desired.version,
+            "--wait",
+        ]
+        for filename, values in value_layers:
+            values_path = Path(tmpdir) / filename
+            values_path.write_text(
+                yaml.safe_dump(values, default_flow_style=False),
+                encoding="utf-8",
             )
+            install_args.extend(["-f", str(values_path)])
+
+        helm(*install_args)
 
 
 def apply_argo_oci_repository_secrets(

@@ -20,6 +20,7 @@ from zep_dev.models import (
     ClusterComponents,
     LocalRepo,
     LocalRepoIntegration,
+    OciRepository,
 )
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
@@ -197,3 +198,44 @@ def test_install_helm_components_applies_local_repo_integration_only_to_selected
             ],
         },
     }
+
+
+def test_install_helm_components_refreshes_argo_oci_repositories_when_installed(
+    fake_execute: Callable[[ModuleType], FakeExecute],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = OciRepository(
+        name="private-charts",
+        registry="registry.example.com",
+        repository="charts",
+    )
+    reconciled: list[tuple[str, list[OciRepository]]] = []
+    fake = fake_execute(cluster)
+    fake.on("helm", "list", stdout="argo\n")
+    monkeypatch.setattr(
+        cluster,
+        "apply_argo_oci_repository_secrets",
+        lambda namespace, repositories: reconciled.append(
+            (namespace, list(repositories))
+        ),
+    )
+    components = ClusterComponents(
+        helm_repos={},
+        cluster_components=[
+            ClusterComponent(
+                name="argo",
+                chart="example/argo",
+                version="1.0.0",
+                namespace="argo",
+                local_repo_integration=LocalRepoIntegration(
+                    type="argo-cd",
+                    oci_repositories=[repository],
+                ),
+            )
+        ],
+    )
+
+    cluster.install_helm_components(components)
+
+    assert reconciled == [("argo", [repository])]
+    assert fake.calls_for("helm", "install") == []

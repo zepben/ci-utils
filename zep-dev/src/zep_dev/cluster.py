@@ -29,24 +29,24 @@ def create_cluster(
     components: ClusterComponents,
     local_repos: Sequence[Path] = (),
 ) -> None:
-    repos = _load_local_repos(local_repos)
-    _create_kind_cluster(kind_config, repos)
-    _add_helm_repos(components)
-    _install_helm_components(components, repos)
+    repos = load_local_repos(local_repos)
+    create_kind_cluster(kind_config, repos)
+    add_helm_repos(components)
+    install_helm_components(components, repos)
 
 
-def _load_local_repos(paths: Sequence[Path]) -> tuple[LocalRepo, ...]:
+def load_local_repos(paths: Sequence[Path]) -> tuple[LocalRepo, ...]:
     repos = tuple(LocalRepo(path=path.resolve()) for path in paths)
     seen: set[str] = set()
     for repo in repos:
         if repo.basename in seen:
             raise ClickException(f"duplicate --local-repo basename: {repo.basename}")
         seen.add(repo.basename)
-        _validate_repo(repo)
+        validate_repo(repo)
     return repos
 
 
-def _validate_repo(repo: LocalRepo) -> None:
+def validate_repo(repo: LocalRepo) -> None:
     try:
         toplevel = Path(
             execute(
@@ -68,7 +68,7 @@ def _validate_repo(repo: LocalRepo) -> None:
         )
 
 
-def _create_kind_cluster(kind_config: Path, local_repos: Sequence[LocalRepo]) -> None:
+def create_kind_cluster(kind_config: Path, local_repos: Sequence[LocalRepo]) -> None:
     LOG.info("Creating kind cluster")
     existing = kind(
         "get", "clusters", "--quiet", capture_stdout=True
@@ -78,11 +78,11 @@ def _create_kind_cluster(kind_config: Path, local_repos: Sequence[LocalRepo]) ->
             # Ensure that if we have a running cluster, the mounts are the same
             # as passed on the command line. Otherwise we would have a silent
             # and confusing failure mode.
-            _validate_existing_worker_mounts(local_repos)
+            validate_existing_worker_mounts(local_repos)
         LOG.info("Reusing existing cluster: %s", CLUSTER_NAME)
         return
 
-    rendered_config = _inject_repo_mounts(kind_config, local_repos)
+    rendered_config = inject_repo_mounts(kind_config, local_repos)
 
     config_path = Path("/tmp/kind-config.yaml")
     config_path.write_text(rendered_config, encoding="utf-8")
@@ -105,7 +105,7 @@ def _create_kind_cluster(kind_config: Path, local_repos: Sequence[LocalRepo]) ->
     )
 
 
-def _validate_existing_worker_mounts(local_repos: Sequence[LocalRepo]) -> None:
+def validate_existing_worker_mounts(local_repos: Sequence[LocalRepo]) -> None:
     """
     Call podman and extract the mounts our running kind cluster has configured.
     If they are not the exact same set as we have passed on the command line --local-repos,
@@ -120,7 +120,7 @@ def _validate_existing_worker_mounts(local_repos: Sequence[LocalRepo]) -> None:
 
     expected_mounts = {(str(repo.path), repo.container_path) for repo in local_repos}
     for worker in workers:
-        existing_mounts = _inspect_live_mounts(worker)
+        existing_mounts = inspect_live_mounts(worker)
         if existing_mounts != expected_mounts:
             raise ClickException(
                 "Existing cluster local-repo mounts do not match --local-repo. "
@@ -128,7 +128,7 @@ def _validate_existing_worker_mounts(local_repos: Sequence[LocalRepo]) -> None:
             )
 
 
-def _inspect_live_mounts(worker: str) -> set[tuple[str, str]]:
+def inspect_live_mounts(worker: str) -> set[tuple[str, str]]:
     raw_mounts = podman(
         "inspect",
         worker,
@@ -157,7 +157,7 @@ def _inspect_live_mounts(worker: str) -> set[tuple[str, str]]:
     return local_mounts
 
 
-def _inject_repo_mounts(kind_config: Path, repos: Sequence[LocalRepo]) -> str:
+def inject_repo_mounts(kind_config: Path, repos: Sequence[LocalRepo]) -> str:
     config: Any = yaml.safe_load(kind_config.read_text(encoding="utf-8"))
     if not isinstance(config, dict):
         raise ClickException(f"kind config must be a mapping: {kind_config}")
@@ -185,7 +185,7 @@ def _inject_repo_mounts(kind_config: Path, repos: Sequence[LocalRepo]) -> str:
     return yaml.safe_dump(config, default_flow_style=False)
 
 
-def _add_helm_repos(components: ClusterComponents) -> None:
+def add_helm_repos(components: ClusterComponents) -> None:
     if components.helm_repos:
         LOG.info("Adding helm repos")
         repo_out = helm("repo", "list", "--no-headers", capture_stdout=True)
@@ -198,7 +198,7 @@ def _add_helm_repos(components: ClusterComponents) -> None:
         helm("repo", "update")
 
 
-def _local_repos_overlay(local_repos: Sequence[LocalRepo]) -> dict[str, Any]:
+def local_repos_overlay(local_repos: Sequence[LocalRepo]) -> dict[str, Any]:
     """Helm values that expose --local-repo mounts to Argo CD.
 
     kind extraMounts put the repos on workers under LOCAL_REPO_MOUNT_ROOT.
@@ -261,13 +261,13 @@ def _local_repos_overlay(local_repos: Sequence[LocalRepo]) -> dict[str, Any]:
     }
 
 
-def _install_helm_components(
+def install_helm_components(
     components: ClusterComponents,
     local_repos: Sequence[LocalRepo] = (),
 ) -> None:
     list_out = helm("list", "--all-namespaces", "--deployed", "-q", capture_stdout=True)
     installed = list_out.stdout.splitlines()
-    local_repos_overlay = _local_repos_overlay(local_repos)
+    repos_overlay = local_repos_overlay(local_repos)
     LOG.info("Installing cluster components")
     for desired in components.cluster_components:
         if desired.name in installed:
@@ -292,7 +292,7 @@ def _install_helm_components(
                         encoding="utf-8",
                     )
                     install_args.extend(["-f", str(values_path)])
-                if desired.local_repo_integration is not None and local_repos_overlay:
+                if desired.local_repo_integration is not None and repos_overlay:
                     # TODO: If we add any more of these, don't just add more if conditionals, refactor
                     # how this works. It will get spaghetti real fast otherwise.
                     if desired.local_repo_integration.type != "argo-cd":
@@ -301,7 +301,7 @@ def _install_helm_components(
                         )
                     overlay_path = Path(tmpdir) / "local-repos-overlay.yaml"
                     overlay_path.write_text(
-                        yaml.safe_dump(local_repos_overlay, default_flow_style=False),
+                        yaml.safe_dump(repos_overlay, default_flow_style=False),
                         encoding="utf-8",
                     )
                     install_args.extend(["-f", str(overlay_path)])
@@ -312,13 +312,13 @@ def _install_helm_components(
         # Apply OCI repo secrets even when Argo is already installed so
         # credentials stay current across repeated cluster create runs.
         if desired.local_repo_integration is not None:
-            _apply_argo_oci_repository_secrets(
+            apply_argo_oci_repository_secrets(
                 desired.namespace,
                 desired.local_repo_integration.oci_repositories,
             )
 
 
-def _apply_argo_oci_repository_secrets(
+def apply_argo_oci_repository_secrets(
     namespace: str,
     repositories: Sequence[OciRepository],
 ) -> None:

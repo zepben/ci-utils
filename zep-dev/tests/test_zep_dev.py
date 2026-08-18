@@ -88,7 +88,7 @@ def test_add_helm_repos_skips_all_helm_when_no_repos_configured(
         raise AssertionError(f"unexpected helm invocation: {args}")
 
     monkeypatch.setattr(cluster, "helm", fake_helm)
-    cluster._add_helm_repos(
+    cluster.add_helm_repos(
         ClusterComponents(helm_repos={}, cluster_components=[]),
     )
 
@@ -114,7 +114,7 @@ def test_install_helm_components_applies_local_repo_integration_only_to_selected
     fake.on("helm", "install", "other", hook=capture_values)
     monkeypatch.setattr(
         cluster,
-        "_apply_argo_oci_repository_secrets",
+        "apply_argo_oci_repository_secrets",
         lambda namespace, _repositories: reconciled_components.append(namespace),
     )
     components = ClusterComponents(
@@ -138,7 +138,7 @@ def test_install_helm_components_applies_local_repo_integration_only_to_selected
         ],
     )
 
-    cluster._install_helm_components(
+    cluster.install_helm_components(
         components,
         local_repos=[LocalRepo(path=tmp_path / "deployments")],
     )

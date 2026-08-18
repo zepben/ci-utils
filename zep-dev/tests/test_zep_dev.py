@@ -18,6 +18,7 @@ from zep_dev.k8s import (
 from zep_dev.models import (
     ClusterComponent,
     ClusterComponents,
+    ConfigMapFromFile,
     LocalRepo,
     LocalRepoIntegration,
     OciRepository,
@@ -40,6 +41,12 @@ def test_examples_components_yaml_parses() -> None:
     assert argo_cd.version == "9.5.0"
     assert argo_cd.namespace == "argo-cd"
     assert argo_cd.local_repo_integration == LocalRepoIntegration(type="argo-cd")
+    assert argo_cd.config_maps_from_file == [
+        ConfigMapFromFile(
+            name="kind-cluster-config",
+            from_file={"kind-cluster.yaml": "kind-cluster.yaml"},
+        )
+    ]
     assert argo_cd.values["server"]["service"]["type"] == "NodePort"
     assert argo_cd.values["configs"]["cm"]["admin.enabled"] is True
     assert argo_cd.values["dex"]["enabled"] is False
@@ -67,6 +74,149 @@ unknown_field: true
 """
     with pytest.raises(ValidationError):
         ClusterComponents.from_text_io(StringIO(yaml_input))
+
+
+def test_cluster_components_from_path_sets_source_dir(
+    tmp_path: Path,
+) -> None:
+    components_path = tmp_path / "components.yaml"
+    components_path.write_text(
+        """\
+helm_repos: {}
+cluster_components:
+  - name: database
+    chart: example/database
+    version: "1.0.0"
+    namespace: test
+    config_maps_from_file:
+      - name: database-init
+        from_file:
+          init.sql: ../sql/init.sql
+"""
+    )
+
+    from_path = ClusterComponents.from_path(components_path)
+    from_text = ClusterComponents.from_text_io(StringIO(components_path.read_text()))
+
+    assert from_path.source_dir == tmp_path.resolve()
+    assert from_text.source_dir is None
+    assert from_path.cluster_components[0].config_maps_from_file[0].from_file == {
+        "init.sql": "../sql/init.sql",
+    }
+
+
+def test_config_map_from_file_rejects_unknown_fields() -> None:
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        ConfigMapFromFile.model_validate(
+            {
+                "name": "database-init",
+                "from_file": {"init.sql": "init.sql"},
+                "unexpected": True,
+            }
+        )
+
+
+def test_cluster_component_rejects_duplicate_config_map_names() -> None:
+    with pytest.raises(ValidationError, match="duplicate config_maps_from_file name"):
+        ClusterComponent.model_validate(
+            {
+                "name": "database",
+                "chart": "example/database",
+                "version": "1.0.0",
+                "namespace": "test",
+                "config_maps_from_file": [
+                    {"name": "database-init", "from_file": {"init.sql": "init.sql"}},
+                    {
+                        "name": "database-init",
+                        "from_file": {"seed.sql": "seed.sql"},
+                    },
+                ],
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    ("installed", "namespace_exists", "expected_events"),
+    [
+        ("", False, ["Namespace", "ConfigMap", "helm install"]),
+        ("database\n", False, ["Namespace", "ConfigMap"]),
+        ("", True, ["ConfigMap", "helm install"]),
+        ("database\n", True, ["ConfigMap"]),
+    ],
+)
+def test_install_helm_components_applies_config_maps_before_install_or_skip(
+    fake_execute: Callable[[ModuleType], FakeExecute],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    installed: str,
+    namespace_exists: bool,
+    expected_events: list[str],
+) -> None:
+    (tmp_path / "init.sql").write_text("SELECT 'ready';\n", encoding="utf-8")
+    components_path = tmp_path / "components.yaml"
+    components_path.write_text(
+        """\
+helm_repos: {}
+cluster_components:
+  - name: database
+    chart: example/database
+    version: "1.0.0"
+    namespace: test
+    config_maps_from_file:
+      - name: database-init
+        from_file:
+          init.sql: init.sql
+"""
+    )
+    components = ClusterComponents.from_path(components_path)
+    events: list[str] = []
+    config_maps: list[dict[str, object]] = []
+    resource_exists_calls: list[tuple[str, str]] = []
+    fake_helm = fake_execute(cluster)
+    fake_helm.on("helm", "list", stdout=installed)
+    if not installed:
+        fake_helm.on(
+            "helm",
+            "install",
+            "database",
+            hook=lambda _args, _kwargs: events.append("helm install"),
+        )
+
+    def record_create_namespace(
+        _args: tuple[str, ...], _kwargs: dict[str, object]
+    ) -> None:
+        events.append("Namespace")
+
+    def record_apply(_args: tuple[str, ...], kwargs: dict[str, object]) -> None:
+        manifest = yaml.safe_load(str(kwargs["input"]))
+        events.append(manifest["kind"])
+        if manifest["kind"] == "ConfigMap":
+            config_maps.append(manifest)
+
+    def fake_resource_exists(resource: str, name: str, **kwargs: object) -> bool:
+        resource_exists_calls.append((resource, name))
+        return namespace_exists
+
+    fake_kubectl = (
+        FakeExecute()
+        .on("create", "namespace", hook=record_create_namespace)
+        .on("apply", "-f", "-", hook=record_apply)
+    )
+    monkeypatch.setattr(cluster, "resource_exists", fake_resource_exists)
+    monkeypatch.setattr(cluster, "kubectl", fake_kubectl)
+
+    cluster.install_helm_components(components)
+
+    assert resource_exists_calls == [("namespace", "test")]
+    assert events == expected_events
+    assert config_maps == [
+        {
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": {"name": "database-init", "namespace": "test"},
+            "data": {"init.sql": "SELECT 'ready';\n"},
+        }
+    ]
 
 
 def test_kube_guard(

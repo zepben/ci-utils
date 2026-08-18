@@ -1,4 +1,3 @@
-from io import TextIOWrapper
 from pathlib import Path
 
 import click
@@ -15,7 +14,11 @@ from zep_dev.models import LOCAL_REPO_MOUNT_ROOT, ClusterComponents
     required=True,
     help="Path to kind cluster config YAML",
 )
-@click.option("--components", type=click.File("r"), required=True)
+@click.option(
+    "--components",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+)
 @click.option(
     "--local-repo",
     "local_repos",
@@ -33,12 +36,12 @@ from zep_dev.models import LOCAL_REPO_MOUNT_ROOT, ClusterComponents
 )
 def create(
     kind_config: Path,
-    components: TextIOWrapper,
+    components: Path,
     local_repos: tuple[Path, ...],
 ) -> None:
     cluster.create_cluster(
         kind_config,
-        components=ClusterComponents.from_text_io(components),
+        components=ClusterComponents.from_path(components),
         local_repos=local_repos,
     )
     click.echo("Cluster created. Execute:")

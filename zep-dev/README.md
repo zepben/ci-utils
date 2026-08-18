@@ -9,6 +9,25 @@ The tool requires two files:
 * kind-cluster.yaml - configures kind. See [example](examples/kind-cluster.yaml).
 * components.yaml - configures dependencies to be installed via helm when creating the kind cluster.
 
+### ConfigMaps from files
+
+A component can create ConfigMaps from files before its Helm release is installed:
+
+```yaml
+cluster_components:
+  - name: database
+    chart: example/database
+    version: "1.0.0"
+    namespace: test
+    config_maps_from_file:
+      - name: database-init
+        from_file:
+          init.sql: files/init.sql
+```
+
+Each ConfigMap uses its component namespace. On a reused Kind cluster, ConfigMaps are
+applied again before Helm is skipped. See [`examples/components.yaml`](examples/components.yaml) for an example.
+
 ## Development
 
 The Makefile in the root of the project contains some targets for interacting with the the tool. Simply run:

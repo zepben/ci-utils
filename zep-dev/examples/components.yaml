@@ -10,6 +10,11 @@ cluster_components:
     # mounts, and that the expected env variables exist, etc.
     local_repo_integration:
       type: argo-cd
+    # Create a ConfigMap from a file relative to this components file.
+    config_maps_from_file:
+      - name: kind-cluster-config
+        from_file:
+          kind-cluster.yaml: kind-cluster.yaml
     # Complete values to be passed to helm.
     values:
       applicationSet:

@@ -65,6 +65,22 @@ class ConfigMapFromFile(BaseModel):
         }
 
 
+class WaitFor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    resource: str
+    for_: str = Field(alias="for")
+    timeout: str
+    namespace: str | None = None
+
+
+class LoadDbCredentials(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    from_secret: str
+    database: str
+
+
 class ClusterComponent(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
@@ -73,6 +89,8 @@ class ClusterComponent(BaseModel):
     namespace: str
     local_repo_integration: LocalRepoIntegration | None = None
     config_maps_from_file: list[ConfigMapFromFile] = Field(default_factory=list)
+    wait_for: list[WaitFor] = Field(default_factory=list)
+    load_db_credentials: LoadDbCredentials | None = None
     values: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")

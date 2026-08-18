@@ -1,5 +1,6 @@
 import json
 import logging
+from base64 import b64decode
 from collections.abc import Sequence
 from contextlib import nullcontext
 from pathlib import Path
@@ -16,6 +17,7 @@ from zep_dev.models import (
     LOCAL_REPO_MOUNT_ROOT,
     ClusterComponent,
     ClusterComponents,
+    LoadDbCredentials,
     LocalRepo,
     OciRepository,
 )
@@ -295,11 +297,73 @@ def reconcile_helm_component(
         value_layers = helm_value_layers(desired, local_repos_overlay)
         install_helm_component(desired, value_layers)
 
+    wait_for_resources(desired)
+    if desired.load_db_credentials is not None:
+        apply_load_db_credentials(desired, desired.load_db_credentials)
+
     if desired.local_repo_integration:
         apply_argo_oci_repository_secrets(
             desired.namespace,
             desired.local_repo_integration.oci_repositories,
         )
+
+
+def wait_for_resources(desired: ClusterComponent) -> None:
+    for wait_for in desired.wait_for:
+        namespace = wait_for.namespace or desired.namespace
+        kubectl(
+            "wait",
+            f"--for={wait_for.for_}",
+            wait_for.resource,
+            f"--namespace={namespace}",
+            f"--timeout={wait_for.timeout}",
+        )
+
+
+def apply_load_db_credentials(
+    desired: ClusterComponent,
+    credentials: LoadDbCredentials,
+) -> None:
+    source = kubectl(
+        "get",
+        "secret",
+        credentials.from_secret,
+        f"--namespace={desired.namespace}",
+        "--output=json",
+        capture_stdout=True,
+    )
+    source_data: dict[str, str] = json.loads(source.stdout).get("data", {})
+    config = {
+        "host": secret_data(source_data, "host"),
+        "port": int(secret_data(source_data, "port")),
+        "name": credentials.database,
+        "username": secret_data(source_data, "username", "user"),
+        "password": secret_data(source_data, "password"),
+    }
+    manifest = {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {
+            "name": "ewb-load-database-config",
+            "namespace": desired.namespace,
+        },
+        "type": "Opaque",
+        "stringData": {"load-database.json": json.dumps(config, separators=(",", ":"))},
+    }
+    kubectl(
+        "apply",
+        "-f",
+        "-",
+        input=yaml.safe_dump(manifest, default_flow_style=False),
+    )
+
+
+def secret_data(source_data: dict[str, str], *keys: str) -> str:
+    for key in keys:
+        encoded = source_data.get(key)
+        if encoded is not None:
+            return b64decode(encoded, validate=True).decode("utf-8")
+    raise ClickException(f"Secret data does not contain any of: {', '.join(keys)}")
 
 
 def apply_configmaps_from_file(

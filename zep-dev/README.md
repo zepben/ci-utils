@@ -28,6 +28,27 @@ cluster_components:
 Each ConfigMap uses its component namespace. On a reused Kind cluster, ConfigMaps are
 applied again before Helm is skipped. See [`examples/components.yaml`](examples/components.yaml) for an example.
 
+### Waiting for resources and creating EWB load-database credentials
+
+A component can wait for resources created by its Helm chart, then create the
+Secret consumed by EWB's optional load-database configuration. This is useful for creating
+and waiting for databases to be used by EWB/HCS.
+
+```yaml
+cluster_components:
+  - name: kind-pg
+    chart: cnpg/cluster
+    version: "0.8.1"
+    namespace: ewb-test
+    wait_for:
+      - resource: cluster/kind-pg
+        for: condition=Ready
+        timeout: 180s
+    load_db_credentials:
+      from_secret: kind-pg-superuser
+      database: app
+```
+
 ## Development
 
 The Makefile in the root of the project contains some targets for interacting with the the tool. Simply run:

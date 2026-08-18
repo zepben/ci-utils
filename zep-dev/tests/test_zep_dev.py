@@ -1,4 +1,6 @@
+import json
 import os
+from base64 import b64encode
 from collections.abc import Callable
 from io import StringIO
 from itertools import pairwise
@@ -7,6 +9,7 @@ from types import ModuleType
 
 import pytest
 import yaml
+from click import ClickException
 from pydantic import ValidationError
 
 from _fake_execute import FakeExecute
@@ -133,6 +136,130 @@ def test_cluster_component_rejects_duplicate_config_map_names() -> None:
                 ],
             }
         )
+
+
+def _k8s_secret_json(**fields: str) -> str:
+    return json.dumps(
+        {
+            "data": {
+                key: b64encode(value.encode()).decode() for key, value in fields.items()
+            }
+        }
+    )
+
+
+DATABASE_SUPERUSER_SECRET = _k8s_secret_json(
+    host="database-rw",
+    port="5432",
+    user="app-user",
+    password="secret-password",
+)
+
+EXPECTED_LOAD_DB_CONFIG = {
+    "host": "database-rw",
+    "port": 5432,
+    "name": "app",
+    "username": "app-user",
+    "password": "secret-password",
+}
+
+
+def test_apply_load_db_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    desired = ClusterComponent.model_validate(
+        {
+            "name": "database",
+            "chart": "example/database",
+            "version": "1.0.0",
+            "namespace": "test",
+            "load_db_credentials": {
+                "from_secret": "database-superuser",
+                "database": "app",
+            },
+        }
+    )
+    fake_kubectl = (
+        FakeExecute()
+        .on("get", "secret", "database-superuser", stdout=DATABASE_SUPERUSER_SECRET)
+        .on("apply", "-f", "-")
+    )
+    monkeypatch.setattr(cluster, "kubectl", fake_kubectl)
+
+    assert desired.load_db_credentials is not None
+    cluster.apply_load_db_credentials(desired, desired.load_db_credentials)
+
+    apply_calls = fake_kubectl.calls_for("apply", "-f", "-")
+    assert len(apply_calls) == 1
+    (apply_call,) = apply_calls
+    applied = yaml.safe_load(str(apply_call.kwargs["input"]))
+
+    string_data = applied.get("stringData")
+    assert isinstance(string_data, dict)
+    load_database_config = string_data.get("load-database.json")
+    assert isinstance(load_database_config, str)
+    assert json.loads(load_database_config) == EXPECTED_LOAD_DB_CONFIG
+
+    metadata = applied.get("metadata")
+    assert isinstance(metadata, dict)
+    assert metadata.get("name") == "ewb-load-database-config"
+    assert metadata.get("namespace") == "test"
+
+
+def test_apply_load_db_credentials_fails_when_required_secret_key_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    desired = ClusterComponent.model_validate(
+        {
+            "name": "database",
+            "chart": "example/database",
+            "version": "1.0.0",
+            "namespace": "test",
+            "load_db_credentials": {
+                "from_secret": "database-superuser",
+                "database": "app",
+            },
+        }
+    )
+    fake_kubectl = FakeExecute().on(
+        "get",
+        "secret",
+        "database-superuser",
+        stdout=_k8s_secret_json(host="database-rw", port="5432", user="app-user"),
+    )
+    monkeypatch.setattr(cluster, "kubectl", fake_kubectl)
+
+    assert desired.load_db_credentials is not None
+    with pytest.raises(
+        ClickException, match="Secret data does not contain any of: password"
+    ):
+        cluster.apply_load_db_credentials(desired, desired.load_db_credentials)
+
+
+def test_apply_load_db_credentials_fails_on_invalid_base64_secret_data(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    desired = ClusterComponent.model_validate(
+        {
+            "name": "database",
+            "chart": "example/database",
+            "version": "1.0.0",
+            "namespace": "test",
+            "load_db_credentials": {
+                "from_secret": "database-superuser",
+                "database": "app",
+            },
+        }
+    )
+    fake_kubectl = FakeExecute().on(
+        "get",
+        "secret",
+        "database-superuser",
+        stdout=json.dumps({"data": {"host": "%%%INVALID%%%"}}),
+    )
+    monkeypatch.setattr(cluster, "kubectl", fake_kubectl)
+
+    assert desired.load_db_credentials is not None
+    with pytest.raises(Exception, match="Only base64 data is allowed"):
+        cluster.apply_load_db_credentials(desired, desired.load_db_credentials)
 
 
 @pytest.mark.parametrize(

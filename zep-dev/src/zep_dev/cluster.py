@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 from click import ClickException
 
-from zep_dev.k8s import KUBECONF_PATH, kube_guard, kubectl
+from zep_dev.k8s import KUBECONF_PATH, kube_guard, kubectl, resource_exists
 from zep_dev.k8s_secrets import resolve_registry_credential
 from zep_dev.models import (
     LOCAL_REPO_MOUNT_ROOT,
@@ -273,6 +273,7 @@ def install_helm_components(
     for desired in components.cluster_components:
         reconcile_helm_component(
             desired,
+            source_dir=components.source_dir,
             installed=installed,
             local_repos_overlay=repos_overlay,
         )
@@ -281,9 +282,13 @@ def install_helm_components(
 def reconcile_helm_component(
     desired: ClusterComponent,
     *,
+    source_dir: Path | None,
     installed: Sequence[str],
     local_repos_overlay: dict[str, Any],
 ) -> None:
+    if desired.config_maps_from_file:
+        apply_configmaps_from_file(desired, source_dir)
+
     if desired.name in installed:
         LOG.info("Skipping already installed chart: %s", desired.name)
     else:
@@ -294,6 +299,24 @@ def reconcile_helm_component(
         apply_argo_oci_repository_secrets(
             desired.namespace,
             desired.local_repo_integration.oci_repositories,
+        )
+
+
+def apply_configmaps_from_file(
+    desired: ClusterComponent,
+    source_dir: Path | None,
+) -> None:
+    if not resource_exists("namespace", desired.namespace):
+        kubectl("create", "namespace", desired.namespace)
+    for config_map in desired.config_maps_from_file:
+        kubectl(
+            "apply",
+            "-f",
+            "-",
+            input=yaml.safe_dump(
+                config_map.manifest(desired.namespace, source_dir),
+                default_flow_style=False,
+            ),
         )
 
 
@@ -334,7 +357,6 @@ def install_helm_component(
             install_args.extend(["-f", str(values_path)])
 
         helm(*install_args)
-
 
 
 def apply_argo_oci_repository_secrets(

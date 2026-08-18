@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Any, Literal, Self, TextIO
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from click import ClickException
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 # Path inside kind workers. Argo file:// URLs and repo-server hostPath both assume it.
 LOCAL_REPO_MOUNT_ROOT = "/mnt/local-repos"
@@ -41,6 +42,45 @@ class LocalRepoIntegration(BaseModel):
     oci_repositories: list[OciRepository] = Field(default_factory=list)
 
 
+class ConfigMapFromFile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    from_file: dict[str, str] = Field(min_length=1)
+
+    def manifest(self, namespace: str, source_dir: Path | None) -> dict[str, Any]:
+        if source_dir is None:
+            raise ClickException(
+                "config_maps_from_file requires a components file path"
+            )
+
+        return {
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": {"name": self.name, "namespace": namespace},
+            "data": {
+                key: (source_dir / path).read_text(encoding="utf-8")
+                for key, path in self.from_file.items()
+            },
+        }
+
+
+class WaitFor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    resource: str
+    for_: str = Field(alias="for")
+    timeout: str
+    namespace: str | None = None
+
+
+class LoadDbCredentials(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    from_secret: str
+    database: str
+
+
 class ClusterComponent(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
@@ -48,7 +88,17 @@ class ClusterComponent(BaseModel):
     version: str
     namespace: str
     local_repo_integration: LocalRepoIntegration | None = None
+    config_maps_from_file: list[ConfigMapFromFile] = Field(default_factory=list)
+    wait_for: list[WaitFor] = Field(default_factory=list)
+    load_db_credentials: LoadDbCredentials | None = None
     values: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_unique_config_map_names(self) -> Self:
+        names = [config_map.name for config_map in self.config_maps_from_file]
+        if len(names) != len(set(names)):
+            raise ValueError("duplicate config_maps_from_file name")
+        return self
 
 
 class RequiredTool(BaseModel):
@@ -75,11 +125,23 @@ class ClusterComponents(BaseModel):
     model_config = ConfigDict(extra="forbid")
     helm_repos: dict[str, str]
     cluster_components: list[ClusterComponent]
+    _source_dir: Path | None = PrivateAttr(default=None)
+
+    @property
+    def source_dir(self) -> Path | None:
+        return self._source_dir
 
     @classmethod
     def from_text_io(cls, input_data: TextIO) -> Self:
         data: Any = yaml.safe_load(input_data.read())
         return cls.model_validate(data)
+
+    @classmethod
+    def from_path(cls, path: Path) -> Self:
+        with path.open(encoding="utf-8") as input_data:
+            components = cls.from_text_io(input_data)
+        components._source_dir = path.parent.resolve()
+        return components
 
 
 class ChartTestingConfig(BaseModel):

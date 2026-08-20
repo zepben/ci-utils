@@ -39,7 +39,7 @@ def validate_dependencies_present(
 ) -> None:
     chart_repos = [repo.split("=")[-1] for repo in ct_config.chart_repos]
     for dependency in chart_metadata.dependencies:
-        if dependency.repository.startswith("oci://ghcr.io"):
+        if dependency.repository.startswith(("oci://ghcr.io", "file://")):
             continue
         if dependency.repository not in chart_repos:
             raise ClickException(

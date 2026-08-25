@@ -295,7 +295,7 @@ def reconcile_helm_component(
         LOG.info("Skipping already installed chart: %s", desired.name)
     else:
         value_layers = helm_value_layers(desired, local_repos_overlay)
-        install_helm_component(desired, value_layers)
+        install_helm_component(desired, value_layers, source_dir)
 
     wait_for_resources(desired)
     if desired.load_db_credentials is not None:
@@ -399,12 +399,14 @@ def helm_value_layers(
 def install_helm_component(
     desired: ClusterComponent,
     value_layers: Sequence[tuple[str, dict[str, Any]]],
+    source_dir: Path | None,
 ) -> None:
+    chart = resolve_chart_path(desired.chart, source_dir)
     with TemporaryDirectory() as tmpdir:
         install_args: list[str] = [
             "install",
             desired.name,
-            desired.chart,
+            chart,
             "--namespace",
             desired.namespace,
             "--create-namespace",
@@ -421,6 +423,15 @@ def install_helm_component(
             install_args.extend(["-f", str(values_path)])
 
         helm(*install_args)
+
+
+def resolve_chart_path(chart: str, source_dir: Path | None) -> str:
+    chart_path = Path(chart)
+    if not chart.startswith(".") and not chart_path.is_absolute():
+        return chart
+    if source_dir is None:
+        raise ClickException("local chart requires a components file path")
+    return str((source_dir / chart_path).resolve())
 
 
 def apply_argo_oci_repository_secrets(

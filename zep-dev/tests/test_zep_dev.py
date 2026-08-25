@@ -6,6 +6,7 @@ from io import StringIO
 from itertools import pairwise
 from pathlib import Path
 from types import ModuleType
+from unittest.mock import call
 
 import pytest
 import yaml
@@ -344,6 +345,88 @@ cluster_components:
             "data": {"init.sql": "SELECT 'ready';\n"},
         }
     ]
+
+
+def test_install_helm_components_resolves_local_chart_from_components_file(
+    fake_execute: Callable[[ModuleType], FakeExecute],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chart_dir = tmp_path / "kind" / "database"
+    chart_dir.mkdir(parents=True)
+    components_path = tmp_path / "components.yaml"
+    components_path.write_text(
+        """\
+helm_repos: {}
+cluster_components:
+  - name: database
+    chart: ./kind/database
+    version: "1.0.0"
+    namespace: test
+"""
+    )
+    components = ClusterComponents.from_path(components_path)
+    fake = fake_execute(cluster)
+    fake.on("helm", "list", stdout="")
+    fake.on("helm", "install", "database")
+    monkeypatch.chdir(tmp_path.parent)
+
+    cluster.install_helm_components(components)
+
+    assert fake.calls_for("helm", "install") == [
+        call(
+            "helm",
+            "install",
+            "database",
+            str(chart_dir.resolve()),
+            "--namespace",
+            "test",
+            "--create-namespace",
+            "--version",
+            "1.0.0",
+            "--wait",
+            capture_stdout=False,
+        )
+    ]
+
+
+def test_install_helm_component_preserves_repo_chart_and_rejects_local_without_source_dir(
+    fake_execute: Callable[[ModuleType], FakeExecute],
+) -> None:
+    desired = ClusterComponent(
+        name="database",
+        chart="cnpg/cloudnative-pg",
+        version="1.0.0",
+        namespace="test",
+    )
+    fake = fake_execute(cluster)
+    fake.on("helm", "install", "database")
+
+    cluster.install_helm_component(desired, [], source_dir=None)
+
+    assert fake.calls_for("helm", "install") == [
+        call(
+            "helm",
+            "install",
+            "database",
+            "cnpg/cloudnative-pg",
+            "--namespace",
+            "test",
+            "--create-namespace",
+            "--version",
+            "1.0.0",
+            "--wait",
+            capture_stdout=False,
+        )
+    ]
+    with pytest.raises(
+        ClickException, match="local chart requires a components file path"
+    ):
+        cluster.install_helm_component(
+            desired.model_copy(update={"chart": "./kind/database"}),
+            [],
+            source_dir=None,
+        )
 
 
 def test_kube_guard(

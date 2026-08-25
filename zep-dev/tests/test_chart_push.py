@@ -1,12 +1,11 @@
 from collections.abc import Callable
 from pathlib import Path
-from types import ModuleType
 from unittest.mock import call
 
 from click.testing import CliRunner
 
 from _charts import write_chart
-from _fake_execute import FakeExecute
+from _fake_execute import FakeExecuteFactory
 from zep_dev.cli import cli
 from zep_dev.commands.chart import push as push_module
 from zep_dev.models import ChartTestingConfig
@@ -17,7 +16,7 @@ def test_push_adds_configured_repo_before_building_dependencies(
     auth_json: Path,
     chart_testing_config: ChartTestingConfig,
     write_chart_testing_config: Callable[[ChartTestingConfig], None],
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
 ) -> None:
     repo_url = "https://grafana.github.io/helm-charts"
     chart_testing_config.chart_repos = [f"grafana={repo_url}"]
@@ -85,7 +84,7 @@ def test_push_adds_configured_repo_before_building_dependencies(
 
 
 def test_push_is_idempotent_when_chart_present(
-    tmp_path: Path, fake_execute: Callable[[ModuleType], FakeExecute]
+    tmp_path: Path, fake_execute: FakeExecuteFactory
 ) -> None:
     chart = write_chart(
         tmp_path / "charts" / "ewb", {"name": "ewb", "version": "1.2.3"}

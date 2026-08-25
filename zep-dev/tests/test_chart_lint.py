@@ -1,13 +1,12 @@
 from collections.abc import Callable
 from pathlib import Path
-from types import ModuleType
 from unittest.mock import call
 
 import pytest
 from click.testing import CliRunner
 
 from _charts import write_chart
-from _fake_execute import FakeExecute
+from _fake_execute import FakeExecuteFactory
 from zep_dev.cli import cli
 from zep_dev.commands.chart import lint as lint_module
 from zep_dev.commands.chart import utils as ct_module
@@ -38,7 +37,7 @@ def test_lint_dependency_repository_present_runs_ct(
     chart_testing_config: ChartTestingConfig,
     dependent_chart: Path,
     write_chart_testing_config: Callable[[ChartTestingConfig], None],
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     write_chart_testing_config(chart_testing_config)
@@ -77,7 +76,7 @@ def test_lint_library_chart_skips_kubeconform(
     helm_dir: Path,
     chart_testing_config: ChartTestingConfig,
     write_chart_testing_config: Callable[[ChartTestingConfig], None],
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     write_chart_testing_config(chart_testing_config)
@@ -109,7 +108,7 @@ def test_lint_dependency_repository_missing_from_ct_config_fails(
     chart_testing_config: ChartTestingConfig,
     dependent_chart: Path,
     write_chart_testing_config: Callable[[ChartTestingConfig], None],
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     chart_testing_config.chart_repos = ["other-repo=https://other.example.com/charts"]

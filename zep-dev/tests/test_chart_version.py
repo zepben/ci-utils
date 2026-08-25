@@ -1,10 +1,7 @@
-from collections.abc import Callable
-from types import ModuleType
-
 import pytest
 from click.testing import CliRunner
 
-from _fake_execute import FakeExecute
+from _fake_execute import FakeExecuteFactory
 from zep_dev.cli import cli
 from zep_dev.commands.chart import version as version_module
 from zep_dev.commands.chart.version import (
@@ -53,7 +50,7 @@ def test_parse_git_describe_rejects_unexpected_output(output: str) -> None:
 
 
 def test_version_uses_stable_release_tags(
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
 ) -> None:
     fake = fake_execute(version_module)
     fake.on("git", "describe", stdout="v1.37.0-5-gd95cc75\n")

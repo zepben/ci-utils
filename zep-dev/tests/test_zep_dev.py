@@ -1,11 +1,9 @@
 import json
 import os
 from base64 import b64encode
-from collections.abc import Callable
 from io import StringIO
 from itertools import pairwise
 from pathlib import Path
-from types import ModuleType
 from unittest.mock import call
 
 import pytest
@@ -13,7 +11,7 @@ import yaml
 from click import ClickException
 from pydantic import ValidationError
 
-from _fake_execute import FakeExecute
+from _fake_execute import FakeExecute, FakeExecuteFactory
 from zep_dev import cluster
 from zep_dev.k8s import (
     KUBECONF_PATH,
@@ -273,7 +271,7 @@ def test_apply_load_db_credentials_fails_on_invalid_base64_secret_data(
     ],
 )
 def test_install_helm_components_applies_config_maps_before_install_or_skip(
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     installed: str,
@@ -348,7 +346,7 @@ cluster_components:
 
 
 def test_install_helm_components_resolves_local_chart_from_components_file(
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -391,7 +389,7 @@ cluster_components:
 
 
 def test_install_helm_component_preserves_repo_chart_and_rejects_local_without_source_dir(
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
 ) -> None:
     desired = ClusterComponent(
         name="database",
@@ -455,7 +453,7 @@ def test_add_helm_repos_skips_all_helm_when_no_repos_configured(
 
 
 def test_install_helm_components_applies_local_repo_integration_only_to_selected_component(
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -561,7 +559,7 @@ def test_install_helm_components_applies_local_repo_integration_only_to_selected
 
 
 def test_install_helm_components_refreshes_argo_oci_repositories_when_installed(
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repository = OciRepository(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from types import ModuleType
 from typing import Any
 from unittest.mock import call
 
@@ -79,3 +80,6 @@ class FakeExecute:
                 stderr=result.stderr,
             )
         return result
+
+
+type FakeExecuteFactory = Callable[[ModuleType], FakeExecute]

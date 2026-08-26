@@ -1,3 +1,4 @@
+import os
 import subprocess
 from unittest.mock import call
 
@@ -5,6 +6,24 @@ import pytest
 
 from _fake_execute import FakeExecute
 from zep_dev import k8s
+
+
+def test_kube_guard_targets_kind_and_restores_after_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kubeconfig = "/original/kubeconfig"
+    provider_config = "/original/provider-config"
+    monkeypatch.setenv("KUBECONFIG", kubeconfig)
+    monkeypatch.setenv("KUBE_CONFIG_PATH", provider_config)
+
+    with pytest.raises(RuntimeError, match="terraform failure"):
+        with k8s.kube_guard():
+            assert os.environ["KUBECONFIG"] == str(k8s.KUBECONF_PATH)
+            assert os.environ["KUBE_CONFIG_PATH"] == str(k8s.KUBECONF_PATH)
+            raise RuntimeError("terraform failure")
+
+    assert os.environ["KUBECONFIG"] == kubeconfig
+    assert os.environ["KUBE_CONFIG_PATH"] == provider_config
 
 
 @pytest.mark.parametrize(

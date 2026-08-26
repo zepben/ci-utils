@@ -6,6 +6,7 @@ import click
 from zep_dev.groups.chart import chart
 from zep_dev.groups.cluster import cluster
 from zep_dev.groups.secrets import secrets
+from zep_dev.groups.terraform import terraform
 from zep_dev.groups.tools import tools
 from zep_dev.shared import get_bin_dir, resolve_registry_config
 
@@ -58,3 +59,4 @@ cli.add_command(cluster)
 cli.add_command(tools)
 cli.add_command(chart)
 cli.add_command(secrets)
+cli.add_command(terraform)

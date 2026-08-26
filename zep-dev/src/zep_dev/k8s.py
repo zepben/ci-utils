@@ -15,12 +15,24 @@ def kube_guard() -> Generator[None]:
     This is to prevent accidentally targeting production clusters.
     """
     og_conf = os.environ.get("KUBECONFIG")
+    og_kubeconf_path = os.environ.get("KUBE_CONFIG_PATH")
+
+    # The HashiCorp Kubernetes provider reads KUBE_CONFIG_PATH,
+    # whereas the alekc/kubectl provider reads KUBECONFIG.
     os.environ["KUBECONFIG"] = str(KUBECONF_PATH)
-    yield
-    if og_conf is not None:
-        os.environ["KUBECONFIG"] = og_conf
-    else:
-        os.environ.pop("KUBECONFIG", None)
+    os.environ["KUBE_CONFIG_PATH"] = str(KUBECONF_PATH)
+    try:
+        yield
+    finally:
+        if og_conf is not None:
+            os.environ["KUBECONFIG"] = og_conf
+        else:
+            os.environ.pop("KUBECONFIG", None)
+
+        if og_kubeconf_path is None:
+            os.environ.pop("KUBE_CONFIG_PATH", None)
+        else:
+            os.environ["KUBE_CONFIG_PATH"] = og_kubeconf_path
 
 
 def kubectl(

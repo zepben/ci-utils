@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import zipfile
 from contextlib import suppress
 from importlib.resources import as_file, files
 from pathlib import Path
@@ -23,7 +24,7 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
-from zep_dev.models import RequiredTool
+from zep_dev.models import ArchiveFormat, RequiredTool
 from zep_dev.shared import execute, get_bin_dir, get_hash_dir, get_tools_dir
 from zep_dev.static import TOOLS
 
@@ -90,13 +91,35 @@ def download(
                 raise
 
 
-def extract_archive_member(archive: Path, member: str, dest_dir: Path) -> None:
-    with tarfile.open(archive, "r:gz") as tar:
-        try:
-            info = tar.getmember(member)
-        except KeyError as exc:
-            raise Exception(f"Archive member not found: {member}") from exc
-        tar.extract(info, dest_dir, filter="data")
+def extract_archive_member(
+    archive: Path,
+    member: str,
+    dest: Path,
+    archive_format: ArchiveFormat,
+) -> None:
+    match archive_format:
+        case ArchiveFormat.ZIP:
+            with zipfile.ZipFile(archive) as zipped:
+                try:
+                    zip_source = zipped.open(member)
+                except KeyError as exc:
+                    raise Exception(f"Archive member not found: {member}") from exc
+                with zip_source, dest.open("wb") as output:
+                    shutil.copyfileobj(zip_source, output)
+        case ArchiveFormat.TAR_GZ:
+            with tarfile.open(archive, "r:gz") as tar:
+                try:
+                    tar_source = tar.extractfile(member)
+                except KeyError as exc:
+                    raise Exception(f"Archive member not found: {member}") from exc
+                if tar_source is None:
+                    raise Exception(f"Archive member is not a file: {member}")
+                with tar_source, dest.open("wb") as output:
+                    shutil.copyfileobj(tar_source, output)
+        case ArchiveFormat.NONE:
+            raise ValueError("Cannot extract a member from an unarchived tool")
+        case _:
+            raise ValueError(f"Unsupported archive format: {archive_format}")
 
 
 def install_binary_tool(tool: RequiredTool, tools_dir: Path) -> Path:
@@ -108,10 +131,9 @@ def install_binary_tool(tool: RequiredTool, tools_dir: Path) -> Path:
         member = tool.archive_member.format(version=tool.version)
         with TemporaryDirectory() as tmp:
             work = Path(tmp)
-            archive = work / "archive.tar.gz"
+            archive = work / "archive"
             download(url, archive, expected_sha256=tool.sha256, label=tool.name)
-            extract_archive_member(archive, member, work)
-            shutil.copy2(work / member, dest)
+            extract_archive_member(archive, member, dest, tool.archive_format)
 
     dest.chmod(0o755)
     LOG.info("Installed %s %s -> %s", tool.name, tool.version, dest)

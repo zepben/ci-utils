@@ -1,6 +1,7 @@
 import os
 from contextlib import suppress
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal, Self, TextIO
 
@@ -101,6 +102,12 @@ class ClusterComponent(BaseModel):
         return self
 
 
+class ArchiveFormat(StrEnum):
+    NONE = "none"
+    TAR_GZ = "tar.gz"
+    ZIP = "zip"
+
+
 class RequiredTool(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
@@ -108,6 +115,14 @@ class RequiredTool(BaseModel):
     url: str
     sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
     archive_member: str | None = None
+    archive_format: ArchiveFormat = ArchiveFormat.NONE
+
+    @model_validator(mode="after")
+    def validate_archive_configuration(self) -> Self:
+        has_archive = self.archive_format is not ArchiveFormat.NONE
+        if has_archive != (self.archive_member is not None):
+            raise ValueError("archive_member and archive_format must be set together")
+        return self
 
     def to_hash(self) -> str:
         return f"{self.name}-{self.version}-{self.url}-{self.sha256}"

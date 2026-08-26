@@ -1,6 +1,7 @@
 import io
 import os
 import tarfile
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -8,7 +9,7 @@ from requests.exceptions import RequestException
 
 from zep_dev.commands.tools import commands as install_module
 from zep_dev.commands.tools.commands import download, install_binary_tool
-from zep_dev.models import RequiredTool
+from zep_dev.models import ArchiveFormat, RequiredTool
 
 
 @pytest.fixture(autouse=True)
@@ -39,6 +40,35 @@ def test_install_binary_tool_from_archive(
         url="http://unused/{version}",
         sha256="0" * 64,
         archive_member="ct",
+        archive_format=ArchiveFormat.TAR_GZ,
+    )
+    dest = install_binary_tool(tool, tools_dir)
+
+    assert dest == tools_dir / "test-tool"
+    assert dest.read_bytes() == b"#!/bin/sh\n"
+    assert os.access(dest, os.X_OK)
+
+
+def test_install_binary_tool_from_zip(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tools_dir = tmp_path / "bin"
+    tools_dir.mkdir()
+
+    def fake_download(url: str, dest: Path, **kwargs: object) -> None:
+        with zipfile.ZipFile(dest, "w") as archive:
+            archive.writestr("terraform", b"#!/bin/sh\n")
+
+    monkeypatch.setattr(install_module, "download", fake_download)
+
+    tool = RequiredTool(
+        name="test-tool",
+        version="1.0.0",
+        url="http://unused/{version}",
+        sha256="0" * 64,
+        archive_member="terraform",
+        archive_format=ArchiveFormat.ZIP,
     )
     dest = install_binary_tool(tool, tools_dir)
 

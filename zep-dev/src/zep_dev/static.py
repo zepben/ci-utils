@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from zep_dev.models import RequiredTool
+from zep_dev.models import ArchiveFormat, RequiredTool
 
 TOOLS: list[RequiredTool] = [
     RequiredTool(
@@ -9,6 +9,7 @@ TOOLS: list[RequiredTool] = [
         url="https://get.helm.sh/helm-{version}-linux-amd64.tar.gz",
         sha256="9adafecab4d406853bba163a70e9f104f47dbbf65ce24b7653bae7e36150bcb6",
         archive_member="linux-amd64/helm",
+        archive_format=ArchiveFormat.TAR_GZ,
     ),
     RequiredTool(
         name="ct",
@@ -19,6 +20,7 @@ TOOLS: list[RequiredTool] = [
         ),
         sha256="d16f0583616885423826241164ce1f6589c6fe5332fa74f374ebd2bd3cb3fe1f",
         archive_member="ct",
+        archive_format=ArchiveFormat.TAR_GZ,
     ),
     RequiredTool(
         name="kubeconform",
@@ -29,6 +31,7 @@ TOOLS: list[RequiredTool] = [
         ),
         sha256="9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883",
         archive_member="kubeconform",
+        archive_format=ArchiveFormat.TAR_GZ,
     ),
     RequiredTool(
         name="kind",
@@ -51,6 +54,7 @@ TOOLS: list[RequiredTool] = [
         ),
         sha256="b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6",
         archive_member="shellcheck-{version}/shellcheck",
+        archive_format=ArchiveFormat.TAR_GZ,
     ),
     RequiredTool(
         name="chainsaw",
@@ -61,6 +65,7 @@ TOOLS: list[RequiredTool] = [
         ),
         sha256="295d226c89f126c0a97775d364be149f47a810c8a3f9829ee410583d0c1abe3c",
         archive_member="chainsaw",
+        archive_format=ArchiveFormat.TAR_GZ,
     ),
     RequiredTool(
         name="argocd",

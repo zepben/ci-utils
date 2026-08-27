@@ -1,14 +1,12 @@
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from types import ModuleType
 from unittest.mock import call
 
 import pytest
 from click.testing import CliRunner
 
 from _charts import write_chart
-from _fake_execute import FakeExecute
+from _fake_execute import FakeExecute, FakeExecuteFactory
 from zep_dev import k8s, k8s_secrets
 from zep_dev.cli import cli
 from zep_dev.commands.chart import test as test_module
@@ -32,7 +30,7 @@ def _write_chart(
 
 
 def _install_chart_fakes(
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     monkeypatch: pytest.MonkeyPatch,
 ) -> ChartTestFakes:
     kubectl_fake = (
@@ -67,7 +65,7 @@ def test_test_missing_ct_yaml_fails(tmp_path: Path) -> None:
 def test_library_chart_skips_install(
     helm_dir: Path,
     auth_json: Path,
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     chart_dir = _write_chart(helm_dir, "mylib", chart_type="library")
@@ -86,7 +84,7 @@ def test_application_chart_runs_lint_and_install(
     tmp_path: Path,
     helm_dir: Path,
     auth_json: Path,
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_chart(helm_dir, "myapp")
@@ -120,7 +118,7 @@ def test_application_chart_runs_lint_and_install(
 def test_application_chart_lint_and_install_failure_raises(
     helm_dir: Path,
     auth_json: Path,
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     chart_dir = _write_chart(helm_dir, "myapp")
@@ -153,7 +151,7 @@ def test_chart_outside_helm_dir_fails(
 def test_discovery_mode_processes_all_charts_and_skips_libraries(
     helm_dir: Path,
     auth_json: Path,
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _write_chart(helm_dir, "app-a")

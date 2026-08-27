@@ -1,11 +1,9 @@
-from collections.abc import Callable
 from pathlib import Path
-from types import ModuleType
 from unittest.mock import call
 
 from click.testing import CliRunner
 
-from _fake_execute import FakeExecute
+from _fake_execute import FakeExecuteFactory
 from zep_dev.cli import cli
 from zep_dev.commands.chart import list_changed as list_changed_module
 
@@ -13,7 +11,7 @@ from zep_dev.commands.chart import list_changed as list_changed_module
 def test_list_changed_passes_repo_relative_paths(
     tmp_path: Path,
     helm_dir: Path,
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
 ) -> None:
     fake = fake_execute(list_changed_module)
     fake.on("git", stdout=f"{tmp_path.resolve()}\n")

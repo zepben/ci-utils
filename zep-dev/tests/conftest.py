@@ -5,7 +5,7 @@ from types import ModuleType
 import pytest
 import yaml
 
-from _fake_execute import FakeExecute
+from _fake_execute import FakeExecute, FakeExecuteFactory
 from zep_dev import k8s_secrets
 from zep_dev.models import ChartTestingConfig
 
@@ -13,7 +13,7 @@ from zep_dev.models import ChartTestingConfig
 @pytest.fixture
 def fake_execute(
     monkeypatch: pytest.MonkeyPatch,
-) -> Callable[[ModuleType], FakeExecute]:
+) -> FakeExecuteFactory:
     def _install(module: ModuleType) -> FakeExecute:
         fake = FakeExecute()
         monkeypatch.setattr(module, "execute", fake)

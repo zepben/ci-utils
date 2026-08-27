@@ -1,18 +1,17 @@
 import json
 import os
 from base64 import b64encode
-from collections.abc import Callable
 from io import StringIO
 from itertools import pairwise
 from pathlib import Path
-from types import ModuleType
+from unittest.mock import call
 
 import pytest
 import yaml
 from click import ClickException
 from pydantic import ValidationError
 
-from _fake_execute import FakeExecute
+from _fake_execute import FakeExecute, FakeExecuteFactory
 from zep_dev import cluster
 from zep_dev.k8s import (
     KUBECONF_PATH,
@@ -272,7 +271,7 @@ def test_apply_load_db_credentials_fails_on_invalid_base64_secret_data(
     ],
 )
 def test_install_helm_components_applies_config_maps_before_install_or_skip(
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     installed: str,
@@ -346,6 +345,88 @@ cluster_components:
     ]
 
 
+def test_install_helm_components_resolves_local_chart_from_components_file(
+    fake_execute: FakeExecuteFactory,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chart_dir = tmp_path / "kind" / "database"
+    chart_dir.mkdir(parents=True)
+    components_path = tmp_path / "components.yaml"
+    components_path.write_text(
+        """\
+helm_repos: {}
+cluster_components:
+  - name: database
+    chart: ./kind/database
+    version: "1.0.0"
+    namespace: test
+"""
+    )
+    components = ClusterComponents.from_path(components_path)
+    fake = fake_execute(cluster)
+    fake.on("helm", "list", stdout="")
+    fake.on("helm", "install", "database")
+    monkeypatch.chdir(tmp_path.parent)
+
+    cluster.install_helm_components(components)
+
+    assert fake.calls_for("helm", "install") == [
+        call(
+            "helm",
+            "install",
+            "database",
+            str(chart_dir.resolve()),
+            "--namespace",
+            "test",
+            "--create-namespace",
+            "--version",
+            "1.0.0",
+            "--wait",
+            capture_stdout=False,
+        )
+    ]
+
+
+def test_install_helm_component_preserves_repo_chart_and_rejects_local_without_source_dir(
+    fake_execute: FakeExecuteFactory,
+) -> None:
+    desired = ClusterComponent(
+        name="database",
+        chart="cnpg/cloudnative-pg",
+        version="1.0.0",
+        namespace="test",
+    )
+    fake = fake_execute(cluster)
+    fake.on("helm", "install", "database")
+
+    cluster.install_helm_component(desired, [], source_dir=None)
+
+    assert fake.calls_for("helm", "install") == [
+        call(
+            "helm",
+            "install",
+            "database",
+            "cnpg/cloudnative-pg",
+            "--namespace",
+            "test",
+            "--create-namespace",
+            "--version",
+            "1.0.0",
+            "--wait",
+            capture_stdout=False,
+        )
+    ]
+    with pytest.raises(
+        ClickException, match="local chart requires a components file path"
+    ):
+        cluster.install_helm_component(
+            desired.model_copy(update={"chart": "./kind/database"}),
+            [],
+            source_dir=None,
+        )
+
+
 def test_kube_guard(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -372,7 +453,7 @@ def test_add_helm_repos_skips_all_helm_when_no_repos_configured(
 
 
 def test_install_helm_components_applies_local_repo_integration_only_to_selected_component(
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -478,7 +559,7 @@ def test_install_helm_components_applies_local_repo_integration_only_to_selected
 
 
 def test_install_helm_components_refreshes_argo_oci_repositories_when_installed(
-    fake_execute: Callable[[ModuleType], FakeExecute],
+    fake_execute: FakeExecuteFactory,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repository = OciRepository(

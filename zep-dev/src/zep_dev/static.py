@@ -76,6 +76,17 @@ TOOLS: list[RequiredTool] = [
         ),
         sha256="36c243afeb46bbaedec3c9b6823c043a741a36b1b8215147676bb8f18f21ef73",
     ),
+    RequiredTool(
+        name="terraform",
+        version="1.15.9",
+        url=(
+            "https://releases.hashicorp.com/terraform/{version}/"
+            "terraform_{version}_linux_amd64.zip"
+        ),
+        sha256="76edd0b22d2f27d3d2e097cd793209646f719cf60f02ff3af626b07361137da1",
+        archive_member="terraform",
+        archive_format=ArchiveFormat.ZIP,
+    ),
 ]
 TOOLS_BY_NAME = {tool.name: tool for tool in TOOLS}
 

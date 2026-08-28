@@ -2,6 +2,7 @@ import logging
 import os
 import subprocess
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -95,6 +96,7 @@ def execute(
     skip_resolve: bool = False,
     check: bool = True,
     input: str | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> CommandResult:
     if not skip_resolve:
         resolve(args[0])
@@ -106,6 +108,7 @@ def execute(
         stdout=subprocess.PIPE if capture_stdout else None,
         stderr=subprocess.PIPE if capture_stderr else None,
         check=False,
+        env=env,
     )
     result = CommandResult(
         returncode=completed.returncode,

@@ -16,10 +16,6 @@ spec:
       targetRevision: HEAD
       path: zep-dev/argo-cd/applications
 
-    - repoURL: file:///mnt/local-repos/deployments
-      targetRevision: HEAD
-      path: argo-cd-deployments/commons/global/temporal
-
   destination:
     server: https://kubernetes.default.svc
     namespace: argo-cd

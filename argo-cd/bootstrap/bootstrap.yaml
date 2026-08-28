@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bootstrap
+  namespace: argo-cd
+  labels:
+    type: system
+spec:
+  project: default
+  sources:
+    - repoURL: file:///mnt/local-repos/ci-utils
+      targetRevision: HEAD
+      path: zep-dev/argo-cd/bootstrap
+
+    - repoURL: file:///mnt/local-repos/ci-utils
+      targetRevision: HEAD
+      path: zep-dev/argo-cd/applications
+
+    - repoURL: file:///mnt/local-repos/deployments
+      targetRevision: HEAD
+      path: argo-cd-deployments/commons/global/temporal
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-cd
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - RespectIgnoreDifferences=true

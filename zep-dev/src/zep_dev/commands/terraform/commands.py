@@ -1,7 +1,7 @@
 import hashlib
 import os
 import shutil
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -31,14 +31,29 @@ def terraform_state_path(root: Path, namespace: str) -> Path:
 
 
 @contextmanager
-def disposable_workdir() -> Generator[None]:
-    with TemporaryDirectory(prefix="zep-dev-terraform-data-") as temporary_directory:
-        os.environ["TF_DATA_DIR"] = str(Path(temporary_directory) / "data")
+def terraform_environment() -> Generator[dict[str, str]]:
+    with TemporaryDirectory(prefix="zep-dev-terraform-") as temporary_directory:
+        temporary_root = Path(temporary_directory)
+        home = temporary_root / "home"
+        data = temporary_root / "data"
+        cli_config = temporary_root / "terraform.tfrc"
+
+        home.mkdir()
+        data.mkdir()
+        cli_config.touch()
+
         with kube_guard():
-            yield
+            yield {
+                "PATH": os.environ.get("PATH", os.defpath),
+                "KUBECONFIG": os.environ["KUBECONFIG"],
+                "KUBE_CONFIG_PATH": os.environ["KUBE_CONFIG_PATH"],
+                "HOME": str(home),
+                "TF_DATA_DIR": str(data),
+                "TF_CLI_CONFIG_FILE": str(cli_config),
+            }
 
 
-def terraform_init(root: Path) -> None:
+def terraform_init(root: Path, env: Mapping[str, str]) -> None:
     execute(
         "terraform",
         f"-chdir={root}",
@@ -46,6 +61,7 @@ def terraform_init(root: Path) -> None:
         "-backend=false",
         "-input=false",
         "-lockfile=readonly",
+        env=env,
     )
 
 
@@ -53,9 +69,9 @@ def apply_terraform(root: Path, namespace: str) -> None:
     absolute_root = resolve_root(root)
     state = terraform_state_path(absolute_root, namespace)
 
-    with disposable_workdir():
+    with terraform_environment() as env:
         STATE_ROOT.mkdir(exist_ok=True, parents=True)
-        terraform_init(absolute_root)
+        terraform_init(absolute_root, env)
         execute(
             "terraform",
             f"-chdir={absolute_root}",
@@ -64,6 +80,7 @@ def apply_terraform(root: Path, namespace: str) -> None:
             "-auto-approve",
             f"-state={state}",
             f"-var=namespace={namespace}",
+            env=env,
         )
 
 
@@ -73,8 +90,8 @@ def destroy_terraform(root: Path, namespace: str) -> None:
     if not state.is_file():
         raise click.ClickException(f"Terraform state does not exist: {state}")
 
-    with disposable_workdir():
-        terraform_init(absolute_root)
+    with terraform_environment() as env:
+        terraform_init(absolute_root, env)
         execute(
             "terraform",
             f"-chdir={absolute_root}",
@@ -83,6 +100,7 @@ def destroy_terraform(root: Path, namespace: str) -> None:
             "-auto-approve",
             f"-state={state}",
             f"-var=namespace={namespace}",
+            env=env,
         )
 
     shutil.rmtree(state.parent)

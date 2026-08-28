@@ -10,11 +10,11 @@ spec:
   sources:
     - repoURL: file:///mnt/local-repos/ci-utils
       targetRevision: HEAD
-      path: zep-dev/argo-cd/bootstrap
+      path: argo-cd/bootstrap
 
     - repoURL: file:///mnt/local-repos/ci-utils
       targetRevision: HEAD
-      path: zep-dev/argo-cd/applications
+      path: argo-cd/applications
 
   destination:
     server: https://kubernetes.default.svc

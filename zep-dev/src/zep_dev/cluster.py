@@ -3,6 +3,7 @@ import logging
 from base64 import b64decode
 from collections.abc import Sequence
 from contextlib import nullcontext
+from importlib.resources import as_file, files
 from pathlib import Path
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
@@ -26,6 +27,15 @@ from zep_dev.shared import CommandResult, execute
 CLUSTER_NAME = "test-cluster"
 LOG = logging.getLogger(__name__)
 
+# We package these to simulate the same storage classes that
+# exist on the cloud provider k8s clusters. This just eases
+# testing as we don't need to handle the case that these don't
+# exist everywhere we expect them to.
+BUILTIN_STORAGE_CLASS_RESOURCES = (
+    "storageclass-ebs-sc.yaml",
+    "storageclass-managed-csi.yaml",
+)
+
 
 def create_cluster(
     kind_config: Path,
@@ -34,6 +44,7 @@ def create_cluster(
 ) -> None:
     repos = load_local_repos(local_repos)
     create_kind_cluster(kind_config, repos)
+    apply_builtin_storage_classes()
     add_helm_repos(components)
     install_helm_components(components, repos)
 
@@ -199,6 +210,14 @@ def add_helm_repos(components: ClusterComponents) -> None:
             else:
                 helm("repo", "add", name, repo)
         helm("repo", "update")
+
+
+def apply_builtin_storage_classes() -> None:
+    """Apply Kind-local StorageClasses named the same as the AWS/Azure ones."""
+    resources = files("zep_dev.resources")
+    for name in BUILTIN_STORAGE_CLASS_RESOURCES:
+        with as_file(resources.joinpath(name)) as path:
+            kubectl("apply", "-f", str(path))
 
 
 def local_repos_overlay(local_repos: Sequence[LocalRepo]) -> dict[str, Any]:

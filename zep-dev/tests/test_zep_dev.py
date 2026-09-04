@@ -1,6 +1,7 @@
 import json
 import os
 from base64 import b64encode
+from importlib.resources import files
 from io import StringIO
 from itertools import pairwise
 from pathlib import Path
@@ -135,6 +136,32 @@ def test_cluster_component_rejects_duplicate_config_map_names() -> None:
                 ],
             }
         )
+
+
+def test_apply_builtin_storage_classes_applies_aws_and_azure_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_kubectl = FakeExecute().on("apply", "-f")
+    monkeypatch.setattr(cluster, "kubectl", fake_kubectl)
+
+    cluster.apply_builtin_storage_classes()
+
+    applied = []
+    for apply_call in fake_kubectl.calls_for("apply", "-f"):
+        _apply, _flag, path = apply_call.args
+        applied.append(Path(path).name)
+    assert applied == [
+        "storageclass-ebs-sc.yaml",
+        "storageclass-managed-csi.yaml",
+    ]
+    resources = files("zep_dev.resources")
+    for name, expected_sc in (
+        ("storageclass-ebs-sc.yaml", "ebs-sc"),
+        ("storageclass-managed-csi.yaml", "managed-csi"),
+    ):
+        manifest = yaml.safe_load(resources.joinpath(name).read_text(encoding="utf-8"))
+        assert manifest["metadata"]["name"] == expected_sc
+        assert manifest["provisioner"] == "rancher.io/local-path"
 
 
 def _k8s_secret_json(**fields: str) -> str:

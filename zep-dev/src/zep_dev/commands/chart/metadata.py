@@ -3,7 +3,7 @@ from pathlib import Path
 
 import click
 
-from zep_dev.commands.chart.utils import calculate_chart_version
+from zep_dev.commands.chart.version import calculate_chart_version
 from zep_dev.models import ChartMetadata, ChartValues
 
 # When this annotation is present and set to true, it indicates that we

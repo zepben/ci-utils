@@ -10,6 +10,9 @@ from zep_dev.shared import execute
 GIT_DESCRIBE_PATTERN = re.compile(
     r"^v(?P<base>\d+\.\d+\.\d+)-(?P<height>\d+)-g(?P<sha>[0-9a-f]+)$"
 )
+SNAPSHOT_TAG_PATTERN = re.compile(
+    r"^snapshot/v(?P<base>\d+\.\d+\.\d+)(?:b|-next)(?P<snapshot_number>\d+)$"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +38,33 @@ def parse_git_describe(output: str) -> GitDescribe:
 def to_chart_version(description: GitDescribe) -> str:
     if description.height == 0:
         return description.base
-    return f"{description.base}-{description.height}+{description.sha}"
+    return f"0.0.0-{description.base}.{description.height}+{description.sha}"
+
+
+def snapshot_chart_version(tags: list[str]) -> str | None:
+    matches = [
+        match
+        for tag in tags
+        if (match := SNAPSHOT_TAG_PATTERN.fullmatch(tag.strip())) is not None
+    ]
+    if len(matches) > 1:
+        raise ValueError("multiple snapshot tags point at HEAD")
+    if not matches:
+        return None
+
+    groups = matches[0].groupdict()
+    return f"{groups['base']}-b.{groups['snapshot_number']}"
+
+
+def git_tags_at_head() -> list[str]:
+    return execute(
+        "git",
+        "tag",
+        "--points-at",
+        "HEAD",
+        skip_resolve=True,
+        capture_stdout=True,
+    ).stdout.splitlines()
 
 
 def git_describe() -> str:
@@ -64,13 +93,20 @@ def git_describe() -> str:
     ).stdout
 
 
+def calculate_chart_version() -> str:
+    snapshot_version = snapshot_chart_version(git_tags_at_head())
+    if snapshot_version is not None:
+        return snapshot_version
+    return to_chart_version(parse_git_describe(git_describe()))
+
+
 @click.command("version")
 def version() -> None:
     try:
-        describe_output = parse_git_describe(git_describe())
+        chart_version = calculate_chart_version()
     except CalledProcessError as e:
-        raise ClickException(f"git describe failed with rc={e.returncode}") from e
+        raise ClickException(f"git command failed with rc={e.returncode}") from e
     except ValueError as e:
         raise ClickException(str(e)) from e
 
-    click.echo(to_chart_version(describe_output))
+    click.echo(chart_version)

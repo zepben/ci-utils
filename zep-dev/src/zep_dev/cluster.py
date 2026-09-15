@@ -49,6 +49,12 @@ def create_cluster(
     install_helm_components(components, repos)
 
 
+def load_image_archive(archive: Path) -> None:
+    if not archive.is_file() or archive.stat().st_size == 0:
+        raise ClickException(f"image archive is missing or empty: {archive}")
+    kind("load", "image-archive", str(archive), "--name", CLUSTER_NAME)
+
+
 def load_local_repos(paths: Sequence[Path]) -> tuple[LocalRepo, ...]:
     repos = tuple(LocalRepo(path=path.resolve()) for path in paths)
     seen: set[str] = set()

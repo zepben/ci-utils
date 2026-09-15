@@ -4,6 +4,7 @@ from unittest.mock import call
 import pytest
 from click import ClickException
 
+from _charts import write_chart
 from _fake_execute import FakeExecute, FakeExecuteFactory
 from zep_dev import cluster, cluster_images
 from zep_dev.shared import CommandResult
@@ -103,6 +104,56 @@ def test_discover_image_refs_rejects_empty_selection(
 
     with pytest.raises(ClickException, match="no images selected"):
         cluster_images.discover_image_refs("podman", ())
+
+
+def test_extract_image_refs_recurses_through_documents() -> None:
+    rendered = """\
+image: ghcr.io/example/api:1.2
+sidecars:
+  - image: ghcr.io/example/worker:1.2
+  - image: " "
+ignored:
+  image:
+    repository: ghcr.io/example/not-a-reference
+---
+nested:
+  image: ghcr.io/example/api:1.2
+  deeper:
+    image: 42
+"""
+
+    assert cluster_images.extract_image_refs(rendered) == {
+        "ghcr.io/example/api:1.2",
+        "ghcr.io/example/worker:1.2",
+    }
+
+
+def test_pack_images_does_not_create_archive_without_packable_images(
+    helm_dir: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chart = write_chart(
+        helm_dir / "charts" / "digest-app",
+        {"name": "digest-app", "version": "1.0.0"},
+    )
+    helm = FakeExecute().on(
+        "template",
+        "zep-pack",
+        str(chart),
+        stdout="image: ghcr.io/example/app@sha256:abc\n",
+    )
+    monkeypatch.setattr(cluster_images, "helm", helm)
+
+    def unexpected_engine_selection() -> str:
+        raise AssertionError("container engine must not be selected")
+
+    monkeypatch.setattr(cluster_images, "choose_engine", unexpected_engine_selection)
+    output = tmp_path / "images.tar"
+
+    cluster_images.pack_images(helm_dir, output)
+
+    assert not output.exists()
 
 
 @pytest.mark.parametrize(

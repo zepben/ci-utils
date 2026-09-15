@@ -20,6 +20,11 @@ from zep_dev.models import LOCAL_REPO_MOUNT_ROOT, ClusterComponents
     required=True,
 )
 @click.option(
+    "--image-archive",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Load images from this archive before installing cluster components",
+)
+@click.option(
     "--local-repo",
     "local_repos",
     multiple=True,
@@ -37,12 +42,14 @@ from zep_dev.models import LOCAL_REPO_MOUNT_ROOT, ClusterComponents
 def create(
     kind_config: Path,
     components: Path,
+    image_archive: Path | None,
     local_repos: tuple[Path, ...],
 ) -> None:
     cluster.create_cluster(
         kind_config,
         components=ClusterComponents.from_path(components),
         local_repos=local_repos,
+        image_archive=image_archive,
     )
     click.echo("Cluster created. Execute:")
     click.echo(f"    export KUBECONFIG={KUBECONF_PATH}")

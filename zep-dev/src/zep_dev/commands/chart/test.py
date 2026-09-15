@@ -8,7 +8,7 @@ import yaml
 from click import ClickException
 from pydantic import ValidationError
 
-from zep_dev.commands.chart.utils import execute_ct_lint
+from zep_dev.commands.chart.utils import discover_charts, execute_ct_lint
 from zep_dev.k8s import kubectl, resource_exists
 from zep_dev.k8s_secrets import create_image_pull_secret
 from zep_dev.models import ChartMetadata, CiSecrets
@@ -64,12 +64,6 @@ def test(helm_dir: Path, chart: Path | None) -> None:
 
         for resolved_chart in resolved_charts:
             test_chart(resolved_chart)
-
-
-def discover_charts(helm_dir: Path) -> list[Path]:
-    return sorted(
-        p.parent.relative_to(helm_dir) for p in helm_dir.glob("charts/*/Chart.yaml")
-    )
 
 
 def test_chart(resolved_chart: ResolvedChart) -> None:

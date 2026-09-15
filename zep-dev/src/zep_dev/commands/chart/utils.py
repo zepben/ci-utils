@@ -8,6 +8,13 @@ from zep_dev.models import ChartMetadata, ChartTestingConfig
 from zep_dev.shared import CommandResult, execute
 
 
+def discover_charts(helm_dir: Path) -> list[Path]:
+    return sorted(
+        path.parent.relative_to(helm_dir)
+        for path in helm_dir.glob("charts/*/Chart.yaml")
+    )
+
+
 def execute_ct_lint(
     command: Literal["lint", "lint-and-install"], *args: str
 ) -> CommandResult:

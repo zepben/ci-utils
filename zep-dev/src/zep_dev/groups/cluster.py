@@ -48,6 +48,26 @@ def dump_images(output: Path, includes: tuple[str, ...]) -> None:
     cluster_images.dump_images(output, includes)
 
 
+@images.command("pack")
+@click.option(
+    "--helm-dir",
+    required=True,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Root directory containing ct.yaml and application charts",
+)
+@click.option(
+    "--output",
+    required=True,
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Write the image archive here",
+)
+def pack_images(helm_dir: Path, output: Path) -> None:
+    cluster_images.pack_images(
+        helm_dir.resolve(),
+        output,
+    )
+
+
 @images.command("load")
 @click.option(
     "--archive",

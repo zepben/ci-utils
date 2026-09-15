@@ -41,9 +41,18 @@ def create_cluster(
     kind_config: Path,
     components: ClusterComponents,
     local_repos: Sequence[Path] = (),
+    image_archive: Path | None = None,
 ) -> None:
     repos = load_local_repos(local_repos)
     create_kind_cluster(kind_config, repos)
+    if image_archive is not None:
+        if image_archive.exists():
+            load_image_archive(image_archive)
+        else:
+            LOG.info(
+                "Image archive not found; continuing without it: %s",
+                image_archive,
+            )
     apply_builtin_storage_classes()
     add_helm_repos(components)
     install_helm_components(components, repos)

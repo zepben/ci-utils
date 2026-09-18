@@ -7,7 +7,7 @@ from importlib.resources import as_file, files
 from pathlib import Path
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import Any, assert_never
 
 import yaml
 from click import ClickException
@@ -21,6 +21,7 @@ from zep_dev.models import (
     LoadDbCredentials,
     LocalRepo,
     OciRepository,
+    RawManifestComponent,
 )
 from zep_dev.shared import CommandResult, execute
 
@@ -307,12 +308,26 @@ def install_helm_components(
     repos_overlay = local_repos_overlay(local_repos)
     LOG.info("Installing cluster components")
     for desired in components.cluster_components:
-        reconcile_helm_component(
-            desired,
-            source_dir=components.source_dir,
-            installed=installed,
-            local_repos_overlay=repos_overlay,
-        )
+        match desired:
+            case RawManifestComponent():
+                for url in desired.raw_manifests:
+                    kubectl("apply", "--server-side", "-f", url)
+                kubectl(
+                    "wait",
+                    "--for=condition=Established",
+                    "customresourcedefinitions",
+                    "--all",
+                    f"--timeout={desired.wait_timeout}",
+                )
+            case ClusterComponent():
+                reconcile_helm_component(
+                    desired,
+                    source_dir=components.source_dir,
+                    installed=installed,
+                    local_repos_overlay=repos_overlay,
+                )
+            case _:
+                assert_never(desired)
 
 
 def reconcile_helm_component(

@@ -4,10 +4,18 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal, Self, TextIO
+from urllib.parse import urlsplit
 
 import yaml
 from click import ClickException
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 
 # Path inside kind workers. Argo file:// URLs and repo-server hostPath both assume it.
 LOCAL_REPO_MOUNT_ROOT = "/mnt/local-repos"
@@ -102,6 +110,22 @@ class ClusterComponent(BaseModel):
         return self
 
 
+class RawManifestComponent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    raw_manifests: list[str] = Field(min_length=1)
+    wait_timeout: str = Field(default="60s", min_length=1)
+
+    @field_validator("raw_manifests")
+    @classmethod
+    def validate_manifest_urls(cls, values: list[str]) -> list[str]:
+        for value in values:
+            url = urlsplit(value)
+            if url.scheme != "https" or not url.netloc:
+                raise ValueError("raw_manifests must contain only HTTPS URLs")
+        return values
+
+
 class ArchiveFormat(StrEnum):
     NONE = "none"
     TAR_GZ = "tar.gz"
@@ -139,7 +163,7 @@ class RequiredTool(BaseModel):
 class ClusterComponents(BaseModel):
     model_config = ConfigDict(extra="forbid")
     helm_repos: dict[str, str]
-    cluster_components: list[ClusterComponent]
+    cluster_components: list[ClusterComponent | RawManifestComponent]
     _source_dir: Path | None = PrivateAttr(default=None)
 
     @property

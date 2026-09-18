@@ -1,6 +1,9 @@
 helm_repos:
   argo: "https://argoproj.github.io/argo-helm"
 cluster_components:
+  - name: gateway-api-crds
+    raw_manifests:
+      - https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
   - name: argo-cd
     chart: argo/argo-cd
     version: "9.5.0"

@@ -13,7 +13,7 @@ from click import ClickException
 from pydantic import ValidationError
 
 from _fake_execute import FakeExecute, FakeExecuteFactory
-from zep_dev import cluster
+from zep_dev import cluster, k8s
 from zep_dev.k8s import (
     KUBECONF_PATH,
     kube_guard,
@@ -38,7 +38,11 @@ def test_examples_components_yaml_parses() -> None:
     assert components.helm_repos == {
         "argo": "https://argoproj.github.io/argo-helm",
     }
-    [argo_cd] = components.cluster_components
+    argo_cd = next(
+        component
+        for component in components.cluster_components
+        if isinstance(component, ClusterComponent)
+    )
     assert argo_cd.name == "argo-cd"
     assert argo_cd.chart == "argo/argo-cd"
     assert argo_cd.version == "9.5.0"
@@ -103,7 +107,9 @@ cluster_components:
 
     assert from_path.source_dir == tmp_path.resolve()
     assert from_text.source_dir is None
-    assert from_path.cluster_components[0].config_maps_from_file[0].from_file == {
+    component = from_path.cluster_components[0]
+    assert isinstance(component, ClusterComponent)
+    assert component.config_maps_from_file[0].from_file == {
         "init.sql": "../sql/init.sql",
     }
 
@@ -369,6 +375,53 @@ cluster_components:
             "metadata": {"name": "database-init", "namespace": "test"},
             "data": {"init.sql": "SELECT 'ready';\n"},
         }
+    ]
+
+
+def test_install_helm_components_applies_raw_manifests(
+    fake_execute: FakeExecuteFactory,
+) -> None:
+    url = "https://example.com/crds/v1.0.0/install.yaml"
+    components = ClusterComponents.from_text_io(
+        StringIO(
+            f"""\
+helm_repos: {{}}
+cluster_components:
+  - name: example-crds
+    raw_manifests:
+      - {url}
+"""
+        )
+    )
+    fake_execute(cluster).on("helm", "list", stdout="")
+    fake_kubectl = (
+        fake_execute(k8s)
+        .on("kubectl", "apply", "--server-side", "-f", url)
+        .on("kubectl", "wait", "--for=condition=Established")
+    )
+
+    cluster.install_helm_components(components)
+
+    assert fake_kubectl.calls == [
+        call(
+            "kubectl",
+            "apply",
+            "--server-side",
+            "-f",
+            url,
+            capture_stdout=False,
+            input=None,
+        ),
+        call(
+            "kubectl",
+            "wait",
+            "--for=condition=Established",
+            "customresourcedefinitions",
+            "--all",
+            "--timeout=60s",
+            capture_stdout=False,
+            input=None,
+        ),
     ]
 
 

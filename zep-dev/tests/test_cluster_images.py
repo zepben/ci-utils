@@ -2,12 +2,50 @@ from pathlib import Path
 from unittest.mock import call
 
 import pytest
+import yaml
 from click import ClickException
+from click.testing import CliRunner
 
 from _charts import write_chart
 from _fake_execute import FakeExecute, FakeExecuteFactory
 from zep_dev import cluster, cluster_images
+from zep_dev.groups.cluster import pack_images as pack_images_command
 from zep_dev.shared import CommandResult
+
+
+def write_application(
+    path: Path,
+    *,
+    name: str,
+    chart: str,
+    value_files: list[str],
+    release_name: str | None = None,
+) -> Path:
+    helm: dict[str, object] = {"valueFiles": value_files}
+    if release_name is not None:
+        helm["releaseName"] = release_name
+    manifest = {
+        "apiVersion": "argoproj.io/v1alpha1",
+        "kind": "Application",
+        "metadata": {"name": name},
+        "spec": {
+            "sources": [
+                {
+                    "repoURL": "ghcr.io/zepben/charts",
+                    "chart": chart,
+                    "targetRevision": "1.2.3",
+                    "helm": helm,
+                },
+                {
+                    "repoURL": "https://example.invalid/deployments.git",
+                    "ref": "deployments",
+                },
+            ],
+            "destination": {"namespace": "staging"},
+        },
+    }
+    path.write_text(yaml.safe_dump(manifest), encoding="utf-8")
+    return path
 
 
 def test_parse_image_refs() -> None:
@@ -154,6 +192,161 @@ def test_pack_images_does_not_create_archive_without_packable_images(
     cluster_images.pack_images(helm_dir, output)
 
     assert not output.exists()
+
+
+def test_pack_applications_renders_all_and_packs_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deployments = tmp_path / "deployments"
+    deployments.mkdir()
+    first_values = deployments / "first.yaml"
+    second_values = deployments / "second.yaml"
+    first_values.write_text(
+        "worker:\n  image: ghcr.io/example/configured:1\n",
+        encoding="utf-8",
+    )
+    second_values.write_text("second: true\n", encoding="utf-8")
+    first_app = write_application(
+        tmp_path / "first-app.yaml",
+        name="first-app",
+        chart="first",
+        value_files=["$deployments/first.yaml", "$deployments/second.yaml"],
+        release_name="first-release",
+    )
+    second_app = write_application(
+        tmp_path / "second-app.yaml",
+        name="second-app",
+        chart="second",
+        value_files=["$deployments/second.yaml"],
+    )
+    helm = (
+        FakeExecute()
+        .on(
+            "template",
+            "first-release",
+            "oci://ghcr.io/zepben/charts/first",
+            stdout=(
+                "Pulled: ghcr.io/zepben/charts/first:1.2.3\n"
+                "Digest: sha256:abc\n"
+                "oci://ghcr.io/zepben/charts/first:1.2.3 contains an underscore.\n"
+                "---\n"
+                "containers:\n"
+                "  - image: ghcr.io/example/shared:1\n"
+                "  - image: ghcr.io/example/first:1\n"
+            ),
+        )
+        .on(
+            "template",
+            "second-app",
+            "oci://ghcr.io/zepben/charts/second",
+            stdout=(
+                "containers:\n"
+                "  - image: ghcr.io/example/shared:1\n"
+                "  - image: ghcr.io/example/second:1\n"
+            ),
+        )
+    )
+    monkeypatch.setattr(cluster_images, "helm", helm)
+    packed: list[tuple[set[str], Path]] = []
+    monkeypatch.setattr(
+        cluster_images,
+        "pack_image_refs",
+        lambda refs, output: packed.append((set(refs), output)),
+    )
+    output = tmp_path / "images.tar"
+
+    cluster_images.pack_applications(
+        [first_app, second_app],
+        [f"deployments={deployments}"],
+        output,
+    )
+
+    assert helm.calls == [
+        call(
+            "template",
+            "first-release",
+            "oci://ghcr.io/zepben/charts/first",
+            "--version",
+            "1.2.3",
+            "--namespace",
+            "staging",
+            "-f",
+            str(first_values),
+            "-f",
+            str(second_values),
+            capture_stdout=True,
+        ),
+        call(
+            "template",
+            "second-app",
+            "oci://ghcr.io/zepben/charts/second",
+            "--version",
+            "1.2.3",
+            "--namespace",
+            "staging",
+            "-f",
+            str(second_values),
+            capture_stdout=True,
+        ),
+    ]
+    assert packed == [
+        (
+            {
+                "ghcr.io/example/first:1",
+                "ghcr.io/example/second:1",
+                "ghcr.io/example/shared:1",
+                "ghcr.io/example/configured:1",
+            },
+            output,
+        )
+    ]
+
+
+def test_pack_cli_rejects_helm_dir_with_application(tmp_path: Path) -> None:
+    application = tmp_path / "application.yaml"
+    application.touch()
+
+    result = CliRunner().invoke(
+        pack_images_command,
+        [
+            "--helm-dir",
+            str(tmp_path),
+            "--output",
+            "images.tar",
+            str(application),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "--helm-dir cannot be combined with Application paths" in result.output
+
+
+def test_pack_cli_accepts_application_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    applications = [tmp_path / "first.yaml", tmp_path / "second.yaml"]
+    for application in applications:
+        application.touch()
+    calls: list[tuple[tuple[Path, ...], tuple[str, ...], Path]] = []
+    monkeypatch.setattr(
+        cluster_images,
+        "pack_applications",
+        lambda apps, refs, output: calls.append((apps, refs, output)),
+    )
+
+    result = CliRunner().invoke(
+        pack_images_command,
+        [
+            "--output",
+            "images.tar",
+            *(str(path) for path in applications),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert calls == [(tuple(applications), (), Path("images.tar"))]
 
 
 @pytest.mark.parametrize(

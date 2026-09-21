@@ -51,9 +51,19 @@ def dump_images(output: Path, includes: tuple[str, ...]) -> None:
 @images.command("pack")
 @click.option(
     "--helm-dir",
-    required=True,
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     help="Root directory containing ct.yaml and application charts",
+)
+@click.argument(
+    "application_paths",
+    nargs=-1,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--ref",
+    "refs",
+    multiple=True,
+    help="Map an Application value-file ref to a local root as NAME=PATH; repeatable",
 )
 @click.option(
     "--output",
@@ -61,11 +71,26 @@ def dump_images(output: Path, includes: tuple[str, ...]) -> None:
     type=click.Path(dir_okay=False, path_type=Path),
     help="Write the image archive here",
 )
-def pack_images(helm_dir: Path, output: Path) -> None:
-    cluster_images.pack_images(
-        helm_dir.resolve(),
-        output,
-    )
+def pack_images(
+    helm_dir: Path | None,
+    application_paths: tuple[Path, ...],
+    refs: tuple[str, ...],
+    output: Path,
+) -> None:
+    if helm_dir is not None:
+        if application_paths:
+            raise click.UsageError(
+                "--helm-dir cannot be combined with Application paths"
+            )
+        if refs:
+            raise click.UsageError("--ref can only be used with Application paths")
+        cluster_images.pack_images(helm_dir.resolve(), output)
+        return
+
+    if not application_paths:
+        raise click.UsageError("provide --helm-dir or one or more Application paths")
+
+    cluster_images.pack_applications(application_paths, refs, output)
 
 
 @images.command("load")

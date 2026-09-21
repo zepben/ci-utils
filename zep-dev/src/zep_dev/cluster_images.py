@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from fnmatch import fnmatch
 from pathlib import Path
 from subprocess import CalledProcessError
@@ -27,6 +28,15 @@ DEFAULT_EXCLUDES = (
     "*local-path*",
     "import-*",
 )
+
+
+@dataclass(frozen=True)
+class ApplicationRender:
+    chart: str
+    version: str
+    release_name: str
+    namespace: str
+    values_files: tuple[Path, ...]
 
 
 def choose_engine() -> str:
@@ -159,9 +169,96 @@ def pack_images(
         if kind_values.is_file():
             refs.update(extract_image_refs(kind_values.read_text(encoding="utf-8")))
 
-    selected = sorted(refs)
+    pack_image_refs(refs, output)
+
+
+def pack_applications(
+    applications: Sequence[Path],
+    refs: Sequence[str],
+    output: Path,
+) -> None:
+    ref_roots = parse_ref_roots(refs)
+    renders = [resolve_application(path, ref_roots) for path in applications]
+
+    image_refs: set[str] = set()
+    for render in renders:
+        args = [
+            "template",
+            render.release_name,
+            render.chart,
+            "--version",
+            render.version,
+            "--namespace",
+            render.namespace,
+        ]
+        for values_file in render.values_files:
+            args.extend(["-f", str(values_file)])
+            image_refs.update(
+                extract_image_refs(values_file.read_text(encoding="utf-8"))
+            )
+        rendered = helm(*args, capture_stdout=True).stdout
+        document_start = rendered.find("---\n")
+        if document_start >= 0:
+            rendered = rendered[document_start:]
+        image_refs.update(extract_image_refs(rendered))
+
+    pack_image_refs(image_refs, output)
+
+
+def parse_ref_roots(refs: Sequence[str]) -> dict[str, Path]:
+    return {
+        name: Path(path).resolve()
+        for name, path in (value.split("=", maxsplit=1) for value in refs)
+    }
+
+
+def resolve_application(
+    application: Path,
+    ref_roots: Mapping[str, Path],
+) -> ApplicationRender:
+    document = yaml.safe_load(application.read_text(encoding="utf-8"))
+    spec = document["spec"]
+    (chart_source,) = (source for source in spec["sources"] if "chart" in source)
+    repo_url = chart_source["repoURL"]
+    repo_url = repo_url.removeprefix("oci://").rstrip("/")
+    chart_name = chart_source["chart"].strip("/")
+    helm_config = chart_source.get("helm", {})
+    unsupported = sorted(
+        field
+        for field in ("valuesObject", "values", "parameters", "fileParameters")
+        if field in helm_config
+    )
+    if unsupported:
+        LOG.warning(
+            "Ignoring unsupported Application Helm fields in %s: %s",
+            application,
+            ", ".join(unsupported),
+        )
+
+    return ApplicationRender(
+        chart=f"oci://{repo_url}/{chart_name}",
+        version=chart_source["targetRevision"],
+        release_name=helm_config.get("releaseName", document["metadata"]["name"]),
+        namespace=spec["destination"]["namespace"],
+        values_files=tuple(
+            resolve_value_file(value_file, ref_roots)
+            for value_file in helm_config.get("valueFiles", [])
+        ),
+    )
+
+
+def resolve_value_file(
+    value_file: str,
+    ref_roots: Mapping[str, Path],
+) -> Path:
+    ref, relative_path = value_file.removeprefix("$").split("/", maxsplit=1)
+    return ref_roots[ref] / relative_path
+
+
+def pack_image_refs(refs: Iterable[str], output: Path) -> None:
+    selected = sorted(set(refs))
     if not selected:
-        LOG.warn("No image references found, not packing anything")
+        LOG.warning("No image references found, not packing anything")
         return
 
     digest_refs = [ref for ref in selected if "@sha256:" in ref]
@@ -192,11 +289,8 @@ def extract_image_refs(yaml_text: str) -> set[str]:
             for child in value:
                 visit(child)
 
-    try:
-        for document in yaml.safe_load_all(yaml_text):
-            visit(document)
-    except yaml.YAMLError as error:
-        raise ClickException("failed to parse YAML while discovering images") from error
+    for document in yaml.safe_load_all(yaml_text):
+        visit(document)
     return refs
 
 

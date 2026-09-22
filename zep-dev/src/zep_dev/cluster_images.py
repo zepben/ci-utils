@@ -1,4 +1,6 @@
+import json
 import logging
+import tarfile
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from fnmatch import fnmatch
@@ -7,7 +9,7 @@ from subprocess import CalledProcessError
 from typing import Any
 
 import yaml
-from click import ClickException
+from click import ClickException, echo
 from pydantic import ValidationError
 
 from zep_dev.cluster import CLUSTER_NAME, helm, kind, load_image_archive
@@ -262,18 +264,65 @@ def pack_image_refs(refs: Iterable[str], output: Path) -> None:
         return
 
     digest_refs = [ref for ref in selected if "@sha256:" in ref]
+    valid_refs = [ref for ref in selected if ref not in digest_refs]
+    if not valid_refs:
+        LOG.warning(
+            "Images with digests not supported for packing, skipping: %s", digest_refs
+        )
+        LOG.warning("No tagged image references found, not packing anything")
+        return
+    archive_refs = read_archive_image_refs(output)
+    desired_keys = {image_ref_comparison_key(ref) for ref in valid_refs}
+    if (
+        archive_refs is not None
+        and {image_ref_comparison_key(ref) for ref in archive_refs} == desired_keys
+    ):
+        echo(f"Image archive already contains the requested images, skipping: {output}")
+        return
     if digest_refs:
         LOG.warning(
             "Images with digests not supported for packing, skipping: %s", digest_refs
         )
-    valid_refs = [ref for ref in selected if ref not in digest_refs]
-    if not valid_refs:
-        LOG.warning("No tagged image references found, not packing anything")
-        return
     engine = choose_engine()
     LOG.info("Using container engine: %s", engine)
     pull_missing_images(engine, valid_refs)
     save_image_archive(engine, output, valid_refs)
+
+
+def read_archive_image_refs(archive: Path) -> set[str] | None:
+    try:
+        with tarfile.open(archive) as tar:
+            manifest_file = tar.extractfile("manifest.json")
+            if manifest_file is None:
+                return None
+            manifest = json.load(manifest_file)
+    except OSError, tarfile.TarError, KeyError, UnicodeError, json.JSONDecodeError:
+        return None
+
+    if not isinstance(manifest, list):
+        return None
+
+    refs: set[str] = set()
+    for entry in manifest:
+        if not isinstance(entry, dict):
+            return None
+        repo_tags = entry.get("RepoTags")
+        if repo_tags is None:
+            continue
+        if not isinstance(repo_tags, list) or not all(
+            isinstance(ref, str) for ref in repo_tags
+        ):
+            return None
+        refs.update(repo_tags)
+    return refs
+
+
+def image_ref_comparison_key(ref: str) -> str:
+    return (
+        ref.removeprefix("index.docker.io/")
+        .removeprefix("docker.io/")
+        .removeprefix("library/")
+    )
 
 
 def extract_image_refs(yaml_text: str) -> set[str]:

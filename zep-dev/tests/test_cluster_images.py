@@ -1,3 +1,6 @@
+import io
+import json
+import tarfile
 from pathlib import Path
 from unittest.mock import call
 
@@ -46,6 +49,14 @@ def write_application(
     }
     path.write_text(yaml.safe_dump(manifest), encoding="utf-8")
     return path
+
+
+def write_image_archive(path: Path, refs: list[str]) -> None:
+    manifest = json.dumps([{"RepoTags": refs}]).encode()
+    member = tarfile.TarInfo("manifest.json")
+    member.size = len(manifest)
+    with tarfile.open(path, "w") as archive:
+        archive.addfile(member, io.BytesIO(manifest))
 
 
 def test_parse_image_refs() -> None:
@@ -192,6 +203,48 @@ def test_pack_images_does_not_create_archive_without_packable_images(
     cluster_images.pack_images(helm_dir, output)
 
     assert not output.exists()
+
+
+def test_pack_image_refs_skips_matching_archive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    refs = [
+        "curlimages/curl:8.11.1",
+        "curlimages/curl:8.11.1@sha256:abc",
+        "rabbitmq:4.1-management",
+    ]
+    output = tmp_path / "images.tar"
+    write_image_archive(
+        output,
+        [
+            "docker.io/library/rabbitmq:4.1-management",
+            "docker.io/curlimages/curl:8.11.1",
+        ],
+    )
+
+    def unexpected_engine_selection() -> str:
+        raise AssertionError("container engine must not be selected")
+
+    monkeypatch.setattr(cluster_images, "choose_engine", unexpected_engine_selection)
+
+    cluster_images.pack_image_refs(refs, output)
+
+    assert capsys.readouterr().out == (
+        f"Image archive already contains the requested images, skipping: {output}\n"
+    )
+    assert caplog.records == []
+
+
+def test_read_archive_image_refs_treats_invalid_archive_as_cache_miss(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "images.tar"
+    output.write_bytes(b"not an image archive")
+
+    assert cluster_images.read_archive_image_refs(output) is None
 
 
 def test_pack_applications_renders_all_and_packs_once(

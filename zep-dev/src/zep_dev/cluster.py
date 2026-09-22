@@ -48,7 +48,7 @@ def create_cluster(
     create_kind_cluster(kind_config, repos)
     if image_archive is not None:
         if image_archive.exists():
-            load_image_archive(image_archive)
+            load_image_archive(image_archive, nodes=worker_nodes())
         else:
             LOG.info(
                 "Image archive not found; continuing without it: %s",
@@ -59,10 +59,23 @@ def create_cluster(
     install_helm_components(components, repos)
 
 
-def load_image_archive(archive: Path) -> None:
+def load_image_archive(archive: Path, nodes: Sequence[str] = ()) -> None:
     if not archive.is_file() or archive.stat().st_size == 0:
         raise ClickException(f"image archive is missing or empty: {archive}")
-    kind("load", "image-archive", str(archive), "--name", CLUSTER_NAME)
+    args = ["load", "image-archive", str(archive), "--name", CLUSTER_NAME]
+    if nodes:
+        args.extend(("--nodes", ",".join(nodes)))
+    kind(*args)
+
+
+def worker_nodes() -> tuple[str, ...]:
+    out = kind("get", "nodes", "--name", CLUSTER_NAME, capture_stdout=True)
+    workers = tuple(
+        name for name in out.stdout.splitlines() if not name.endswith("-control-plane")
+    )
+    if not workers:
+        raise ClickException("image archive loading requires at least one worker node")
+    return workers
 
 
 def load_local_repos(paths: Sequence[Path]) -> tuple[LocalRepo, ...]:

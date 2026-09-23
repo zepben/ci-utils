@@ -3,9 +3,11 @@ import json
 import logging
 from pathlib import Path
 
+import yaml
 from click import ClickException
 
 from zep_dev.k8s import kubectl, resource_exists
+from zep_dev.models import CiSecrets
 
 IMAGE_SECRET_PATHS = [
     Path("~/.config/containers/auth.json").expanduser(),
@@ -14,6 +16,26 @@ IMAGE_SECRET_PATHS = [
 IMAGE_SECRET_NAME = "github-registry"
 
 LOG = logging.getLogger(__name__)
+
+
+def create_additional_secrets(namespace: str, ci_secrets_file: Path) -> None:
+    config = CiSecrets.model_validate(
+        yaml.safe_load(ci_secrets_file.read_text(encoding="utf-8"))
+    )
+    resolved_secrets = [(secret, secret.resolve_value()) for secret in config.secrets]
+
+    for secret, value in resolved_secrets:
+        LOG.info("Creating additional secret: %s", secret.name)
+        if not resource_exists("secret", secret.name, namespace=namespace):
+            kubectl(
+                f"--namespace={namespace}",
+                "create",
+                "secret",
+                "generic",
+                secret.name,
+                "--from-env-file=/dev/stdin",
+                input=value,
+            )
 
 
 def resolve_registry_credential(registry: str) -> tuple[str, str]:

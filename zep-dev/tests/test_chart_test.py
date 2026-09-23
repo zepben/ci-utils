@@ -115,6 +115,47 @@ def test_application_chart_runs_lint_and_install(
     )
 
 
+def test_chart_test_creates_additional_secrets_once(
+    helm_dir: Path,
+    auth_json: Path,
+    fake_execute: FakeExecuteFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_chart(helm_dir, "app-a")
+    _write_chart(helm_dir, "app-b")
+    (helm_dir / "ci-secrets.yaml").write_text(
+        """\
+secrets:
+  - name: app-credentials
+    env_var: APP_CREDENTIALS
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("APP_CREDENTIALS", "APP=value\n")
+    fakes = _install_chart_fakes(fake_execute, monkeypatch)
+    fakes.kubectl.on("get", "secret", "app-credentials").on(
+        "--namespace=test-ns", "create", "secret"
+    )
+    fakes.execute.on("ct", "lint-and-install")
+
+    result = CliRunner().invoke(cli, ["chart", "test", "--helm-dir", str(helm_dir)])
+
+    assert result.exit_code == 0, result.output
+    assert len(fakes.execute.calls_for("ct", "lint-and-install")) == 2
+    assert len(fakes.kubectl.calls_for("get", "secret", "app-credentials")) == 1
+    assert fakes.kubectl.calls_for("--namespace=test-ns", "create", "secret") == [
+        call(
+            "--namespace=test-ns",
+            "create",
+            "secret",
+            "generic",
+            "app-credentials",
+            "--from-env-file=/dev/stdin",
+            input="APP=value\n",
+        )
+    ]
+
+
 def test_application_chart_lint_and_install_failure_raises(
     helm_dir: Path,
     auth_json: Path,

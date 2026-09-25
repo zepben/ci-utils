@@ -1,0 +1,260 @@
+# Reference Profile for stub-free platform apply.
+#
+# Expected outcome: Helm releases ewb, eas, hcs, eas-web-client are Ready in
+# namespace `platform`.
+#   UI:  http://127.0.0.1:8080  (access/web-client-nodeport → 30080)
+#   API: http://127.0.0.1:8081  (access/eas-nodeport → 30081; authType=none)
+#
+# Local ewb-data (no S3) requires EWB chart with modelStorage.hostPath support.
+# Kind/Podman env and commands: examples/profiles/README.md and zep-dev README.
+#
+# Path slots (ewb-data mount, deployments_root) are satisfied by Bindings.
+# See docs/distribution-profile-bindings.md. Do not put absolute host paths here.
+metadata:
+  name: platform
+
+distribution: ../distributions/platform.yaml
+
+namespace: platform
+
+kind:
+  config:
+    # Both node-class labels: EWB/HCS default to high-memory; EAS/web-client to general.
+    # Host 8080 → NodePort 30080 (eas-web-client UI; access/web-client-nodeport.yaml)
+    # Host 8081 → NodePort 30081 (EAS API; access/eas-nodeport.yaml)
+    # Host port maps are Kind-create-time only; changing them requires recreate.
+    kind: Cluster
+    apiVersion: kind.x-k8s.io/v1alpha4
+    nodes:
+      - role: control-plane
+        extraPortMappings:
+          - containerPort: 30080
+            hostPort: 8080
+            protocol: TCP
+          - containerPort: 30081
+            hostPort: 8081
+            protocol: TCP
+      - role: worker
+        kubeadmConfigPatches:
+          - |
+            kind: JoinConfiguration
+            nodeRegistration:
+              kubeletExtraArgs:
+                node-labels: "v1.kubernetes.zepben.com/node-class=high-memory"
+      - role: worker
+        kubeadmConfigPatches:
+          - |
+            kind: JoinConfiguration
+            nodeRegistration:
+              kubeletExtraArgs:
+                node-labels: "v1.kubernetes.zepben.com/node-class=general"
+  host_mounts:
+    - slot: ewb-data
+      node_path: /mnt/ewb-data
+
+terraform:
+  # Fixed Kind-only database coordinates in the generated Terraform templates
+  # must match the CNPG components below. deployments_root comes from Bindings.
+  contracts: [eas, hcs]
+
+helm_repos:
+  cnpg: https://cloudnative-pg.io/charts/
+
+cluster_components:
+  - type: helm
+    name: cnpg
+    chart: cnpg/cloudnative-pg
+    version: "0.28.0"
+    namespace: cnpg-system
+    values:
+      serviceAccount:
+        create: true
+        name: cloudnative-pg
+
+  - type: cnpg
+    name: eas-kind-pg
+    namespace: platform
+    database: eas
+    owner: eas
+    password: eas
+    spec:
+      instances: 1
+      enableSuperuserAccess: false
+      storage: {size: 1Gi, storageClass: standard}
+      resources:
+        requests: {cpu: 100m, memory: 256Mi}
+        limits: {cpu: 500m, memory: 512Mi}
+
+  - type: cnpg
+    name: hcs-kind-pg
+    namespace: platform
+    database: hcs
+    owner: hcs_kind
+    password: hcs-kind-password
+    image_catalog:
+      major: 18
+      image: timescale/timescaledb-ha:pg18.1-ts2.24.0@sha256:b6d5adb7c51cc1003bb5c8ebb142bdb8f1b4ddba4dd470cb379af875b7c3ccf2
+    databases:
+      load: {extensions: [timescaledb]}
+      input: {extensions: [timescaledb]}
+      results: {extensions: [timescaledb]}
+    spec:
+      instances: 1
+      enableSuperuserAccess: false
+      postgresUID: 1000
+      postgresGID: 1000
+      postgresql:
+        shared_preload_libraries: [timescaledb]
+      storage: {size: 1Gi, storageClass: standard}
+      resources:
+        requests: {cpu: 250m, memory: 256Mi}
+        limits: {cpu: 500m, memory: 512Mi}
+
+  - type: local
+    name: eas-nodeport
+    namespace: platform
+    manifests:
+      - access/eas-nodeport.yaml
+
+apps:
+  ewb:
+    values:
+      image:
+        tag: sha-e73c5362a42e710a71910483a909b8e308b48a06
+      loadDatabase:
+        enabled: false
+      modelStorage:
+        type: hostPath
+        hostPath: /mnt/ewb-data
+      global:
+        storageClassName: standard
+      serviceAccount:
+        create: true
+      resources:
+        cpu: "500m"
+        memory: 2Gi
+        limits:
+          cpu: "1"
+          memory: 2Gi
+      networkSwitcher:
+        networkDate: "2026-06-10"
+      numMinutesBeforeFailedStart: 10
+      ingress:
+        enabled: false
+        hostname: ewb.platform.kind.local
+        letsencryptEnvironment: staging
+      config:
+        geoView:
+          mapboxApiToken: "pk.eyJ1IjoiemVwYmVuIiwiYSI6ImNpdXluMXRiOTAwMTcyeWt5aDZtbGV5d20ifQ.oGUqfSPfHD-xR103Y7LetQ"
+        ewbData:
+          path: /data
+          timezone: UTC
+          cachePeriod: "0d"
+          shouldInferPhases: false
+          previousDaysToSearchForNetwork: 30
+        auth:
+          audience: 00000000-0000-0000-0000-000000000001
+          trustedIssuers:
+            - https://login.microsoftonline.com/organizations/v2.0
+
+  eas:
+    values:
+      deploymentProfile: kindTest
+      testIdentity:
+        username: kind-test
+        email: kind-test@example.invalid
+        roles:
+          - SUPER_ADMIN
+      serviceAccount:
+        create: true
+      identity:
+        aws:
+          roleArn: ""
+        azure:
+          clientId: ""
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: "1"
+          memory: 2Gi
+      ingress:
+        enabled: false
+        hostname: eas.platform.kind.local
+      config:
+        browser:
+          clientId: 00000000-0000-0000-0000-000000000001
+          mapboxToken: pk.eyJ1IjoiemVwYmVuIiwiYSI6ImNpdXluMXRiOTAwMTcyeWt5aDZtbGV5d20ifQ.oGUqfSPfHD-xR103Y7LetQ
+        features:
+          openDss:
+            enabled: false
+          powerFactory:
+            enabled: false
+          sincal:
+            enabled: false
+
+  hcs:
+    values:
+      global:
+        cloud:
+          provider: aws
+        storageClassName: standard
+      serviceAccount:
+        create: false
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+      nodeSelector: null
+      jobs:
+        nodeSelector: null
+      generator:
+        resources:
+          requests: {cpu: 1, memory: 1}
+          limits: {cpu: 1, memory: 1}
+      executor:
+        resources:
+          requests: {cpu: 1, memory: 1}
+          limits: {cpu: 1, memory: 1}
+      resultProcessor:
+        resources:
+          requests: {cpu: 1, memory: 1}
+          limits: {cpu: 1, memory: 1}
+      intrinsic:
+        resources:
+          requests: {cpu: 1, memory: 1}
+          limits: {cpu: 1, memory: 1}
+      prrp:
+        resources:
+          requests: {cpu: 1, memory: 1}
+          limits: {cpu: 1, memory: 1}
+      rabbitmq:
+        resources:
+          cpu: 250m
+          memory: 512Mi
+        storage:
+          size: 1Gi
+
+  eas-web-client:
+    values:
+      image:
+        tag: sha-ca9ac2f1d4952f65627a0081182801bfd1db8035
+      nodePort:
+        enabled: true
+        port: 30080
+      ingress:
+        enabled: false
+        hostname: platform.kind.local
+        clusterIssuer: letsencrypt-staging
+      config:
+        auth:
+          authType: none
+        eas:
+          host: "127.0.0.1"
+          port: 8081
+          protocol: http
+        mapboxToken: pk.eyJ1IjoiemVwYmVuIiwiYSI6ImNpdXluMXRiOTAwMTcyeWt5aDZtbGV5d20ifQ.oGUqfSPfHD-xR103Y7LetQ

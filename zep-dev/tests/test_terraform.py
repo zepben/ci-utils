@@ -1,3 +1,4 @@
+import os
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -85,7 +86,9 @@ def test_apply_and_destroy_share_state_with_isolated_environment(
         kwargs: dict[str, object],
     ) -> None:
         assert_terraform_environment(args, kwargs)
-        state.parent.mkdir(parents=True)
+        assert os.environ["KUBECONFIG"] == PARENT_ENVIRONMENT["KUBECONFIG"]
+        assert os.environ["KUBE_CONFIG_PATH"] == PARENT_ENVIRONMENT["KUBE_CONFIG_PATH"]
+        state.parent.mkdir(parents=True, exist_ok=True)
         state.write_text("{}")
 
     fake = (
@@ -112,7 +115,6 @@ def test_apply_and_destroy_share_state_with_isolated_environment(
         "init",
         "-backend=false",
         "-input=false",
-        "-lockfile=readonly",
         env=ANY,
     )
     assert fake.calls == [
@@ -141,6 +143,29 @@ def test_apply_and_destroy_share_state_with_isolated_environment(
     ]
 
 
+def test_terraform_init_uses_lockfile_readonly_when_lock_present(
+    terraform_root: Path,
+    state_root: Path,
+    fake_execute: Callable[[ModuleType], FakeExecute],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (terraform_root / ".terraform.lock.hcl").write_text("# lock\n", encoding="utf-8")
+    namespace = "test-namespace"
+    absolute_root = terraform_root.resolve()
+    chdir = f"-chdir={absolute_root}"
+    for name, value in PARENT_ENVIRONMENT.items():
+        monkeypatch.setenv(name, value)
+
+    fake = (
+        fake_execute(terraform_module)
+        .on("terraform", chdir, "init")
+        .on("terraform", chdir, "apply")
+    )
+    terraform_module.apply_terraform(terraform_root, namespace)
+    init_args = fake.calls_for("terraform", chdir, "init")[0].args
+    assert "-lockfile=readonly" in init_args
+
+
 def test_destroy_failure_preserves_state(
     terraform_root: Path,
     fake_execute: Callable[[ModuleType], FakeExecute],
@@ -148,7 +173,7 @@ def test_destroy_failure_preserves_state(
     namespace = "test-namespace"
     absolute_root = terraform_root.resolve()
     state = terraform_module.terraform_state_path(absolute_root, namespace)
-    state.parent.mkdir(parents=True)
+    state.parent.mkdir(parents=True, exist_ok=True)
     state.write_text("{}")
     chdir = f"-chdir={absolute_root}"
     (
@@ -175,7 +200,7 @@ def test_destroy_requires_existing_state(
 ) -> None:
     fake = fake_execute(terraform_module)
 
-    with pytest.raises(click.ClickException, match="state does not exist"):
+    with pytest.raises(FileNotFoundError, match="state does not exist"):
         terraform_module.destroy_terraform(terraform_root, "test-namespace")
 
     assert not state_root.exists()

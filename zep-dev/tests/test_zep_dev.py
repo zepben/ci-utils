@@ -9,7 +9,6 @@ from unittest.mock import call
 
 import pytest
 import yaml
-from click import ClickException
 from pydantic import ValidationError
 
 from _fake_execute import FakeExecute, FakeExecuteFactory
@@ -91,7 +90,8 @@ def test_cluster_components_from_path_sets_source_dir(
         """\
 helm_repos: {}
 cluster_components:
-  - name: database
+  - type: helm
+    name: database
     chart: example/database
     version: "1.0.0"
     namespace: test
@@ -129,6 +129,7 @@ def test_cluster_component_rejects_duplicate_config_map_names() -> None:
     with pytest.raises(ValidationError, match="duplicate config_maps_from_file name"):
         ClusterComponent.model_validate(
             {
+                "type": "helm",
                 "name": "database",
                 "chart": "example/database",
                 "version": "1.0.0",
@@ -199,6 +200,7 @@ EXPECTED_LOAD_DB_CONFIG = {
 def test_apply_load_db_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     desired = ClusterComponent.model_validate(
         {
+            "type": "helm",
             "name": "database",
             "chart": "example/database",
             "version": "1.0.0",
@@ -241,6 +243,7 @@ def test_apply_load_db_credentials_fails_when_required_secret_key_missing(
 ) -> None:
     desired = ClusterComponent.model_validate(
         {
+            "type": "helm",
             "name": "database",
             "chart": "example/database",
             "version": "1.0.0",
@@ -261,7 +264,7 @@ def test_apply_load_db_credentials_fails_when_required_secret_key_missing(
 
     assert desired.load_db_credentials is not None
     with pytest.raises(
-        ClickException, match="Secret data does not contain any of: password"
+        KeyError, match="Secret data does not contain any of: password"
     ):
         cluster.apply_load_db_credentials(desired, desired.load_db_credentials)
 
@@ -271,6 +274,7 @@ def test_apply_load_db_credentials_fails_on_invalid_base64_secret_data(
 ) -> None:
     desired = ClusterComponent.model_validate(
         {
+            "type": "helm",
             "name": "database",
             "chart": "example/database",
             "version": "1.0.0",
@@ -317,7 +321,8 @@ def test_install_helm_components_applies_config_maps_before_install_or_skip(
         """\
 helm_repos: {}
 cluster_components:
-  - name: database
+  - type: helm
+    name: database
     chart: example/database
     version: "1.0.0"
     namespace: test
@@ -387,7 +392,8 @@ def test_install_helm_components_applies_raw_manifests(
             f"""\
 helm_repos: {{}}
 cluster_components:
-  - name: example-crds
+  - type: raw
+    name: example-crds
     raw_manifests:
       - {url}
 """
@@ -437,7 +443,8 @@ def test_install_helm_components_resolves_local_chart_from_components_file(
         """\
 helm_repos: {}
 cluster_components:
-  - name: database
+  - type: helm
+    name: database
     chart: ./kind/database
     version: "1.0.0"
     namespace: test
@@ -464,6 +471,8 @@ cluster_components:
             "1.0.0",
             "--wait",
             capture_stdout=False,
+            capture_stderr=False,
+            check=True,
         )
     ]
 
@@ -472,6 +481,7 @@ def test_install_helm_component_preserves_repo_chart_and_rejects_local_without_s
     fake_execute: FakeExecuteFactory,
 ) -> None:
     desired = ClusterComponent(
+        type="helm",
         name="database",
         chart="cnpg/cloudnative-pg",
         version="1.0.0",
@@ -495,10 +505,12 @@ def test_install_helm_component_preserves_repo_chart_and_rejects_local_without_s
             "1.0.0",
             "--wait",
             capture_stdout=False,
+            capture_stderr=False,
+            check=True,
         )
     ]
     with pytest.raises(
-        ClickException, match="local chart requires a components file path"
+        ValueError, match="local chart requires a components file path"
     ):
         cluster.install_helm_component(
             desired.model_copy(update={"chart": "./kind/database"}),
@@ -507,16 +519,15 @@ def test_install_helm_component_preserves_repo_chart_and_rejects_local_without_s
         )
 
 
-def test_kube_guard(
+def test_kube_guard_keeps_kind(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    og_kube = "something"
-    monkeypatch.setenv("KUBECONFIG", og_kube)
+    monkeypatch.setenv("KUBECONFIG", "something")
 
     with kube_guard():
         assert os.environ["KUBECONFIG"] == str(KUBECONF_PATH)
 
-    assert os.environ.get("KUBECONFIG") == og_kube
+    assert os.environ["KUBECONFIG"] == str(KUBECONF_PATH)
 
 
 def test_add_helm_repos_skips_all_helm_when_no_repos_configured(
@@ -560,6 +571,7 @@ def test_install_helm_components_applies_local_repo_integration_only_to_selected
         helm_repos={},
         cluster_components=[
             ClusterComponent(
+                type="helm",
                 name="argo",
                 chart="example/argo",
                 version="1.0.0",
@@ -568,6 +580,7 @@ def test_install_helm_components_applies_local_repo_integration_only_to_selected
                 values={"base": "argo"},
             ),
             ClusterComponent(
+                type="helm",
                 name="other",
                 chart="example/other",
                 version="1.0.0",
@@ -661,6 +674,7 @@ def test_install_helm_components_refreshes_argo_oci_repositories_when_installed(
         helm_repos={},
         cluster_components=[
             ClusterComponent(
+                type="helm",
                 name="argo",
                 chart="example/argo",
                 version="1.0.0",

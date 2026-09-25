@@ -4,7 +4,6 @@ from pathlib import Path
 from unittest.mock import call
 
 import pytest
-from click import ClickException
 from click.testing import CliRunner
 
 from _fake_execute import FakeExecute
@@ -38,7 +37,7 @@ def test_resolve_registry_credential_selects_registry_and_has_secret_free_failur
         "ghp_requested",
     )
 
-    with pytest.raises(ClickException) as exc_info:
+    with pytest.raises(LookupError) as exc_info:
         k8s_secrets.resolve_registry_credential("missing.example.com")
     error = str(exc_info.value)
     assert "missing.example.com" in error
@@ -115,4 +114,5 @@ def test_secrets_create_fails_without_auth(
     result = CliRunner().invoke(cli, ["secrets", "create", "--namespace", "test-ns"])
 
     assert result.exit_code != 0
-    assert "Failed to locate auth.json" in result.output
+    assert result.exception is not None
+    assert "Failed to locate auth.json" in str(result.exception)

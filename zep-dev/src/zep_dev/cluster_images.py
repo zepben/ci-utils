@@ -6,8 +6,6 @@ from subprocess import CalledProcessError
 from typing import Any
 
 import yaml
-from click import ClickException
-from pydantic import ValidationError
 
 from zep_dev.cluster import CLUSTER_NAME, helm, kind, load_image_archive
 from zep_dev.commands.chart.utils import discover_charts
@@ -42,7 +40,7 @@ def choose_engine() -> str:
         except CalledProcessError, OSError:
             continue
         return engine
-    raise ClickException("neither podman nor docker is available")
+    raise RuntimeError("neither podman nor docker is available")
 
 
 def parse_image_refs(output: str) -> set[str]:
@@ -92,9 +90,14 @@ def select_image_refs(refs: Iterable[str], includes: Sequence[str]) -> list[str]
     return sorted(selected)
 
 
-def discover_image_refs(engine: str, includes: Sequence[str]) -> list[str]:
+def discover_image_refs(
+    engine: str,
+    includes: Sequence[str],
+    *,
+    cluster_name: str = CLUSTER_NAME,
+) -> list[str]:
     nodes = kind(
-        "get", "nodes", "--name", CLUSTER_NAME, capture_stdout=True
+        "get", "nodes", "--name", cluster_name, capture_stdout=True
     ).stdout.splitlines()
 
     refs: set[str] = set()
@@ -114,13 +117,18 @@ def discover_image_refs(engine: str, includes: Sequence[str]) -> list[str]:
 
     selected = select_image_refs(refs, includes)
     if not selected:
-        raise ClickException("no images selected")
+        raise ValueError("no images selected")
     return selected
 
 
-def dump_images(output: Path, includes: Sequence[str]) -> None:
+def dump_images(
+    output: Path,
+    includes: Sequence[str],
+    *,
+    cluster_name: str = CLUSTER_NAME,
+) -> None:
     engine = choose_engine()
-    selected = discover_image_refs(engine, includes)
+    selected = discover_image_refs(engine, includes, cluster_name=cluster_name)
 
     LOG.info("Using container engine: %s", engine)
     pull_missing_images(engine, selected)
@@ -132,15 +140,12 @@ def pack_images(
     output: Path,
 ) -> None:
     if not (helm_dir / CT_YAML).is_file():
-        raise ClickException(f"{CT_YAML} is required in the root of --helm-dir")
+        raise FileNotFoundError(f"{CT_YAML} is required in the root of --helm-dir")
 
     refs: set[str] = set()
     for chart_path in discover_charts(helm_dir):
         chart_dir = helm_dir / chart_path
-        try:
-            metadata = ChartMetadata.from_chart_dir(chart_dir)
-        except (ValueError, ValidationError) as error:
-            raise ClickException(str(error)) from error
+        metadata = ChartMetadata.from_chart_dir(chart_dir)
         if metadata.type == "library":
             LOG.info("Skipping library chart: %s", chart_dir)
             continue
@@ -196,7 +201,7 @@ def extract_image_refs(yaml_text: str) -> set[str]:
         for document in yaml.safe_load_all(yaml_text):
             visit(document)
     except yaml.YAMLError as error:
-        raise ClickException("failed to parse YAML while discovering images") from error
+        raise ValueError("failed to parse YAML while discovering images") from error
     return refs
 
 
@@ -214,11 +219,7 @@ def pull_missing_images(engine: str, refs: Sequence[str]) -> None:
         )
         if result.returncode != 0:
             LOG.info("Pulling image onto host: %s", ref)
-            try:
-                execute(engine, "pull", ref, skip_resolve=True)
-            except CalledProcessError as error:
-                raise ClickException(f"failed to pull image: {ref}") from error
-
+            execute(engine, "pull", ref, skip_resolve=True)
 
 def save_image_archive(engine: str, output: Path, refs: Sequence[str]) -> None:
     for ref in refs:
@@ -241,5 +242,5 @@ def save_image_archive(engine: str, output: Path, refs: Sequence[str]) -> None:
     LOG.info("Wrote image archive: %s", output)
 
 
-def load_images(archive: Path) -> None:
-    load_image_archive(archive)
+def load_images(archive: Path, *, cluster_name: str = CLUSTER_NAME) -> None:
+    load_image_archive(archive, cluster_name=cluster_name)

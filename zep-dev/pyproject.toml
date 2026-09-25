@@ -15,7 +15,12 @@ dependencies = [
 ]
 
 [tool.setuptools.package-data]
-zep_dev = ["resources/*"]
+zep_dev = [
+    "resources/*",
+    "resources/terraform/common/*.tf",
+    "resources/terraform/eas/*.tf",
+    "resources/terraform/hcs/*.tf",
+]
 
 [project.optional-dependencies]
 dev = [

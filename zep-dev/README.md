@@ -1,74 +1,75 @@
 # Zep Dev
 
-Reusable kubernetes cluster for development and CI. Requires kind installed https://kind.sigs.k8s.io/docs/user/quick-start/.
+CLI for local and CI Kubernetes work around Zepben charts.
 
-## Required Files
+Two different jobs share this tool. Do not mix them up.
 
-The tool requires two files:
+| Job | What you use | Cluster name |
+| --- | --- | --- |
+| Single-chart CI / chart test | `kind-cluster.yaml` + `components.yaml` (or repo equivalents) | `test-cluster` |
+| Full platform (multi-app Kind) | Distribution + Profile + Bindings | Profile `metadata.name` |
 
-* kind-cluster.yaml - configures kind. See [example](examples/kind-cluster.yaml).
-* components.yaml - configures dependencies to be installed via helm when creating the kind cluster.
+Mental model for the platform path:
+[docs/distribution-profile-bindings.md](docs/distribution-profile-bindings.md).
 
-### ConfigMaps from files
+Production chart and Argo flow:
+[deployments deployment-pipeline](https://github.com/zepben/deployments/tree/main/docs/deployment-pipeline)
+([testing and CI](https://github.com/zepben/deployments/blob/main/docs/deployment-pipeline/testing-and-ci.md)).
 
-A component can create ConfigMaps from files before its Helm release is installed:
+Requires [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/). This environment
+uses rootless Podman; set `CONTAINER_HOST` and `KIND_EXPERIMENTAL_PROVIDER=podman`
+before Kind commands. Kubeconfig for zep-dev Kind clusters is always
+`/tmp/kind-k8s-conf.yaml`.
 
-```yaml
-cluster_components:
-  - name: database
-    chart: example/database
-    version: "1.0.0"
-    namespace: test
-    config_maps_from_file:
-      - name: database-init
-        from_file:
-          init.sql: files/init.sql
-```
-
-Each ConfigMap uses its component namespace. On a reused Kind cluster, ConfigMaps are
-applied again before Helm is skipped. See [`examples/components.yaml`](examples/components.yaml) for an example.
-
-### Waiting for resources and creating EWB load-database credentials
-
-A component can wait for resources created by its Helm chart, then create the
-Secret consumed by EWB's optional load-database configuration. This is useful for creating
-and waiting for databases to be used by EWB/HCS.
-
-```yaml
-cluster_components:
-  - name: kind-pg
-    chart: cnpg/cluster
-    version: "0.8.1"
-    namespace: ewb-test
-    wait_for:
-      - resource: cluster/kind-pg
-        for: condition=Ready
-        timeout: 180s
-    load_db_credentials:
-      from_secret: kind-pg-superuser
-      database: app
-```
-
-## Development
-
-The Makefile in the root of the project contains some targets for interacting with the the tool. Simply run:
-
-```shell
-make check-zep-dev test-zep-dev
-```
-
-To execute the linters and tests. 
-
-`zep-dev chart lint` and `zep-dev chart test` enforce the chart metadata schema
-and YAML lint policy bundled with `zep-dev`.
-
-To create a local kind cluster, you can run:
-```shell
-make setup-k8s
-```
-
-Be sure to set the env so kubectl and friends operate as expected:
-
-```shell
+```bash
+export PATH="$HOME/.local/share/ci-utils/bin:$HOME/.local/share/helm/bin:$PATH"
+export CONTAINER_HOST=unix:///run/user/$(id -u)/podman/podman.sock
+export KIND_EXPERIMENTAL_PROVIDER=podman
 export KUBECONFIG=/tmp/kind-k8s-conf.yaml
+```
+
+## Platform (Distribution · Profile · Bindings)
+
+Bring up ewb, eas, hcs, and eas-web-client from OCI pins into a Kind cluster.
+
+1. Install tools / the CLI (`zep-dev tools install`, or your repo Makefile).
+2. Write machine-local Bindings (see examples README). Do not commit personal paths.
+3. Ensure charts exist, then apply:
+
+```bash
+zep-dev distribution build --distribution examples/distributions/platform.yaml
+zep-dev platform apply --profile examples/profiles/platform.yaml
+zep-dev platform destroy --profile examples/profiles/platform.yaml
+```
+
+Worked example and Bindings sample:
+[examples/profiles/README.md](examples/profiles/README.md).
+
+## Single-chart Kind (`test-cluster`)
+
+Used by app-repo `make test` / CI chart install. Examples:
+
+- [examples/kind-cluster.yaml](examples/kind-cluster.yaml)
+- [examples/components.yaml](examples/components.yaml)
+
+```bash
+zep-dev cluster create --kind-config examples/kind-cluster.yaml \
+  --components examples/components.yaml
+# chart lint / test from an application helm/ tree
+zep-dev chart lint --helm-dir …
+zep-dev chart test --helm-dir …
+zep-dev cluster teardown
+```
+
+`components.yaml` can declare Helm helpers, ConfigMaps from files, `wait_for`,
+and EWB load-database credential wiring. See the examples file for the shape.
+
+Platform Profiles must not use `metadata.name: test-cluster` (reserved).
+
+## Development of zep-dev itself
+
+From the ci-utils repo root:
+
+```bash
+make check-zep-dev test-zep-dev
 ```

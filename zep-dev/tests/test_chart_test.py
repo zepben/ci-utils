@@ -59,7 +59,8 @@ def test_test_missing_ct_yaml_fails(tmp_path: Path) -> None:
     )
 
     assert result.exit_code != 0
-    assert "ct.yaml" in result.output
+    assert result.exception is not None
+    assert "ct.yaml" in str(result.exception)
 
 
 def test_library_chart_skips_install(
@@ -130,7 +131,8 @@ def test_application_chart_lint_and_install_failure_raises(
     )
 
     assert result.exit_code != 0
-    assert "rc=3" in result.output
+    assert result.exception is not None
+    assert result.exception.returncode == 3
 
 
 def test_chart_outside_helm_dir_fails(
@@ -145,8 +147,8 @@ def test_chart_outside_helm_dir_fails(
     )
 
     assert result.exit_code != 0
-    assert "not inside --helm-dir" in result.output
-
+    assert result.exception is not None
+    assert "not inside --helm-dir" in str(result.exception)
 
 def test_discovery_mode_processes_all_charts_and_skips_libraries(
     helm_dir: Path,

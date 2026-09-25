@@ -1,0 +1,32 @@
+# Reference Distribution for platform apply and distribution build.
+# Check published pins: zep-dev distribution build --distribution
+#   examples/distributions/platform.yaml
+# Helm needs GHCR read access via helm registry login or local container auth.
+#
+# Pins are the newest chart versions observed in oci://ghcr.io/zepben/charts
+# at fixture authoring time. Helm accepts semver with '+'; OCI tags store
+# the same string with '_' (Helm rewrites on pull).
+#
+# Refresh pins:
+#   skopeo list-tags docker://ghcr.io/zepben/charts/<name> \
+#     --authfile "$HOME/.config/containers/auth.json"
+#   Then set version: to the newest tag, replacing '_' with '+' for Helm.
+#
+# Expected after `zep-dev platform apply --profile examples/profiles/platform.yaml`:
+# releases ewb, eas, hcs, eas-web-client Ready in Profile namespace.
+#
+# When using kind.host_mounts + apps.ewb modelStorage.hostPath, bump ewb to a
+# chart version that includes modelStorage (see energy-workbench-server helm chart).
+metadata:
+  name: platform
+
+components:
+  ewb:
+    version: "0.0.0-3.13.0.7+e73c536"
+  eas:
+    version: "0.0.0-2.19.0.14+96274bc"
+  hcs:
+    version: "2.0.0-6+2c6bb43"
+  eas-web-client:
+    # Includes nodePort + config.auth.authType + config.eas (absent from 1.40.0).
+    version: "0.0.0-1.39.0.14+ca9ac2f"

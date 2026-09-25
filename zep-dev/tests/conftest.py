@@ -10,6 +10,16 @@ from zep_dev import k8s_secrets
 from zep_dev.models import ChartTestingConfig
 
 
+@pytest.fixture(autouse=True)
+def _stub_tools_bin_dir(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CLI startup calls get_bin_dir(); avoid requiring an app virtualenv in tests."""
+    bin_dir = tmp_path_factory.mktemp("zep-dev-bin")
+    monkeypatch.setattr("zep_dev.cli.get_bin_dir", lambda: bin_dir)
+    monkeypatch.setattr("zep_dev.shared.get_bin_dir", lambda: bin_dir)
+
+
 @pytest.fixture
 def fake_execute(
     monkeypatch: pytest.MonkeyPatch,

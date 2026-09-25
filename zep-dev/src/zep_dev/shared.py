@@ -6,8 +6,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from click import ClickException
-
 from zep_dev.static import TOOLS_BY_NAME
 
 LOG = logging.getLogger(__name__)
@@ -46,7 +44,7 @@ def resolve_chart(helm_dir: Path, chart: Path) -> ResolvedChart:
     try:
         path_relative_to_helm_dir = absolute_path.relative_to(helm_dir)
     except ValueError as e:
-        raise ClickException(
+        raise ValueError(
             f"--chart {chart} is not inside --helm-dir {helm_dir}"
         ) from e
     return ResolvedChart(
@@ -97,6 +95,7 @@ def execute(
     check: bool = True,
     input: str | None = None,
     env: Mapping[str, str] | None = None,
+    timeout: float | None = None,
 ) -> CommandResult:
     if not skip_resolve:
         resolve(args[0])
@@ -109,6 +108,7 @@ def execute(
         stderr=subprocess.PIPE if capture_stderr else None,
         check=False,
         env=env,
+        timeout=timeout,
     )
     result = CommandResult(
         returncode=completed.returncode,

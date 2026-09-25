@@ -64,5 +64,5 @@ def test_resolve_chart_outside_helm_dir_raises(tmp_path: Path) -> None:
     helm_dir.mkdir()
     outside_chart = (tmp_path / "other" / "myapp").resolve()
 
-    with pytest.raises(Exception, match="not inside --helm-dir"):
+    with pytest.raises(ValueError, match="not inside --helm-dir"):
         resolve_chart(helm_dir, outside_chart)

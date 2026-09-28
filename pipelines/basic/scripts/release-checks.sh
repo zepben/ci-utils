@@ -30,7 +30,7 @@ run git fetch --tags origin
 info "$BRANCH"
 info "Checking to make sure commit has not been already released."
 current_commit_id=$(git rev-parse HEAD)
-for tag in $(git tag -l --sort=-v:refname)
+for tag in $(git tag -l --sort=-v:refname | grep -v snapshot)
 do
     commit_released=$(git rev-list $tag | grep $current_commit_id || true)
     if [[ ! -z $commit_released  ]]; then

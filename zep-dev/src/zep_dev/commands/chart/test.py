@@ -1,4 +1,3 @@
-import logging
 from contextlib import chdir
 from pathlib import Path
 from subprocess import CalledProcessError
@@ -10,15 +9,13 @@ from pydantic import ValidationError
 
 from zep_dev.commands.chart.utils import discover_charts, execute_ct_lint
 from zep_dev.k8s import kubectl, resource_exists
-from zep_dev.k8s_secrets import create_image_pull_secret
-from zep_dev.models import ChartMetadata, CiSecrets
+from zep_dev.k8s_secrets import create_additional_secrets, create_image_pull_secret
+from zep_dev.models import ChartMetadata
 from zep_dev.shared import (
     ResolvedChart,
     resolve_chart,
 )
 from zep_dev.static import CI_SECRETS_YAML, CT_YAML
-
-LOG = logging.getLogger(__name__)
 
 
 @click.command("test")
@@ -90,33 +87,9 @@ def create_test_namespace(ct_yaml_path: Path) -> str:
 
 
 def create_secrets(namespace: str) -> None:
-    create_additional_secrets(namespace)
-    create_image_pull_secret(namespace)
-
-
-def create_additional_secrets(namespace: str) -> None:
-    """
-    If an Application requires additional secrets, it can place a file "ci-secrets.yaml" next to ct.yaml
-    in the helm dir. This file defines where to locate additional secrets that need to be injected into
-    Kubernetes in order for the tests to success. As an example, the EWB requires AWS access creds to download
-    an empty network model for it to be able to successfully start up and allow the helm unit test probes
-    to pass successfully.
-    """
     if CI_SECRETS_YAML.exists():
-        config = CiSecrets.model_validate(yaml.safe_load(CI_SECRETS_YAML.read_text()))
-        for secret in config.secrets:
-            LOG.info("Creating additional secret: %s", secret.name)
-            value = secret.resolve_value()
-            if not resource_exists("secret", secret.name, namespace=namespace):
-                kubectl(
-                    f"--namespace={namespace}",
-                    "create",
-                    "secret",
-                    "generic",
-                    secret.name,
-                    "--from-env-file=/dev/stdin",
-                    input=value,
-                )
+        create_additional_secrets(namespace, CI_SECRETS_YAML)
+    create_image_pull_secret(namespace)
 
 
 def execute_lint_and_install(

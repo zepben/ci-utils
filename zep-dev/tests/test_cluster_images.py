@@ -85,6 +85,34 @@ def test_discover_image_refs_collects_all_nodes(
         "ghcr.io/example/api:1.2",
         "ghcr.io/example/worker:1.2",
     ]
+    assert fake_kind.calls == [
+        call("get", "nodes", "--name", "test-cluster", capture_stdout=True)
+    ]
+
+
+def test_discover_image_refs_uses_cluster_name(
+    monkeypatch: pytest.MonkeyPatch,
+    fake_execute: FakeExecuteFactory,
+) -> None:
+    fake_kind = FakeExecute().on(
+        "get",
+        "nodes",
+        stdout="my-cluster-control-plane\n",
+    )
+    fake_execute(cluster_images).on(
+        "podman",
+        "exec",
+        "my-cluster-control-plane",
+        stdout="ghcr.io/example/api:1.2 application/test\n",
+    )
+    monkeypatch.setattr(cluster_images, "kind", fake_kind)
+
+    assert cluster_images.discover_image_refs(
+        "podman", (), cluster_name="my-cluster"
+    ) == ["ghcr.io/example/api:1.2"]
+    assert fake_kind.calls == [
+        call("get", "nodes", "--name", "my-cluster", capture_stdout=True)
+    ]
 
 
 def test_discover_image_refs_rejects_empty_selection(
@@ -176,7 +204,9 @@ def test_dump_images_pulls_missing_images_and_saves(
     ]
     monkeypatch.setattr(cluster_images, "choose_engine", lambda: engine_name)
     monkeypatch.setattr(
-        cluster_images, "discover_image_refs", lambda engine, includes: selected
+        cluster_images,
+        "discover_image_refs",
+        lambda engine, includes, **kwargs: selected,
     )
     engine = (
         fake_execute(cluster_images)
@@ -225,6 +255,7 @@ def test_load_images_validates_archive_and_loads(
     archive = tmp_path / "images.tar"
     archive.write_bytes(b"archive")
     cluster_images.load_images(archive)
+    cluster_images.load_images(archive, cluster_name="my-cluster")
 
     assert kind.calls == [
         call(
@@ -233,5 +264,12 @@ def test_load_images_validates_archive_and_loads(
             str(archive),
             "--name",
             "test-cluster",
-        )
+        ),
+        call(
+            "load",
+            "image-archive",
+            str(archive),
+            "--name",
+            "my-cluster",
+        ),
     ]

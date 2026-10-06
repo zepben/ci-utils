@@ -3,6 +3,7 @@ from pathlib import Path
 import click
 
 from zep_dev import cluster_images
+from zep_dev.cluster import CLUSTER_NAME
 from zep_dev.commands.cluster.create import create
 from zep_dev.commands.cluster.debug_dump import debug_dump
 from zep_dev.commands.cluster.teardown import teardown
@@ -14,8 +15,16 @@ def cluster() -> None:
 
 
 @cluster.group("images", help="Save and load images from the local kind cluster")
-def images() -> None:
-    pass
+@click.option(
+    "--cluster-name",
+    default=CLUSTER_NAME,
+    show_default=True,
+    help="Kind cluster name",
+)
+@click.pass_context
+def images(ctx: click.Context, cluster_name: str) -> None:
+    ctx.ensure_object(dict)
+    ctx.obj["cluster_name"] = cluster_name
 
 
 @images.command("list")
@@ -25,9 +34,12 @@ def images() -> None:
     multiple=True,
     help="Only include image references matching this glob; repeatable",
 )
-def list_images(includes: tuple[str, ...]) -> None:
+@click.pass_context
+def list_images(ctx: click.Context, includes: tuple[str, ...]) -> None:
     engine = cluster_images.choose_engine()
-    for ref in cluster_images.discover_image_refs(engine, includes):
+    for ref in cluster_images.discover_image_refs(
+        engine, includes, cluster_name=ctx.obj["cluster_name"]
+    ):
         click.echo(ref)
 
 
@@ -44,8 +56,9 @@ def list_images(includes: tuple[str, ...]) -> None:
     multiple=True,
     help="Only include image references matching this glob; repeatable",
 )
-def dump_images(output: Path, includes: tuple[str, ...]) -> None:
-    cluster_images.dump_images(output, includes)
+@click.pass_context
+def dump_images(ctx: click.Context, output: Path, includes: tuple[str, ...]) -> None:
+    cluster_images.dump_images(output, includes, cluster_name=ctx.obj["cluster_name"])
 
 
 @images.command("pack")
@@ -75,8 +88,9 @@ def pack_images(helm_dir: Path, output: Path) -> None:
     type=click.Path(dir_okay=False, path_type=Path),
     help="Load images from this archive",
 )
-def load_images(archive: Path) -> None:
-    cluster_images.load_images(archive)
+@click.pass_context
+def load_images(ctx: click.Context, archive: Path) -> None:
+    cluster_images.load_images(archive, cluster_name=ctx.obj["cluster_name"])
 
 
 cluster.add_command(create)

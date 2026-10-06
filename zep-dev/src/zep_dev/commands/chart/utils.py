@@ -2,8 +2,6 @@ from importlib.resources import as_file, files
 from pathlib import Path
 from typing import Literal
 
-from click import ClickException
-
 from zep_dev.models import ChartMetadata, ChartTestingConfig
 from zep_dev.shared import CommandResult, execute
 
@@ -44,7 +42,7 @@ def validate_dependencies_present(
         if dependency.repository.startswith(("oci://ghcr.io", "file://")):
             continue
         if dependency.repository not in chart_repos:
-            raise ClickException(
+            raise ValueError(
                 f"{dependency.repository} not found in {ct_path}. "
                 "It needs to be added under the chart_repos list, "
                 "in the format <name>=<url>"

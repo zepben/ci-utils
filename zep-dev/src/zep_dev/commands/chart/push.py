@@ -3,8 +3,6 @@ from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
 
 import click
-from click import ClickException
-from pydantic import ValidationError
 
 from zep_dev.commands.chart.utils import validate_dependencies_present
 from zep_dev.models import ChartMetadata, ChartTestingConfig
@@ -14,12 +12,12 @@ from zep_dev.static import CT_YAML
 REGISTRY_HOST = "ghcr.io"
 
 
-def _detailed_failure_for(step: str, e: CalledProcessError) -> ClickException:
-    stdout = e.output if isinstance(e.output, str) else ""
+def failure_message(step: str, e: CalledProcessError) -> str:
     msg = f"{step} failed with rc={e.returncode}"
-    if stdout.strip():
-        msg = f"{msg}\n{stdout.strip()}"
-    return ClickException(msg)
+    for output in (e.stdout, e.stderr):
+        if isinstance(output, str) and output.strip():
+            msg = f"{msg}\n{output.strip()}"
+    return msg
 
 
 @click.command("push")
@@ -50,10 +48,7 @@ def push(
     oci_repo: str,
 ) -> None:
     chart = chart.resolve()
-    try:
-        meta = ChartMetadata.from_chart_dir(chart)
-    except (ValueError, ValidationError) as e:
-        raise ClickException(str(e)) from e
+    meta = ChartMetadata.from_chart_dir(chart)
 
     version = meta.version
 
@@ -84,7 +79,7 @@ def push(
 
     text = f"{result.stderr}\n{result.stdout}".lower()
     if "not found" not in text and "manifest unknown" not in text:
-        raise ClickException(
+        raise RuntimeError(
             f"exist check failed (rc={result.returncode}): {result.stderr.strip()}"
         )
 
@@ -112,7 +107,8 @@ def push(
                 capture_stdout=True,
             )
     except CalledProcessError as e:
-        raise _detailed_failure_for("repository setup", e) from e
+        e.add_note(failure_message("repository setup", e))
+        raise
 
     try:
         execute(
@@ -125,7 +121,8 @@ def push(
             capture_stdout=True,
         )
     except CalledProcessError as e:
-        raise _detailed_failure_for("dependency build", e) from e
+        e.add_note(failure_message("dependency build", e))
+        raise
 
     with TemporaryDirectory() as tmp:
         try:
@@ -147,4 +144,5 @@ def push(
                 capture_stdout=True,
             )
         except CalledProcessError as e:
-            raise _detailed_failure_for("push", e) from e
+            e.add_note(failure_message("push", e))
+            raise

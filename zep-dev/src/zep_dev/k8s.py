@@ -11,28 +11,14 @@ KUBECONF_PATH = Path("/tmp/kind-k8s-conf.yaml")
 @contextmanager
 def kube_guard() -> Generator[None]:
     """
-    Ensure when we run commands, we are using our kind KUBECONFIG.
-    This is to prevent accidentally targeting production clusters.
-    """
-    og_conf = os.environ.get("KUBECONFIG")
-    og_kubeconf_path = os.environ.get("KUBE_CONFIG_PATH")
+    Keep Kubernetes commands on the Kind kubeconfig for this process.
 
-    # The HashiCorp Kubernetes provider reads KUBE_CONFIG_PATH,
-    # whereas the alekc/kubectl provider reads KUBECONFIG.
+    Do not restore the previous values: concurrent Helm calls must not see
+    another thread's original kubeconfig after one call finishes.
+    """
     os.environ["KUBECONFIG"] = str(KUBECONF_PATH)
     os.environ["KUBE_CONFIG_PATH"] = str(KUBECONF_PATH)
-    try:
-        yield
-    finally:
-        if og_conf is not None:
-            os.environ["KUBECONFIG"] = og_conf
-        else:
-            os.environ.pop("KUBECONFIG", None)
-
-        if og_kubeconf_path is None:
-            os.environ.pop("KUBE_CONFIG_PATH", None)
-        else:
-            os.environ["KUBE_CONFIG_PATH"] = og_kubeconf_path
+    yield
 
 
 def kubectl(

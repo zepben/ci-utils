@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 
 import click
 
-from zep_dev.k8s import kube_guard
+from zep_dev.k8s import KUBECONF_PATH
 from zep_dev.shared import execute
 
 STATE_ROOT = Path("/tmp") / "zep-dev-terraform-state"
@@ -42,35 +42,41 @@ def terraform_environment() -> Generator[dict[str, str]]:
         data.mkdir()
         cli_config.touch()
 
-        with kube_guard():
-            yield {
-                "PATH": os.environ.get("PATH", os.defpath),
-                "KUBECONFIG": os.environ["KUBECONFIG"],
-                "KUBE_CONFIG_PATH": os.environ["KUBE_CONFIG_PATH"],
-                "HOME": str(home),
-                "TF_DATA_DIR": str(data),
-                "TF_CLI_CONFIG_FILE": str(cli_config),
-            }
+        yield {
+            "PATH": os.environ.get("PATH", os.defpath),
+            "KUBECONFIG": str(KUBECONF_PATH),
+            "KUBE_CONFIG_PATH": str(KUBECONF_PATH),
+            "HOME": str(home),
+            "TF_DATA_DIR": str(data),
+            "TF_CLI_CONFIG_FILE": str(cli_config),
+        }
 
 
 def terraform_init(root: Path, env: Mapping[str, str]) -> None:
-    execute(
+    args = [
         "terraform",
         f"-chdir={root}",
         "init",
         "-backend=false",
         "-input=false",
-        "-lockfile=readonly",
-        env=env,
-    )
+    ]
+    if (root / ".terraform.lock.hcl").is_file():
+        args.append("-lockfile=readonly")
+    execute(*args, env=env)
 
 
-def apply_terraform(root: Path, namespace: str) -> None:
+def apply_terraform(root: Path, namespace: str, *, state: Path | None = None) -> None:
     absolute_root = resolve_root(root)
-    state = terraform_state_path(absolute_root, namespace)
+    if state is None:
+        STATE_ROOT.mkdir(exist_ok=True, parents=True, mode=0o700)
+        STATE_ROOT.chmod(0o700)
+        state = terraform_state_path(absolute_root, namespace)
+    else:
+        state = state.resolve()
 
     with terraform_environment() as env:
-        STATE_ROOT.mkdir(exist_ok=True, parents=True)
+        state.parent.mkdir(exist_ok=True, parents=True, mode=0o700)
+        state.parent.chmod(0o700)
         terraform_init(absolute_root, env)
         execute(
             "terraform",

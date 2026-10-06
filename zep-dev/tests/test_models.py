@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from zep_dev.models import ArchiveFormat, CiSecret, RequiredTool
 
@@ -53,6 +54,16 @@ def test_ci_secret_resolve_value_missing_env_raises(
         secret.resolve_value()
 
 
+def test_ci_secret_resolve_value_empty_env_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = CiSecret(name="aws-creds", env_var="AWS_ACCESS_KEY_ID")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "")
+
+    with pytest.raises(ValueError, match="AWS_ACCESS_KEY_ID is not set"):
+        secret.resolve_value()
+
+
 def test_ci_secret_resolve_value_reads_environment_variable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -60,6 +71,16 @@ def test_ci_secret_resolve_value_reads_environment_variable(
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-access-key")
 
     assert secret.resolve_value() == "test-access-key"
+
+
+def test_ci_secret_rejects_empty_name() -> None:
+    with pytest.raises(ValidationError):
+        CiSecret(name="", env_var="AWS_ACCESS_KEY_ID")
+
+
+def test_ci_secret_rejects_empty_env_var() -> None:
+    with pytest.raises(ValidationError):
+        CiSecret(name="aws-creds", env_var="")
 
 
 def test_exists_when_hash_matches(tmp_path: Path, tool: RequiredTool) -> None:

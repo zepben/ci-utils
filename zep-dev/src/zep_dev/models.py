@@ -7,7 +7,6 @@ from typing import Any, Literal, Self, TextIO
 from urllib.parse import urlsplit
 
 import yaml
-from click import ClickException
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -59,9 +58,7 @@ class ConfigMapFromFile(BaseModel):
 
     def manifest(self, namespace: str, source_dir: Path | None) -> dict[str, Any]:
         if source_dir is None:
-            raise ClickException(
-                "config_maps_from_file requires a components file path"
-            )
+            raise ValueError("config_maps_from_file requires a components file path")
 
         return {
             "apiVersion": "v1",
@@ -209,13 +206,13 @@ class ChartTestingConfig(BaseModel):
 class CiSecret(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str
-    env_var: str
+    name: str = Field(min_length=1)
+    env_var: str = Field(min_length=1)
 
     def resolve_value(self) -> str:
         value = os.environ.get(self.env_var)
-        if value is None:
-            raise ValueError(f"{self.env_var} is not set. This is required ")
+        if value is None or value == "":
+            raise ValueError(f"{self.env_var} is not set")
         return value
 
 

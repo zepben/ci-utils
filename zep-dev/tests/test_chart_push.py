@@ -1,7 +1,9 @@
 from collections.abc import Callable
 from pathlib import Path
+from subprocess import CalledProcessError
 from unittest.mock import call
 
+import pytest
 from click.testing import CliRunner
 
 from _charts import write_chart
@@ -127,4 +129,60 @@ def test_push_is_idempotent_when_chart_present(
             capture_stdout=True,
             capture_stderr=True,
         ),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("command", "phase"),
+    [
+        (("repo", "add"), "repository setup"),
+        (("dependency", "build"), "dependency build"),
+        (("package",), "push"),
+        (("push",), "push"),
+    ],
+)
+def test_push_preserves_command_failure_and_adds_diagnostics(
+    helm_dir: Path,
+    auth_json: Path,
+    chart_testing_config: ChartTestingConfig,
+    write_chart_testing_config: Callable[[ChartTestingConfig], None],
+    fake_execute: FakeExecuteFactory,
+    command: tuple[str, ...],
+    phase: str,
+) -> None:
+    write_chart_testing_config(chart_testing_config)
+    chart = write_chart(
+        helm_dir / "charts" / "ewb", {"name": "ewb", "version": "1.2.3"}
+    )
+    error = CalledProcessError(
+        2, ["helm", *command], output="command stdout", stderr="command stderr"
+    )
+    fake_execute(push_module).on("helm", *command, raises=error).on(
+        "helm", "show", "chart", returncode=1, stderr="manifest unknown"
+    ).on("helm", "repo", "add").on("helm", "dependency", "build").on(
+        "helm", "package"
+    ).on("helm", "push")
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "chart",
+            "push",
+            "--chart",
+            str(chart),
+            "--registry-config",
+            str(auth_json),
+            "--oci-repo",
+            "org/repo",
+        ],
+    )
+
+    assert result.exception is error
+    assert error.__cause__ is None
+    assert error.cmd == ["helm", *command]
+    assert error.returncode == 2
+    assert error.stdout == "command stdout"
+    assert error.stderr == "command stderr"
+    assert error.__notes__ == [
+        f"{phase} failed with rc=2\ncommand stdout\ncommand stderr"
     ]

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+from subprocess import CalledProcessError
 from unittest.mock import call
 
 import pytest
@@ -59,7 +60,8 @@ def test_test_missing_ct_yaml_fails(tmp_path: Path) -> None:
     )
 
     assert result.exit_code != 0
-    assert "ct.yaml" in result.output
+    assert result.exception is not None
+    assert "ct.yaml" in str(result.exception)
 
 
 def test_library_chart_skips_install(
@@ -171,7 +173,8 @@ def test_application_chart_lint_and_install_failure_raises(
     )
 
     assert result.exit_code != 0
-    assert "rc=3" in result.output
+    assert isinstance(result.exception, CalledProcessError)
+    assert result.exception.returncode == 3
 
 
 def test_chart_outside_helm_dir_fails(
@@ -186,7 +189,12 @@ def test_chart_outside_helm_dir_fails(
     )
 
     assert result.exit_code != 0
-    assert "not inside --helm-dir" in result.output
+    assert isinstance(result.exception, ValueError)
+    assert str(outside_chart) in str(result.exception)
+    assert result.exception.__cause__ is None
+    assert result.exception.__notes__ == [
+        f"--chart {outside_chart} is not inside --helm-dir {helm_dir}"
+    ]
 
 
 def test_discovery_mode_processes_all_charts_and_skips_libraries(

@@ -1,11 +1,8 @@
 from contextlib import chdir
 from pathlib import Path
-from subprocess import CalledProcessError
 
 import click
 import yaml
-from click import ClickException
-from pydantic import ValidationError
 
 from zep_dev.commands.chart.utils import discover_charts, execute_ct_lint
 from zep_dev.k8s import kubectl, resource_exists
@@ -42,7 +39,7 @@ from zep_dev.static import CI_SECRETS_YAML, CT_YAML
 def test(helm_dir: Path, chart: Path | None) -> None:
     helm_dir = helm_dir.resolve()
     if not (helm_dir / CT_YAML).is_file():
-        raise ClickException(f"{CT_YAML} is required in the root of --helm-dir")
+        raise FileNotFoundError(f"{CT_YAML} is required in the root of --helm-dir")
 
     if chart is not None:
         resolved_charts = [resolve_chart(helm_dir, chart)]
@@ -64,10 +61,7 @@ def test(helm_dir: Path, chart: Path | None) -> None:
 
 
 def test_chart(resolved_chart: ResolvedChart) -> None:
-    try:
-        meta = ChartMetadata.from_chart_dir(resolved_chart.absolute_path)
-    except (ValueError, ValidationError) as e:
-        raise ClickException(str(e)) from e
+    meta = ChartMetadata.from_chart_dir(resolved_chart.absolute_path)
 
     if meta.type == "library":
         click.echo(f"Skipping install for library chart: {meta.name}")
@@ -80,7 +74,7 @@ def create_test_namespace(ct_yaml_path: Path) -> str:
     ct_yaml = yaml.safe_load(ct_yaml_path.read_text())
     test_namespace: str | None = ct_yaml.get("namespace")
     if test_namespace is None:
-        raise ClickException(f"namespace must be specified in {CT_YAML}")
+        raise ValueError(f"namespace must be specified in {CT_YAML}")
     if not resource_exists("namespace", test_namespace):
         kubectl("create", "namespace", test_namespace)
     return test_namespace
@@ -95,14 +89,11 @@ def create_secrets(namespace: str) -> None:
 def execute_lint_and_install(
     ct_yaml_path: Path, chart_path_relative_to_helm_dir: Path
 ) -> None:
-    try:
-        execute_ct_lint(
-            "lint-and-install",
-            "--config",
-            str(ct_yaml_path),
-            "--charts",
-            str(chart_path_relative_to_helm_dir),
-            "--check-version-increment=true",
-        )
-    except CalledProcessError as e:
-        raise ClickException(f"lint-and-install failed with rc={e.returncode}") from e
+    execute_ct_lint(
+        "lint-and-install",
+        "--config",
+        str(ct_yaml_path),
+        "--charts",
+        str(chart_path_relative_to_helm_dir),
+        "--check-version-increment=true",
+    )

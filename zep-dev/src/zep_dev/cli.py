@@ -5,6 +5,7 @@ import click
 
 from zep_dev.groups.chart import chart
 from zep_dev.groups.cluster import cluster
+from zep_dev.groups.deployment import deployment
 from zep_dev.groups.distribution import distribution
 from zep_dev.groups.secrets import secrets
 from zep_dev.groups.terraform import terraform
@@ -58,6 +59,7 @@ def configure_logging(verbose: int) -> None:
 
 cli.add_command(cluster)
 cli.add_command(distribution)
+cli.add_command(deployment)
 cli.add_command(tools)
 cli.add_command(chart)
 cli.add_command(secrets)

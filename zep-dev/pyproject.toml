@@ -15,7 +15,9 @@ dependencies = [
 ]
 
 [tool.setuptools.package-data]
-zep_dev = ["resources/*"]
+zep_dev = [
+    "resources/*",
+]
 
 [project.optional-dependencies]
 dev = [

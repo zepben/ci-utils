@@ -7,12 +7,12 @@ import pytest
 import yaml
 
 from _fake_execute import FakeExecute, FakeExecuteFactory
-from zep_dev import k8s_secrets
+from zep_dev import k8s_secrets, terraform_roots
 from zep_dev.commands.terraform import commands as terraform_commands
 from zep_dev.models import ChartTestingConfig
+from zep_dev.profile import Profile
 
 WriteProfile = Callable[..., Path]
-
 
 
 @pytest.fixture(autouse=True)
@@ -87,8 +87,6 @@ def write_chart_testing_config(
     return write
 
 
-
-
 @pytest.fixture
 def write_distribution(tmp_path: Path) -> Callable[..., Path]:
     def write(filename: str = "dist.yaml", **charts: dict[str, object]) -> Path:
@@ -148,7 +146,39 @@ def write_profile(
 
 
 @pytest.fixture
+def generated_tf_base(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    base = tmp_path / "generated"
+    monkeypatch.setattr(terraform_roots, "GENERATED_TF_BASE", base)
+    return base
+
+
+@pytest.fixture
 def state_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     root = tmp_path / "states"
     monkeypatch.setattr(terraform_commands, "STATE_ROOT", root)
     return root
+
+
+@pytest.fixture
+def contract_profile(write_profile: WriteProfile) -> Profile:
+    return Profile.from_path(
+        write_profile(
+            body={
+                "k8s": {
+                    "components": [
+                        {
+                            "type": "cnpg",
+                            "name": f"{app}-kind-pg",
+                            "namespace": "integration",
+                            "database": app,
+                            "owner": app,
+                            "password": "kind-password",
+                            "spec": {"instances": 1},
+                        }
+                        for app in ("eas", "hcs")
+                    ]
+                },
+                "runtime": {"databases": {"eas": "eas-kind-pg", "hcs": "hcs-kind-pg"}},
+            }
+        )
+    )

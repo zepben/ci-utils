@@ -10,6 +10,7 @@ from contextlib import suppress
 from importlib.resources import as_file, files
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import assert_never
 
 import click
 import requests
@@ -119,7 +120,7 @@ def extract_archive_member(
         case ArchiveFormat.NONE:
             raise ValueError("Cannot extract a member from an unarchived tool")
         case _:
-            raise ValueError(f"Unsupported archive format: {archive_format}")
+            assert_never(archive_format)
 
 
 def install_binary_tool(tool: RequiredTool, tools_dir: Path) -> Path:

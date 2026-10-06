@@ -7,6 +7,7 @@ import yaml
 
 from _fake_execute import FakeExecute, FakeExecuteFactory
 from zep_dev import k8s_secrets
+from zep_dev.commands.terraform import commands as terraform_commands
 from zep_dev.models import ChartTestingConfig
 
 
@@ -67,3 +68,10 @@ def write_chart_testing_config(
         )
 
     return write
+
+
+@pytest.fixture
+def state_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    root = tmp_path / "states"
+    monkeypatch.setattr(terraform_commands, "STATE_ROOT", root)
+    return root

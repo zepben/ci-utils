@@ -1,14 +1,17 @@
 import os
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 from unittest.mock import call
 
 import pytest
 
 from _fake_execute import FakeExecute
-from zep_dev import k8s
+from zep_dev import cluster, k8s
+from zep_dev.shared import CommandResult
 
 
-def test_kube_guard_targets_kind_and_restores_after_failure(
+def test_kube_guard_keeps_kind_after_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     kubeconfig = "/original/kubeconfig"
@@ -22,8 +25,39 @@ def test_kube_guard_targets_kind_and_restores_after_failure(
             assert os.environ["KUBE_CONFIG_PATH"] == str(k8s.KUBECONF_PATH)
             raise RuntimeError("terraform failure")
 
-    assert os.environ["KUBECONFIG"] == kubeconfig
-    assert os.environ["KUBE_CONFIG_PATH"] == provider_config
+    assert os.environ["KUBECONFIG"] == str(k8s.KUBECONF_PATH)
+    assert os.environ["KUBE_CONFIG_PATH"] == str(k8s.KUBECONF_PATH)
+
+
+def test_parallel_helm_calls_keep_kind_after_first_call_finishes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("KUBECONFIG", "/original/kubeconfig")
+    monkeypatch.setenv("KUBE_CONFIG_PATH", "/original/provider-config")
+    second_started = Event()
+    first_finished = Event()
+    observed: list[tuple[str, str]] = []
+
+    def fake_execute(*args: str, **_kwargs: object) -> CommandResult:
+        if args[1] == "first":
+            assert second_started.wait(timeout=3)
+        else:
+            second_started.set()
+            assert first_finished.wait(timeout=3)
+            observed.append((os.environ["KUBECONFIG"], os.environ["KUBE_CONFIG_PATH"]))
+        return CommandResult(0, "", "")
+
+    monkeypatch.setattr(cluster, "execute", fake_execute)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(cluster.helm, "first")
+        second = pool.submit(cluster.helm, "second")
+        try:
+            first.result(timeout=3)
+        finally:
+            first_finished.set()
+        second.result(timeout=3)
+
+    assert observed == [(str(k8s.KUBECONF_PATH), str(k8s.KUBECONF_PATH))]
 
 
 @pytest.mark.parametrize(

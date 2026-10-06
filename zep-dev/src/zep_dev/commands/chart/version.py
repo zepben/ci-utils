@@ -1,9 +1,8 @@
 import re
 from dataclasses import dataclass
-from subprocess import CalledProcessError
+from pathlib import Path
 
 import click
-from click import ClickException
 
 from zep_dev.shared import execute
 
@@ -56,20 +55,24 @@ def snapshot_chart_version(tags: list[str]) -> str | None:
     return f"{groups['base']}-b.{groups['snapshot_number']}"
 
 
-def git_tags_at_head() -> list[str]:
+def git_prefix(repo: Path | None) -> tuple[str, ...]:
+    return ("git", "-C", str(repo)) if repo is not None else ("git",)
+
+
+def git_tags_at_head(repo: Path | None = None, ref: str = "HEAD") -> list[str]:
     return execute(
-        "git",
+        *git_prefix(repo),
         "tag",
         "--points-at",
-        "HEAD",
+        ref,
         skip_resolve=True,
         capture_stdout=True,
     ).stdout.splitlines()
 
 
-def git_describe() -> str:
+def git_describe(repo: Path | None = None, ref: str = "HEAD") -> str:
     return execute(
-        "git",
+        *git_prefix(repo),
         "describe",
         # Consider lightweight and annotated tags, not only annotated.
         "--tags",
@@ -88,25 +91,20 @@ def git_describe() -> str:
         "*[0-9][a-zA-Z]*",
         # Prefer 7-char SHAs; Git may lengthen for uniqueness.
         "--abbrev=7",
+        ref,
         skip_resolve=True,
         capture_stdout=True,
     ).stdout
 
 
-def calculate_chart_version() -> str:
-    snapshot_version = snapshot_chart_version(git_tags_at_head())
+def calculate_chart_version(repo: Path | None = None, ref: str = "HEAD") -> str:
+    snapshot_version = snapshot_chart_version(git_tags_at_head(repo, ref))
     if snapshot_version is not None:
         return snapshot_version
-    return to_chart_version(parse_git_describe(git_describe()))
+    return to_chart_version(parse_git_describe(git_describe(repo, ref)))
 
 
 @click.command("version")
 def version() -> None:
-    try:
-        chart_version = calculate_chart_version()
-    except CalledProcessError as e:
-        raise ClickException(f"git command failed with rc={e.returncode}") from e
-    except ValueError as e:
-        raise ClickException(str(e)) from e
-
+    chart_version = calculate_chart_version()
     click.echo(chart_version)

@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 import yaml
@@ -9,6 +10,8 @@ from _fake_execute import FakeExecute, FakeExecuteFactory
 from zep_dev import k8s_secrets
 from zep_dev.commands.terraform import commands as terraform_commands
 from zep_dev.models import ChartTestingConfig
+
+WriteProfile = Callable[..., Path]
 
 
 @pytest.fixture
@@ -66,6 +69,66 @@ def write_chart_testing_config(
                 config.model_dump(by_alias=True, mode="json"), sort_keys=False
             )
         )
+
+    return write
+
+
+
+
+@pytest.fixture
+def write_distribution(tmp_path: Path) -> Callable[..., Path]:
+    def write(filename: str = "dist.yaml", **charts: dict[str, object]) -> Path:
+        path = tmp_path / filename
+        path.write_text(
+            yaml.safe_dump(
+                {
+                    "metadata": {"name": "platform-latest"},
+                    "charts": charts or {"ewb": {"version": "1.0.0"}},
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        return path
+
+    return write
+
+
+@pytest.fixture
+def write_profile(
+    tmp_path: Path, write_distribution: Callable[..., Path]
+) -> WriteProfile:
+    def write(
+        *,
+        name: str = "demo",
+        distribution: str = "dist.yaml",
+        body: dict[str, Any] | None = None,
+        **charts: dict[str, object],
+    ) -> Path:
+        write_distribution(distribution, **charts)
+        profile: dict[str, Any] = {
+            "metadata": {"name": name},
+            "distribution": distribution,
+            "namespace": "integration",
+            "k8s": {
+                "kind": {
+                    "config": {
+                        "kind": "Cluster",
+                        "apiVersion": "kind.x-k8s.io/v1alpha4",
+                        "nodes": [],
+                    }
+                }
+            },
+        }
+        if body:
+            if "k8s" in body:
+                k8s = profile["k8s"]
+                k8s.update(body["k8s"])
+                body = {k: v for k, v in body.items() if k != "k8s"}
+            profile.update(body)
+        path = tmp_path / "profile.yaml"
+        path.write_text(yaml.safe_dump(profile, sort_keys=False), encoding="utf-8")
+        return path
 
     return write
 

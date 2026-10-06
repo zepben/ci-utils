@@ -1,0 +1,16 @@
+# Pins from oci://ghcr.io/zepben/charts at authoring time.
+# Helm versions use '+'. OCI tags use '_'. Helm changes '_' to '+' on pull.
+#
+# Refresh a pin:
+#   skopeo list-tags docker://ghcr.io/zepben/charts/<name> \
+#     --authfile "$HOME/.config/containers/auth.json"
+metadata:
+  name: integration
+
+charts:
+  ewb:
+    version: "0.0.0-3.13.0.7+e73c536"
+  eas:
+    version: "0.0.0-2.19.0.14+96274bc"
+  eas-web-client:
+    version: "0.0.0-1.39.0.14+ca9ac2f"

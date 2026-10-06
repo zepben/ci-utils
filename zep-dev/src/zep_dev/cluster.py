@@ -1,23 +1,28 @@
 import json
 import logging
 from base64 import b64decode
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from contextlib import nullcontext
+from copy import deepcopy
 from importlib.resources import as_file, files
 from pathlib import Path
-from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
 from typing import Any, assert_never
 
 import yaml
 from click import ClickException
 
+from zep_dev.cnpg import apply_cnpg_component as apply_cnpg_component
+from zep_dev.cnpg import cnpg_manifests as cnpg_manifests
 from zep_dev.k8s import KUBECONF_PATH, kube_guard, kubectl, resource_exists
 from zep_dev.k8s_secrets import resolve_registry_credential
 from zep_dev.models import (
     LOCAL_REPO_MOUNT_ROOT,
     ClusterComponent,
+    ClusterComponentItem,
     ClusterComponents,
+    CnpgComponent,
+    HostMount,
     LoadDbCredentials,
     LocalRepo,
     OciRepository,
@@ -55,14 +60,20 @@ def create_cluster(
                 image_archive,
             )
     apply_builtin_storage_classes()
-    add_helm_repos(components)
-    install_helm_components(components, repos)
+    add_helm_repos(components.helm_repos)
+    install_helm_components(
+        components.cluster_components, repos, source_dir=components.source_dir
+    )
 
 
-def load_image_archive(archive: Path) -> None:
+def load_image_archive(
+    archive: Path,
+    *,
+    cluster_name: str = CLUSTER_NAME,
+) -> None:
     if not archive.is_file() or archive.stat().st_size == 0:
         raise ClickException(f"image archive is missing or empty: {archive}")
-    kind("load", "image-archive", str(archive), "--name", CLUSTER_NAME)
+    kind("load", "image-archive", str(archive), "--name", cluster_name)
 
 
 def load_local_repos(paths: Sequence[Path]) -> tuple[LocalRepo, ...]:
@@ -77,20 +88,17 @@ def load_local_repos(paths: Sequence[Path]) -> tuple[LocalRepo, ...]:
 
 
 def validate_repo(repo: LocalRepo) -> None:
-    try:
-        toplevel = Path(
-            execute(
-                "git",
-                "-C",
-                str(repo.path),
-                "rev-parse",
-                "--show-toplevel",
-                skip_resolve=True,
-                capture_stdout=True,
-            ).stdout.strip()
-        ).resolve()
-    except CalledProcessError as e:
-        raise ClickException(f"--local-repo is not a Git work tree: {repo.path}") from e
+    toplevel = Path(
+        execute(
+            "git",
+            "-C",
+            str(repo.path),
+            "rev-parse",
+            "--show-toplevel",
+            skip_resolve=True,
+            capture_stdout=True,
+        ).stdout.strip()
+    ).resolve()
     if repo.path != toplevel:
         raise ClickException(
             f"--local-repo must be a Git repository toplevel: {repo.path} "
@@ -98,67 +106,82 @@ def validate_repo(repo: LocalRepo) -> None:
         )
 
 
-def create_kind_cluster(kind_config: Path, local_repos: Sequence[LocalRepo]) -> None:
+def create_kind_cluster(
+    kind_config: Path | dict[str, Any],
+    local_repos: Sequence[LocalRepo] = (),
+    *,
+    host_mounts: Sequence[HostMount] = (),
+    cluster_name: str = CLUSTER_NAME,
+) -> None:
     LOG.info("Creating kind cluster")
+    mounts = tuple(repo.to_host_mount() for repo in local_repos) + tuple(host_mounts)
     existing = kind(
         "get", "clusters", "--quiet", capture_stdout=True
     ).stdout.splitlines()
-    if CLUSTER_NAME in existing:
-        if local_repos:
-            # Ensure that if we have a running cluster, the mounts are the same
-            # as passed on the command line. Otherwise we would have a silent
-            # and confusing failure mode.
-            validate_existing_worker_mounts(local_repos)
-        LOG.info("Reusing existing cluster: %s", CLUSTER_NAME)
-        return
+    if cluster_name in existing:
+        if mounts:
+            validate_existing_worker_mounts(mounts, cluster_name=cluster_name)
+        LOG.info("Reusing existing cluster: %s", cluster_name)
+    else:
+        rendered_config = inject_host_mounts(kind_config, mounts)
 
-    rendered_config = inject_repo_mounts(kind_config, local_repos)
+        config_path = Path("/tmp/kind-config.yaml")
+        config_path.write_text(rendered_config, encoding="utf-8")
 
-    config_path = Path("/tmp/kind-config.yaml")
-    config_path.write_text(rendered_config, encoding="utf-8")
+        kind(
+            "create",
+            "cluster",
+            "--name",
+            cluster_name,
+            "--config",
+            str(config_path),
+        )
 
-    kind(
-        "create",
-        "cluster",
-        "--name",
-        CLUSTER_NAME,
-        "--config",
-        str(config_path),
-    )
+    # Always export kubeconfig again.
+    # Reuse needs a fresh file if /tmp was cleared.
     kind(
         "export",
         "kubeconfig",
         "--name",
-        CLUSTER_NAME,
+        cluster_name,
         "--kubeconfig",
         str(KUBECONF_PATH),
     )
 
 
-def validate_existing_worker_mounts(local_repos: Sequence[LocalRepo]) -> None:
+def validate_existing_worker_mounts(
+    host_mounts: Sequence[HostMount],
+    *,
+    cluster_name: str = CLUSTER_NAME,
+) -> None:
+    """Fail if the live worker bind mounts are not the mounts you requested.
+
+    A mismatch fails later with no clear error.
     """
-    Call podman and extract the mounts our running kind cluster has configured.
-    If they are not the exact same set as we have passed on the command line --local-repos,
-    fail.
-    """
-    out = kind("get", "nodes", "--name", CLUSTER_NAME, capture_stdout=True)
+    out = kind("get", "nodes", "--name", cluster_name, capture_stdout=True)
     workers = tuple(
         name for name in out.stdout.splitlines() if not name.endswith("-control-plane")
     )
     if not workers:
-        raise ClickException("--local-repo requires at least one worker node.")
+        raise RuntimeError("host mounts require at least one worker node.")
 
-    expected_mounts = {(str(repo.path), repo.container_path) for repo in local_repos}
+    expected = {
+        (str(mount.host_path.resolve()), mount.node_path) for mount in host_mounts
+    }
+    expected_dests = {dest for _, dest in expected}
     for worker in workers:
-        existing_mounts = inspect_live_mounts(worker)
-        if existing_mounts != expected_mounts:
-            raise ClickException(
-                "Existing cluster local-repo mounts do not match --local-repo. "
-                "Run: zep-dev cluster teardown"
+        existing_mounts = {
+            pair for pair in inspect_bind_mounts(worker) if pair[1] in expected_dests
+        }
+        if existing_mounts != expected:
+            raise RuntimeError(
+                "Existing cluster host mounts do not match the Profile / --local-repo. "
+                "Run: zep-dev deployment destroy --profile <path> "
+                "(or zep-dev cluster teardown for chart-test clusters)"
             )
 
 
-def inspect_live_mounts(worker: str) -> set[tuple[str, str]]:
+def inspect_bind_mounts(worker: str) -> set[tuple[str, str]]:
     raw_mounts = podman(
         "inspect",
         worker,
@@ -168,9 +191,9 @@ def inspect_live_mounts(worker: str) -> set[tuple[str, str]]:
     ).stdout
     mounts: Any = json.loads(raw_mounts)
     if not isinstance(mounts, list):
-        raise ClickException(f"podman inspect returned invalid mounts for {worker}")
+        raise RuntimeError(f"podman inspect returned invalid mounts for {worker}")
 
-    local_mounts = set()
+    bind_mounts: set[tuple[str, str]] = set()
     for mount in mounts:
         if not isinstance(mount, dict):
             continue
@@ -180,47 +203,61 @@ def inspect_live_mounts(worker: str) -> set[tuple[str, str]]:
         destination = mount.get("Destination")
         if not isinstance(source, str) or not isinstance(destination, str):
             continue
-        if not destination.startswith(f"{LOCAL_REPO_MOUNT_ROOT}/"):
-            continue
-        local_mounts.add((str(Path(source).resolve()), destination))
+        bind_mounts.add((str(Path(source).resolve()), destination))
 
-    return local_mounts
+    return bind_mounts
 
 
-def inject_repo_mounts(kind_config: Path, repos: Sequence[LocalRepo]) -> str:
-    config: Any = yaml.safe_load(kind_config.read_text(encoding="utf-8"))
+def inject_host_mounts(
+    kind_config: Path | dict[str, Any], host_mounts: Sequence[HostMount]
+) -> str:
+    config: Any = (
+        yaml.safe_load(kind_config.read_text(encoding="utf-8"))
+        if isinstance(kind_config, Path)
+        else deepcopy(kind_config)
+    )
     if not isinstance(config, dict):
-        raise ClickException(f"kind config must be a mapping: {kind_config}")
+        raise ValueError(f"kind config must be a mapping: {kind_config}")
 
     nodes = config.get("nodes", [])
+    if not isinstance(nodes, list):
+        raise ValueError("kind config nodes must be a list")
+    for index, node in enumerate(nodes):
+        if not isinstance(node, dict):
+            raise ValueError(f"kind config nodes[{index}] must be a mapping")
+        if node.get("role") == "worker" and "extraMounts" in node:
+            if not isinstance(node["extraMounts"], list):
+                raise ValueError(
+                    f"kind config nodes[{index}].extraMounts must be a list"
+                )
     workers = [node for node in nodes if node.get("role") == "worker"]
-    if not workers:
-        raise ClickException(
-            "--local-repo requires at least one worker node in the kind config"
+    if host_mounts and not workers:
+        raise ValueError(
+            "host mounts require at least one worker node in the kind config"
         )
 
-    # Workers only: control-plane gets no extraMounts. The Argo overlay prevents
-    # Argo pods being scheduled on the control-plane nodes.
+    # Put extraMounts on workers only.
+    # The control-plane node has none.
     for worker in workers:
         mounts = worker.setdefault("extraMounts", [])
         mounts.extend(
             {
-                "hostPath": str(repo.path),
-                "containerPath": repo.container_path,
-                "readOnly": True,
+                "hostPath": str(mount.host_path),
+                "containerPath": mount.node_path,
+                "readOnly": mount.read_only,
             }
-            for repo in repos
+            for mount in host_mounts
         )
 
     return yaml.safe_dump(config, default_flow_style=False)
 
 
-def add_helm_repos(components: ClusterComponents) -> None:
-    if components.helm_repos:
+def add_helm_repos(repositories: Mapping[str, str]) -> None:
+    if repositories:
         LOG.info("Adding helm repos")
         repo_out = helm("repo", "list", "--no-headers", capture_stdout=True)
         existing_repos = [tuple(s.split()) for s in repo_out.stdout.splitlines()]
-        for name, repo in components.helm_repos.items():
+        for name, repo in repositories.items():
             if (name, repo) in existing_repos:
                 LOG.info("Not adding %s -> %s as already present", name, repo)
             else:
@@ -300,14 +337,16 @@ def local_repos_overlay(local_repos: Sequence[LocalRepo]) -> dict[str, Any]:
 
 
 def install_helm_components(
-    components: ClusterComponents,
+    components: Sequence[ClusterComponentItem],
     local_repos: Sequence[LocalRepo] = (),
+    *,
+    source_dir: Path | None = None,
 ) -> None:
     list_out = helm("list", "--all-namespaces", "--deployed", "-q", capture_stdout=True)
     installed = list_out.stdout.splitlines()
     repos_overlay = local_repos_overlay(local_repos)
     LOG.info("Installing cluster components")
-    for desired in components.cluster_components:
+    for desired in components:
         match desired:
             case RawManifestComponent():
                 for url in desired.raw_manifests:
@@ -319,10 +358,12 @@ def install_helm_components(
                     "--all",
                     f"--timeout={desired.wait_timeout}",
                 )
+            case CnpgComponent():
+                apply_cnpg_component(desired)
             case ClusterComponent():
                 reconcile_helm_component(
                     desired,
-                    source_dir=components.source_dir,
+                    source_dir=source_dir,
                     installed=installed,
                     local_repos_overlay=repos_overlay,
                 )
@@ -521,9 +562,9 @@ def apply_argo_oci_repository_secrets(
         )
 
 
-def teardown_cluster() -> None:
+def teardown_cluster(*, cluster_name: str = CLUSTER_NAME) -> None:
     LOG.info("Tearing down cluster")
-    kind("delete", "cluster", "--name", CLUSTER_NAME)
+    kind("delete", "cluster", "--name", cluster_name)
 
 
 def take_debug_dump(filter_namespaces: list[str], out_dir: Path | None) -> None:
@@ -574,6 +615,27 @@ def podman(*args: str, capture_stdout: bool = False) -> CommandResult:
     )
 
 
-def helm(*args: str, capture_stdout: bool = False) -> CommandResult:
+def helm(
+    *args: str,
+    capture_stdout: bool = False,
+    capture_stderr: bool = False,
+    check: bool = True,
+    timeout: float | None = None,
+) -> CommandResult:
     with kube_guard():
-        return execute("helm", *args, capture_stdout=capture_stdout)
+        if timeout is not None:
+            return execute(
+                "helm",
+                *args,
+                capture_stdout=capture_stdout,
+                capture_stderr=capture_stderr,
+                check=check,
+                timeout=timeout,
+            )
+        return execute(
+            "helm",
+            *args,
+            capture_stdout=capture_stdout,
+            capture_stderr=capture_stderr,
+            check=check,
+        )

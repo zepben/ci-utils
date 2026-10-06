@@ -3,7 +3,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal, Self, TextIO
+from typing import Annotated, Any, Literal, Self, TextIO
 from urllib.parse import urlsplit
 
 import yaml
@@ -19,6 +19,15 @@ from pydantic import (
 # Path inside kind workers. Argo file:// URLs and repo-server hostPath both assume it.
 LOCAL_REPO_MOUNT_ROOT = "/mnt/local-repos"
 
+DatabaseApp = Literal["eas", "hcs"]
+
+
+@dataclass(frozen=True)
+class HostMount:
+    host_path: Path
+    node_path: str
+    read_only: bool = False
+
 
 @dataclass(frozen=True)
 class LocalRepo:
@@ -31,6 +40,13 @@ class LocalRepo:
     @property
     def container_path(self) -> str:
         return f"{LOCAL_REPO_MOUNT_ROOT}/{self.basename}"
+
+    def to_host_mount(self) -> HostMount:
+        return HostMount(
+            host_path=self.path,
+            node_path=self.container_path,
+            read_only=True,
+        )
 
 
 class OciRepository(BaseModel):
@@ -89,6 +105,7 @@ class LoadDbCredentials(BaseModel):
 
 class ClusterComponent(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    type: Literal["helm"]
     name: str
     chart: str
     version: str
@@ -109,6 +126,7 @@ class ClusterComponent(BaseModel):
 
 class RawManifestComponent(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    type: Literal["raw"]
     name: str
     raw_manifests: list[str] = Field(min_length=1)
     wait_timeout: str = Field(default="60s", min_length=1)
@@ -121,6 +139,50 @@ class RawManifestComponent(BaseModel):
             if url.scheme != "https" or not url.netloc:
                 raise ValueError("raw_manifests must contain only HTTPS URLs")
         return values
+
+
+class CnpgImageCatalog(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    major: int = Field(ge=10)
+    image: str = Field(min_length=1)
+
+
+class CnpgDatabase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    extensions: list[str] = Field(default_factory=list)
+
+
+class CnpgComponent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["cnpg"]
+    name: str = Field(min_length=1)
+    namespace: str = Field(min_length=1)
+    database: str = Field(min_length=1)
+    owner: str = Field(min_length=1)
+    password: str = Field(min_length=1)
+    databases: dict[str, CnpgDatabase] = Field(default_factory=dict)
+    image_catalog: CnpgImageCatalog | None = None
+    spec: dict[str, Any]
+
+    @model_validator(mode="after")
+    def validate_cnpg_spec(self) -> Self:
+        if "bootstrap" in self.spec:
+            raise ValueError("spec.bootstrap is generated from database and owner")
+        if self.database in self.databases:
+            raise ValueError("primary database must not appear in databases")
+        if self.image_catalog and (
+            "imageName" in self.spec or "imageCatalogRef" in self.spec
+        ):
+            raise ValueError(
+                "image_catalog cannot be combined with spec image selection"
+            )
+        return self
+
+
+ClusterComponentItem = Annotated[
+    ClusterComponent | RawManifestComponent | CnpgComponent,
+    Field(discriminator="type"),
+]
 
 
 class ArchiveFormat(StrEnum):
@@ -160,7 +222,7 @@ class RequiredTool(BaseModel):
 class ClusterComponents(BaseModel):
     model_config = ConfigDict(extra="forbid")
     helm_repos: dict[str, str]
-    cluster_components: list[ClusterComponent | RawManifestComponent]
+    cluster_components: list[ClusterComponentItem]
     _source_dir: Path | None = PrivateAttr(default=None)
 
     @property

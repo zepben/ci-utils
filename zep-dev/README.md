@@ -1,74 +1,127 @@
 # Zep Dev
 
-Reusable kubernetes cluster for development and CI. Requires kind installed https://kind.sigs.k8s.io/docs/user/quick-start/.
+`zep-dev` creates named, local Kubernetes development Environments on Kind.
+A Template defines the environment. A Distribution selects application charts.
+Bindings supply machine-local paths and secret sources for the Template’s inputs.
 
-## Required Files
+## Find the right documentation
 
-The tool requires two files:
+- [Create and use an Environment](#create-and-use-an-environment) and the
+  [examples](#templates-and-examples) show how to run the tool.
+- The [configuration and behavior reference](docs/reference.md) defines terms,
+  configuration rules, ownership, and command behavior.
+- The [package architecture](docs/architecture.md) maps modules, dependencies,
+  tests, and common extension points for maintainers.
 
-* kind-cluster.yaml - configures kind. See [example](examples/kind-cluster.yaml).
-* components.yaml - configures dependencies to be installed via helm when creating the kind cluster.
+## Create and use an Environment
 
-### ConfigMaps from files
-
-A component can create ConfigMaps from files before its Helm release is installed:
-
-```yaml
-cluster_components:
-  - name: database
-    chart: example/database
-    version: "1.0.0"
-    namespace: test
-    config_maps_from_file:
-      - name: database-init
-        from_file:
-          init.sql: files/init.sql
-```
-
-Each ConfigMap uses its component namespace. On a reused Kind cluster, ConfigMaps are
-applied again before Helm is skipped. See [`examples/components.yaml`](examples/components.yaml) for an example.
-
-### Waiting for resources and creating EWB load-database credentials
-
-A component can wait for resources created by its Helm chart, then create the
-Secret consumed by EWB's optional load-database configuration. This is useful for creating
-and waiting for databases to be used by EWB/HCS.
+Save this minimal Template as `minimal.yaml`. It creates cluster
+`zep-dev-minimal` and namespace `minimal`, with no Distribution, supporting
+services, or local inputs:
 
 ```yaml
-cluster_components:
-  - name: kind-pg
-    chart: cnpg/cluster
-    version: "0.8.1"
-    namespace: ewb-test
-    wait_for:
-      - resource: cluster/kind-pg
-        for: condition=Ready
-        timeout: 180s
-    load_db_credentials:
-      from_secret: kind-pg-superuser
-      database: app
+metadata:
+  name: minimal
+cluster:
+  kind:
+    kind: Cluster
+    apiVersion: kind.x-k8s.io/v1alpha4
+    nodes:
+      - role: control-plane
 ```
+
+```sh
+zep-dev environment create --template minimal.yaml
+zep-dev environment list
+zep-dev environment kubeconfig minimal
+KUBECONFIG="$(zep-dev environment kubeconfig minimal)" kubectl get nodes
+zep-dev environment destroy minimal
+```
+
+Set `KUBECONFIG` for external clients. Creation refuses an existing cluster
+unless `--allow-reuse` is supplied. See the
+[behavior reference](docs/reference.md) for reuse, failure,
+and destruction rules. Environment creation does not run application integration
+tests.
+
+`environment list` prints the names of live zep-dev Kind clusters, one per line.
+It does not report state directories whose clusters are absent or indicate whether
+creation completed successfully.
+
+## Templates and examples
+
+The integration example creates EWB, EAS, and the web client, plus CNPG and
+an EAS database. Read its documents in this order:
+
+1. [Distribution](examples/integration/distribution.yaml) selects published
+   versions of the three application charts.
+2. [Template](examples/integration/template.yaml) references that Distribution
+   and defines the cluster, supporting services, application values, and required
+   local inputs. Its manifest path is relative to the Template.
+3. [Bindings](examples/bindings.yaml) supplies this machine’s `ewb-data`
+   directory and `deployments` checkout. The same Template can use different
+   paths on another machine.
+
+The example requires registry access, an EWB data directory, and a `deployments`
+checkout containing `eas-kind-runtime-contract`. It reserves host ports 8080
+and 8081. After configuring Bindings as described below, run from the repository
+root:
+
+```sh
+zep-dev environment create --template zep-dev/examples/integration/template.yaml
+zep-dev environment destroy integration
+```
+
+The integration Distribution contains illustrative version selections. Confirm the OCI artifacts
+are available for the configured version before creation; version selection does
+not build them. `zep-dev distribution build --distribution <path>` resolves source
+selections and can dispatch their builds. Creation resolves and installs only
+published artifacts. The EAS/HCS database path requires the matching Kind runtime
+wrapper in the bound deployments checkout. The base runtime-contract modules are
+not interchangeable with those wrappers.
+
+See the [configuration and behavior reference](docs/reference.md) for Template
+relationships, validation rules, and installation behavior.
+
+## Machine-local inputs
+
+Copy [the Bindings example](examples/bindings.yaml) to `.zep-dev/bindings.yaml`,
+or set `ZEP_DEV_BINDINGS` to its path. Set it to a scratch file containing `{}`
+when you need to bypass an outdated machine default. Replace `/home/alice/...`
+with existing absolute local paths. See
+[Resolve local inputs](docs/reference.md#resolve-local-inputs)
+for discovery and validation, [secret sources](docs/reference.md#secret-sources)
+for secret Bindings, and [Argo repository setup](docs/reference.md#argo-repository-setup)
+for consuming a local checkout through Argo.
+
+## Other commands
+
+```sh
+zep-dev images list --environment minimal
+zep-dev images dump --environment minimal --output images.tar
+zep-dev images load --environment minimal --archive images.tar
+zep-dev images pack --helm-dir path/to/helm --output images.tar
+zep-dev secrets create --environment minimal --namespace test --ci-secrets-file secrets.yaml
+zep-dev terraform apply --environment minimal --root path/to/module --namespace test
+zep-dev terraform destroy --environment minimal --root path/to/module --namespace test
+zep-dev chart lint --helm-dir path/to/helm --chart charts/example
+zep-dev tools install
+```
+
+Running-cluster image, Secret, and Terraform commands require `--environment`.
+`images pack`, static chart commands, Distribution build, and tool installation
+do not. Use `zep-dev --help` and the command's `--help` for exact options. The
+standalone `--ci-secrets-file` format is separate from Template secret Bindings.
+
+Application teams own integration tests.
 
 ## Development
 
-The Makefile in the root of the project contains some targets for interacting with the the tool. Simply run:
+From the repository root, using Python 3.14:
 
-```shell
+```sh
 make check-zep-dev test-zep-dev
+git diff --check
 ```
 
-To execute the linters and tests. 
-
-`zep-dev chart lint` and `zep-dev chart test` enforce the chart metadata schema
-and YAML lint policy bundled with `zep-dev`.
-
-To create a local kind cluster, you can run:
-```shell
-make setup-k8s
-```
-
-Be sure to set the env so kubectl and friends operate as expected:
-
-```shell
-export KUBECONFIG=/tmp/kind-k8s-conf.yaml
-```
+The root `make check` also runs staged formatting and can modify files.

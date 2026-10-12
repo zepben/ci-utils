@@ -1,0 +1,127 @@
+# Application/database example. Published application charts and the two Kind runtime
+# wrappers in the bound deployments checkout must be available before creation.
+# CNPG password is disposable development data. Host ports 8080/8081 are exclusive.
+metadata:
+  name: integration
+distribution: distribution.yaml
+cluster:
+  kind:
+    kind: Cluster
+    apiVersion: kind.x-k8s.io/v1alpha4
+    nodes:
+    - role: control-plane
+      extraPortMappings:
+      - containerPort: 30080
+        hostPort: 8080
+        protocol: TCP
+      - containerPort: 30081
+        hostPort: 8081
+        protocol: TCP
+    - role: worker
+      labels:
+        v1.kubernetes.zepben.com/node-class: high-memory
+    - role: worker
+      labels:
+        v1.kubernetes.zepben.com/node-class: general
+  mounts:
+  - slot: ewb-data
+    node_path: /mnt/ewb-data
+services:
+  cnpg:
+    type: helm
+    chart: cloudnative-pg
+    repository: https://cloudnative-pg.github.io/charts
+    version: 0.28.0
+    namespace: cnpg-system
+    values:
+      serviceAccount:
+        create: true
+        name: cloudnative-pg
+  eas-kind-pg:
+    type: cnpg
+    namespace: integration
+    database: eas
+    owner: eas
+    password: eas
+    spec:
+      instances: 1
+      enableSuperuserAccess: false
+      storage:
+        size: 1Gi
+        storageClass: standard
+applications:
+  ewb:
+    values:
+      modelStorage:
+        type: hostPath
+        hostPath: /mnt/ewb-data
+      loadDatabase:
+        enabled: false
+      serviceAccount:
+        create: true
+      resources:
+        cpu: 500m
+        memory: 2Gi
+        limits:
+          cpu: '1'
+          memory: 2Gi
+      ingress:
+        enabled: false
+        hostname: ewb.integration.kind.local
+        letsencryptEnvironment: staging
+      config:
+        geoView:
+          mapboxApiToken: pk.eyJ1IjoiemVwYmVuIiwiYSI6ImNpdXluMXRiOTAwMTcyeWt5aDZtbGV5d20ifQ.oGUqfSPfHD-xR103Y7LetQ
+        ewbData:
+          path: /data
+          timezone: UTC
+          cachePeriod: 0d
+          shouldInferPhases: false
+          previousDaysToSearchForNetwork: 30
+        auth:
+          audience: 00000000-0000-0000-0000-000000000001
+          trustedIssuers:
+          - https://login.microsoftonline.com/00000000-0000-0000-0000-000000000002/v2.0
+  eas:
+    values:
+      deploymentProfile: kindTest
+      testIdentity:
+        username: kind-test
+        email: kind-test@example.invalid
+        roles:
+        - SUPER_ADMIN
+      serviceAccount:
+        create: true
+      ingress:
+        enabled: false
+        hostname: eas.integration.kind.local
+      config:
+        browser:
+          clientId: 00000000-0000-0000-0000-000000000001
+          mapboxToken: pk.eyJ1IjoiemVwYmVuIiwiYSI6ImNpdXluMXRiOTAwMTcyeWt5aDZtbGV5d20ifQ.oGUqfSPfHD-xR103Y7LetQ
+    database:
+      service: eas-kind-pg
+    manifests:
+    - access/eas-nodeport.yaml
+  eas-web-client:
+    values:
+      nodePort:
+        enabled: true
+        port: 30080
+      ingress:
+        enabled: false
+        hostname: integration.kind.local
+        clusterIssuer: letsencrypt-staging
+      config:
+        auth:
+          authType: none
+        eas:
+          host: 127.0.0.1
+          port: 8081
+          protocol: http
+        mapboxToken: pk.eyJ1IjoiemVwYmVuIiwiYSI6ImNpdXluMXRiOTAwMTcyeWt5aDZtbGV5d20ifQ.oGUqfSPfHD-xR103Y7LetQ
+inputs:
+  mounts:
+  - ewb-data
+  repositories:
+  - deployments

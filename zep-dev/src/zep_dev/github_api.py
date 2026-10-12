@@ -2,9 +2,26 @@ import os
 import re
 
 import requests
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 _SHA = re.compile(r"[0-9a-f]{40}\Z")
 _WORKFLOW = "build-commit-container.yaml"
+
+
+class _Repository(BaseModel):
+    model_config = ConfigDict(strict=True)
+    full_name: str
+
+
+class _PullRequestHead(BaseModel):
+    model_config = ConfigDict(strict=True)
+    sha: str
+    repo: _Repository
+
+
+class _PullRequest(BaseModel):
+    model_config = ConfigDict(strict=True)
+    head: _PullRequestHead
 
 
 class GitHubAPI:
@@ -40,16 +57,17 @@ class GitHubAPI:
 
     def pr_head(self, repo_name: str, number: int) -> str:
         response = self.request("GET", f"/repos/zepben/{repo_name}/pulls/{number}")
-        head = response.json()["head"]
-        sha = head["sha"]
-        source = head["repo"]["full_name"]
-        if not isinstance(source, str):
-            raise RuntimeError(f"Invalid source repository for PR #{number}")
+        try:
+            head = _PullRequest.model_validate_json(response.text).head
+        except ValidationError:
+            raise RuntimeError(f"Invalid head response for PR #{number}") from None
+        sha = head.sha
+        source = head.repo.full_name
         if source.lower() != f"zepben/{repo_name}".lower():
             raise ValueError(
                 f"PR #{number} comes from a fork; refusing privileged build"
             )
-        if not isinstance(sha, str) or not _SHA.fullmatch(sha):
+        if not _SHA.fullmatch(sha):
             raise RuntimeError(f"Invalid head SHA for PR #{number}")
         return sha
 

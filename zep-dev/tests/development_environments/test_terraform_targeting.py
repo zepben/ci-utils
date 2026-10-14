@@ -66,7 +66,7 @@ def test_runtime_root_targets_provider_and_preserves_state(
         target, terraform.resolve_runtime_databases(template, None)
     )
     assert state.read_text() == "preserve"
-    assert json.loads((root / "main.tf.json").read_text())["module"] == {}
+    assert "module" not in json.loads((root / "main.tf.json").read_text())
 
 
 def test_standalone_state_and_subprocess_are_environment_scoped(
@@ -214,8 +214,8 @@ def test_runtime_applies_empty_module_set_when_state_remains(
     state.parent.mkdir(parents=True)
     state.write_text("preserve")
     assert terraform.apply_runtime(target, databases) == state
-    assert (
-        json.loads((target.runtime_root / "main.tf.json").read_text())["module"] == {}
+    assert "module" not in json.loads(
+        (target.runtime_root / "main.tf.json").read_text()
     )
     assert (
         len(fake.calls_for("terraform", f"-chdir={target.runtime_root}", "apply")) == 1

@@ -89,7 +89,15 @@ def test_release_identity_controls_install_but_always_waits(
         .on(
             "helm",
             "list",
-            stdout=json.dumps([{"name": "operator", "namespace": installed_namespace}]),
+            stdout=json.dumps(
+                [
+                    {
+                        "name": "operator",
+                        "namespace": installed_namespace,
+                        "status": "deployed",
+                    }
+                ]
+            ),
         )
         .on("helm", "install")
     )
@@ -148,7 +156,9 @@ def test_argo_mounts_and_overlay_come_from_consumed_binding(
         kubernetes, "apply_builtin_storage_classes", lambda *_args: None
     )
     monkeypatch.setattr(
-        helm, "deployed_releases", lambda _target: {("integration", "argo")}
+        helm,
+        "release_statuses",
+        lambda _target: {("integration", "argo"): "deployed"},
     )
     monkeypatch.setattr(helm, "install_service", lambda *_args: None)
     lifecycle.create_environment(write_template(basic_template), allow_reuse=True)
@@ -189,7 +199,7 @@ def service_provisioning(
         "apply_raw_service",
         lambda *_args: events.append("raw"),
     )
-    monkeypatch.setattr(helm, "deployed_releases", lambda _target: set())
+    monkeypatch.setattr(helm, "release_statuses", lambda _target: {})
     monkeypatch.setattr(helm, "install_service", lambda *_args: events.append("helm"))
     monkeypatch.setattr(
         cnpg, "apply_cnpg_service", lambda *_args: events.append("cnpg")
@@ -206,6 +216,23 @@ def test_services_follow_template_order(
     lifecycle.create_environment(template)
 
     assert events == ["raw", "helm", "cnpg"]
+
+
+def test_non_deployed_helm_release_fails_without_install(
+    service_provisioning: tuple[Path, list[str], FakeExecute],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    template, events, _kind_calls = service_provisioning
+    monkeypatch.setattr(
+        helm,
+        "release_statuses",
+        lambda _target: {("integration", "operator"): "failed"},
+    )
+
+    with pytest.raises(ValueError, match="status 'failed'"):
+        lifecycle.create_environment(template)
+
+    assert events == ["raw"]
 
 
 def test_service_failure_stops_provisioning_and_preserves_environment(

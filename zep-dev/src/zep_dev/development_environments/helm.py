@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, TypeAdapter
 
 from zep_dev.development_environments.chart_sources import ChartRef
 from zep_dev.development_environments.distributions import APP_HELM_TIMEOUT
+from zep_dev.development_environments.local_charts import LocalChartRef
 from zep_dev.development_environments.services import HelmService
 from zep_dev.development_environments.target import (
     ExecutionTarget,
@@ -29,6 +30,7 @@ class _Release(BaseModel):
     model_config = ConfigDict(strict=True)
     namespace: str
     name: str
+    status: str
 
 
 _RELEASES: TypeAdapter[list[_Release]] = TypeAdapter(list[_Release])
@@ -57,17 +59,16 @@ def helm(
     )
 
 
-def deployed_releases(target: ExecutionTarget) -> set[tuple[str, str]]:
+def release_statuses(target: ExecutionTarget) -> dict[tuple[str, str], str]:
     result = helm(
         target,
         "list",
         "--all-namespaces",
-        "--deployed",
         "--output=json",
         capture_stdout=True,
     )
     releases = _RELEASES.validate_json(result.stdout)
-    return {(item.namespace, item.name) for item in releases}
+    return {(item.namespace, item.name): item.status for item in releases}
 
 
 def install_service(
@@ -114,8 +115,6 @@ def application_install_args(
         "--install",
         ref.name,
         ref.chart,
-        "--version",
-        ref.version,
         "--namespace",
         target.namespace,
         "--kubeconfig",
@@ -126,6 +125,8 @@ def application_install_args(
         "--rollback-on-failure",
         f"--timeout={APP_HELM_TIMEOUT}",
     ]
+    if not isinstance(ref, LocalChartRef):
+        args.extend(["--version", ref.version])
     if values_path is not None:
         args.extend(["-f", str(values_path)])
     return args

@@ -76,9 +76,9 @@ The integration Distribution contains illustrative version selections. Confirm t
 are available for the configured version before creation; version selection does
 not build them. `zep-dev distribution build --distribution <path>` resolves source
 selections and can dispatch their builds. Creation resolves and installs only
-published artifacts. The EAS/HCS database path requires the matching Kind runtime
-wrapper in the bound deployments checkout. The base runtime-contract modules are
-not interchangeable with those wrappers.
+published artifacts or previously built local charts. The EAS/HCS database path
+requires the matching Kind runtime wrapper in the bound deployments checkout.
+The base runtime-contract modules are not interchangeable with those wrappers.
 
 See the [configuration and behavior reference](docs/reference.md) for Template
 relationships, validation rules, and installation behavior.

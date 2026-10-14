@@ -1,8 +1,8 @@
-"""Resolve Distribution chart selections and ensure they exist in the OCI registry.
+"""Resolve Distribution charts and ensure OCI or local packages are available.
 
 Environment creation uses resolve and check. It does not start a build.
-Build uses resolve and ensure. For source selections, it can start CI and wait.
-GitHub HTTP is in github_api. Git cache and OCI checks are here.
+Build uses resolve and ensure: package local charts, or start CI for missing
+PR/branch/commit charts. Local packaging is in local_charts; GitHub HTTP is in github_api.
 """
 
 import os
@@ -19,14 +19,22 @@ from typing import Literal, assert_never
 from zep_dev.chart_version import calculate_chart_version
 from zep_dev.development_environments.distributions import (
     CHART_OCI_PREFIX,
+    BranchLocator,
     ChartLocator,
     ChartName,
     Charts,
     CommitLocator,
     Distribution,
+    LocalLocator,
     PullRequestLocator,
     VersionLocator,
     ordered_charts,
+)
+from zep_dev.development_environments.local_charts import (
+    LocalChartRef,
+    build_local_chart,
+    check_local_chart,
+    resolve_local_chart,
 )
 from zep_dev.github_api import GitHubAPI
 from zep_dev.infrastructure.serialization import RegistryConfig
@@ -66,13 +74,13 @@ class VersionChartRef(_ChartRef):
 
 @dataclass(frozen=True)
 class SourceChartRef(_ChartRef):
-    source: Literal["pullRequest", "commit"]
+    source: Literal["pullRequest", "branch", "commit"]
     sha: str
     repo_name: str
     repo: Path
 
 
-type ChartRef = VersionChartRef | SourceChartRef
+type ChartRef = VersionChartRef | SourceChartRef | LocalChartRef
 
 
 class GitCache:
@@ -143,6 +151,20 @@ class GitCache:
                 "retry distribution build"
             )
         return sha
+
+    def branch_commit(self, repo: Path, branch: str) -> str:
+        try:
+            validated = self.git("check-ref-format", "--branch", branch, cwd=repo)
+        except subprocess.CalledProcessError:
+            raise ValueError(f"Invalid branch name: {branch!r}") from None
+        if validated != branch:
+            raise ValueError(f"Invalid branch name: {branch!r}")
+        try:
+            return self.commit(repo, f"refs/remotes/origin/{branch}")
+        except subprocess.CalledProcessError:
+            raise ValueError(
+                f"Branch {branch!r} not found in source repository"
+            ) from None
 
     def trusted_commit(self, repo: Path, sha: str) -> str:
         self.git("fetch", "origin", sha, cwd=repo)
@@ -277,6 +299,10 @@ class ChartResolver:
 
     def resolve(self, name: ChartName, locator: ChartLocator) -> ChartRef:
         match locator:
+            case LocalLocator():
+                ref = resolve_local_chart(name)
+                self.report(f"  resolved local {ref.label()} from {ref.repo}")
+                return ref
             case VersionLocator():
                 return VersionChartRef(name=name, version=locator.version)
             case PullRequestLocator():
@@ -286,7 +312,14 @@ class ChartResolver:
                 expected = api.pr_head(repo_name, locator.pullRequest)
                 repo = cache.ensure_repo(name)
                 sha = cache.pr_head_commit(repo, locator.pullRequest, expected)
-                source: Literal["pullRequest", "commit"] = "pullRequest"
+                source: Literal["pullRequest", "branch", "commit"] = "pullRequest"
+            case BranchLocator():
+                cache, api = self.services()
+                repo_name = REPOSITORIES[name]
+                self.report(f"  resolving {name} branch {locator.branch}")
+                repo = cache.ensure_repo(name)
+                sha = cache.branch_commit(repo, locator.branch)
+                source = "branch"
             case CommitLocator():
                 cache, api = self.services()
                 repo_name = REPOSITORIES[name]
@@ -312,7 +345,10 @@ class ChartResolver:
         return [self.resolve(name, locator) for name, locator in ordered_charts(charts)]
 
     def check(self, ref: ChartRef) -> None:
-        """Require the chart in OCI. Do not start a build."""
+        """Require the resolved chart artifact. Do not start a build."""
+        if isinstance(ref, LocalChartRef):
+            check_local_chart(ref)
+            return
         if probe_oci_chart(ref.name, ref.version, progress=self._progress):
             return
         match ref.source:
@@ -322,7 +358,7 @@ class ChartResolver:
                     "Publish this version or change the Distribution selection; "
                     "distribution build cannot build a version: locator."
                 )
-            case "pullRequest" | "commit":
+            case "pullRequest" | "branch" | "commit":
                 raise FileNotFoundError(
                     f"Missing OCI chart for charts.{ref.name}.{ref.source} "
                     f"({ref.version}); run distribution build first"
@@ -335,7 +371,10 @@ class ChartResolver:
             self.check(ref)
 
     def ensure(self, ref: ChartRef) -> None:
-        """Make sure the chart exists. For source selections, start CI if it is missing."""
+        """Build local charts; ensure remote charts, starting CI when needed."""
+        if isinstance(ref, LocalChartRef):
+            build_local_chart(ref, self._progress)
+            return
         if isinstance(ref, VersionChartRef):
             self.check(ref)
             return

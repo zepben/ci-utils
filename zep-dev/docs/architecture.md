@@ -19,6 +19,7 @@ Distribution, Bindings, Environment ownership, and command behavior. The
 | `lifecycle.py` | Preflight, creation, reuse, destruction, listing, and kubeconfig lookup. |
 | `target.py` | Explicit cluster targets, owned paths, private files, and child-process environment. |
 | `chart_sources.py` | Chart resolution, Git cache, OCI checks, and Distribution builds. |
+| `local_charts.py` | Caller checkout resolution, staged chart packaging, and versioned local artifacts. |
 | `kind.py`, `kubernetes.py`, `helm.py`, `terraform.py` | Tool-specific commands and generated resources. |
 | `cnpg.py`, `argo.py`, `supporting.py`, `manifests.py` | Supporting services and application resources. |
 | `images.py`, `secrets.py` | Environment-targeted image and Secret operations. |

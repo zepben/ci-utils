@@ -122,9 +122,10 @@ def test_helm_service_values_layers_and_target(
     [
         "{}",
         "[null]",
-        '[{"namespace": 123, "name": "app"}]',
-        '[{"namespace": "default", "name": false}]',
-        '[{"namespace": "default"}]',
+        '[{"namespace": 123, "name": "app", "status": "deployed"}]',
+        '[{"namespace": "default", "name": false, "status": "deployed"}]',
+        '[{"namespace": "default", "status": "deployed"}]',
+        '[{"namespace": "default", "name": "app"}]',
     ],
     ids=[
         "not-a-list",
@@ -132,12 +133,13 @@ def test_helm_service_values_layers_and_target(
         "invalid-namespace",
         "invalid-name",
         "missing-name",
+        "missing-status",
     ],
 )
-def test_deployed_releases_rejects_invalid_response(
+def test_release_statuses_rejects_invalid_response(
     tmp_path: Path, fake_execute: FakeExecuteFactory, response: str
 ) -> None:
     target = execution_target("integration", environ={"XDG_STATE_HOME": str(tmp_path)})
     fake_execute(helm).on("helm", "list", stdout=response)
     with pytest.raises(ValidationError):
-        helm.deployed_releases(target)
+        helm.release_statuses(target)

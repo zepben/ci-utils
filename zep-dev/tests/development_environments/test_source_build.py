@@ -13,6 +13,7 @@ from tests.support.clock import FakeClock
 from zep_dev.development_environments import chart_sources
 from zep_dev.development_environments.chart_sources import ChartResolver, GitCache
 from zep_dev.development_environments.distributions import (
+    BranchLocator,
     CommitLocator,
     PullRequestLocator,
 )
@@ -34,6 +35,11 @@ class FakeCache(GitCache):
     @override
     def pr_head_commit(self, repo: Path, number: int, expected: str) -> str:
         self.events.append(("pr_head_commit", repo, number, expected))
+        return SHA
+
+    @override
+    def branch_commit(self, repo: Path, branch: str) -> str:
+        self.events.append(("branch_commit", repo, branch))
         return SHA
 
     @override
@@ -84,6 +90,10 @@ def resolver(
     ("locator", "expected"),
     [
         (PullRequestLocator(pullRequest=42), ("pr_head_commit", 42, SHA)),
+        (
+            BranchLocator(branch="feature/integration"),
+            ("branch_commit", "feature/integration"),
+        ),
         (CommitLocator(commit=SHA), ("trusted_commit", SHA)),
     ],
 )
@@ -92,7 +102,7 @@ def test_present_source_chart_preserves_sha_without_dispatch(
     fake_cache: FakeCache,
     fake_api: FakeAPI,
     monkeypatch: pytest.MonkeyPatch,
-    locator: PullRequestLocator | CommitLocator,
+    locator: PullRequestLocator | BranchLocator | CommitLocator,
     expected: tuple[object, ...],
 ) -> None:
     monkeypatch.setattr(chart_sources, "probe_oci_chart", lambda *args, **kw: True)

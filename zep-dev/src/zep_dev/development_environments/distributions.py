@@ -8,6 +8,7 @@ from pydantic import (
     ConfigDict,
     Field,
     PositiveInt,
+    field_validator,
 )
 
 from zep_dev.development_environments.names import NonEmptyStr
@@ -36,17 +37,38 @@ class PullRequestLocator(BaseModel):
     pullRequest: PositiveInt
 
 
+class BranchLocator(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    branch: NonEmptyStr
+
+
 class CommitLocator(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     commit: FullCommitSha
 
 
+class LocalLocator(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    local: Literal[True]
+
+    @field_validator("local", mode="before")
+    @classmethod
+    def require_true(cls, value: object) -> object:
+        if value is not True:
+            raise ValueError("local must be true")
+        return value
+
+
 # Each locator has one field.
 # YAML such as {version: "1.0.0"} is valid.
 # Two keys in one locator are rejected.
 # https://docs.pydantic.dev/latest/concepts/unions/
-type ChartLocator = VersionLocator | PullRequestLocator | CommitLocator
+type ChartLocator = (
+    VersionLocator | PullRequestLocator | BranchLocator | CommitLocator | LocalLocator
+)
 
 type Charts = Annotated[dict[ChartName, ChartLocator], Field(min_length=1)]
 

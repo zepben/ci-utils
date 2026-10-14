@@ -6,7 +6,7 @@ validated identity and conventionally derived operational paths.
 
 import shutil
 import sys
-from collections.abc import Set
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import assert_never
@@ -124,7 +124,7 @@ def preflight(template_path: Path, image_archive: Path | None = None) -> Creatio
 
 def provision_services(plan: CreationPlan) -> None:
     target = plan.target
-    deployed_releases: set[tuple[str, str]] | None = None
+    releases: Mapping[tuple[str, str], str] | None = None
     for name, service in plan.template.services.items():
         match service:
             case CnpgService():
@@ -134,9 +134,9 @@ def provision_services(plan: CreationPlan) -> None:
             case RawService():
                 supporting.apply_raw_service(target, service)
             case HelmService():
-                if deployed_releases is None:
-                    deployed_releases = helm.deployed_releases(target)
-                provision_helm_service(plan, name, service, deployed_releases)
+                if releases is None:
+                    releases = helm.release_statuses(target)
+                provision_helm_service(plan, name, service, releases)
             case _:
                 assert_never(service)
 
@@ -145,14 +145,15 @@ def provision_helm_service(
     plan: CreationPlan,
     name: str,
     service: HelmService,
-    deployed_releases: Set[tuple[str, str]],
+    releases: Mapping[tuple[str, str], str],
 ) -> None:
     target = plan.target
     namespace = service.namespace or target.namespace
     if configs := plan.config_maps[name]:
         kubernetes.ensure_namespace(target, namespace)
         supporting.apply_config_maps(target, namespace, configs)
-    if (namespace, name) not in deployed_releases:
+    status = releases.get((namespace, name))
+    if status is None or status == "uninstalled":
         repositories = (
             [
                 plan.inputs.argo_repositories[key]
@@ -163,6 +164,12 @@ def provision_helm_service(
         )
         helm.install_service(
             target, name, service, argo.repository_overlay(repositories)
+        )
+    elif status != "deployed":
+        raise ValueError(
+            f"Supporting Helm release {name!r} in namespace {namespace!r} has "
+            f"status {status!r} (Environment {target.name!r}). Destroy the "
+            f"Environment or uninstall the release before retrying."
         )
     supporting.wait_for_resources(target, service)
     supporting.apply_load_db_credentials(target, service)

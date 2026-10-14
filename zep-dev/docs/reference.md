@@ -19,7 +19,7 @@ Production deployment and CI job selection have separate owners.
 | --- | --- |
 | **Environment** | A named local instance, including its Kind cluster and operational files. It may be only partly created. |
 | **Environment Template (Template)** | A reusable document describing an Environment's cluster, supporting services, application configuration, and required local inputs. Its `metadata.name` names the Environment. |
-| **Distribution** | A named selection of application charts. A selection uses a published version, a pull request, or a commit. It can be built without creating an Environment. |
+| **Distribution** | A named selection of application charts. A selection uses a published version, a pull request, a branch, a commit, or the caller’s local chart working tree. It can be built without creating an Environment. |
 | **Bindings** | Machine-local references that supply paths, checkouts, or secret sources for inputs declared by a Template. They do not contain application secret values. |
 | **Application** | An EWB, EAS, HCS, or web client chart selected by a Distribution. |
 | **Supporting service** | A facility an application or test needs, such as a database, operator, storage service, or Argo. A Template declares these under `services`. |
@@ -73,18 +73,22 @@ host ports and shared writable inputs can still conflict.
 ## Build a Distribution
 
 A Distribution selects each application chart by published version, pull request,
-or commit. Resolution produces a chart reference. It does not check that the chart
-exists or that selected charts work together.
+branch, commit, or `local: true`. Resolution produces a chart reference. It does
+not check that the chart exists or that selected charts work together.
 
-`zep-dev distribution build` checks the selected charts in the OCI registry. It
-requests a build and waits for publication when a source-selected chart is
-missing. A missing version-selected chart is an error: a version cannot trigger
-a source build. Required resolution, build, and publication failures are errors.
+`zep-dev distribution build` packages local charts and checks remote selections
+in OCI. For missing PR/branch/commit charts, it requests a build and waits for
+publication. A missing version-selected chart is an error: a version cannot
+trigger a source build. Required resolution, build, and publication failures are errors.
 
 Success means the charts were available at that time. It does not certify
-compatibility or prepare supporting services. A pull request can advance between
-build and Environment creation; creation resolves it again and may select a
-chart that is not yet available.
+compatibility or prepare supporting services. A pull request or branch can advance
+between build and Environment creation; creation resolves it again and may select
+a chart that is not yet available.
+
+For `local: true`, run build and creation from the chart's checkout. Build packages
+working-tree chart changes locally; creation requires the saved package for the
+computed version. Rebuild after edits: uncommitted changes share a version.
 
 ## Create an Environment
 
@@ -218,11 +222,12 @@ Repository registration does not create Applications or sync resources.
 does not fully reconcile the cluster with the Template. Editing a Template alone
 does not change an Environment.
 
-A deployed supporting Helm release is identified by namespace and release name.
-Reuse may skip its installation but still runs its configured checks and related
-ConfigMap, load-database, and Argo Secret actions. CNPG and raw services are
-reapplied. Existing application Secrets retain their values; missing Secrets
-use the current bound sources. Application charts use Helm upgrade or install.
+A supporting Helm release is identified by namespace and release name. Reuse
+skips installation when that release is `deployed`. A release in any other
+status is an error. Configured checks and related ConfigMap, load-database, and
+Argo Secret actions still run. CNPG and raw services are reapplied. Existing
+application Secrets retain their values; missing Secrets use the current bound
+sources. Application charts use Helm upgrade or install.
 
 Missing Terraform runtime state does not prove its resources are absent. The
 tool attempts a fresh apply when required and reports failure; it cannot

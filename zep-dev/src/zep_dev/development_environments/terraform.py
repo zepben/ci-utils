@@ -111,8 +111,9 @@ def generate_runtime_root(
                 "sensitive": True,
             },
         },
-        "module": modules,
     }
+    if modules:
+        config["module"] = modules
     variables = {
         "namespace": target.namespace,
         "kubeconfig": str(target.kubeconfig),

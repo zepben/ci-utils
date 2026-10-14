@@ -81,3 +81,26 @@ def test_commit_unreachable_from_default_branch_is_rejected(
     git("-C", str(work), "push", "origin", "HEAD:refs/pull/99/head")
     with pytest.raises(ValueError, match="not reachable"):
         git_cache.GitCache().trusted_commit(repo, untrusted)
+
+
+def test_branch_tracks_remote_head_and_rejects_deleted_branch(
+    repository: tuple[Path, Path],
+) -> None:
+    _remote, work = repository
+    branch = "feature/integration"
+    git("-C", str(work), "push", "origin", f"HEAD:refs/heads/{branch}")
+    cache = git_cache.GitCache()
+    repo = cache.ensure_repo("ewb")
+    assert cache.branch_commit(repo, branch) == git(
+        "-C", str(work), "rev-parse", "HEAD"
+    )
+
+    new = advance(work, "two")
+    git("-C", str(work), "push", "origin", f"HEAD:refs/heads/{branch}")
+    cache.ensure_repo("ewb")
+    assert cache.branch_commit(repo, branch) == new
+
+    git("-C", str(work), "push", "origin", "--delete", branch)
+    cache.ensure_repo("ewb")
+    with pytest.raises(ValueError, match="not found in source repository"):
+        cache.branch_commit(repo, branch)

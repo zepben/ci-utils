@@ -47,37 +47,32 @@ def load_bindings(cwd: Path | None = None, *, required: bool = True) -> Bindings
 
 
 def resolve_inputs(template: EnvironmentTemplate, bindings: Bindings) -> ResolvedInputs:
-    mounts: dict[str, Path] = {}
-    repositories: dict[str, Path] = {}
-    secrets: dict[str, SecretSource] = {}
-    for slot in template.inputs.mounts:
-        path = bindings.mounts.get(slot)
-        if path is None or not path.is_dir():
-            raise ValueError(f"bindings.mounts.{slot} must name an existing directory")
-        mounts[slot] = path.resolve()
-    argo_repositories = {
+    mounts = {
+        slot: resolve_directory(bindings.mounts.get(slot), f"bindings.mounts.{slot}")
+        for slot in template.inputs.mounts
+    }
+    argo_names = {
         name
         for service in template.services.values()
         if isinstance(service, HelmService) and service.integration is not None
         for name in service.integration.repositories
     }
-    required_repositories = argo_repositories.copy()
+    required_repositories = argo_names.copy()
     if any(
         application.database is not None
         for application in template.applications.values()
     ):
         required_repositories.add("deployments")
-    for name in template.inputs.repositories:
-        if name not in required_repositories:
-            continue
-        path = bindings.repositories.get(name)
-        if path is None or not path.is_dir():
-            raise ValueError(
-                f"bindings.repositories.{name} must name an existing directory"
-            )
-        repositories[name] = path.resolve()
-    for name in sorted(argo_repositories):
-        validate_git_checkout(name, repositories[name])
+    repositories = {
+        name: resolve_directory(
+            bindings.repositories.get(name), f"bindings.repositories.{name}"
+        )
+        for name in sorted(required_repositories)
+    }
+    argo_repositories = {name: repositories[name] for name in sorted(argo_names)}
+    for name, path in argo_repositories.items():
+        validate_git_checkout(name, path)
+    secrets: dict[str, SecretSource] = {}
     for key in template.inputs.secrets:
         source = bindings.secrets.get(key)
         if source is None:
@@ -88,10 +83,14 @@ def resolve_inputs(template: EnvironmentTemplate, bindings: Bindings) -> Resolve
         mounts=mounts,
         repositories=repositories,
         secrets=secrets,
-        argo_repositories={
-            name: repositories[name] for name in sorted(argo_repositories)
-        },
+        argo_repositories=argo_repositories,
     )
+
+
+def resolve_directory(path: Path | None, context: str) -> Path:
+    if path is None or not path.is_dir():
+        raise ValueError(f"{context} must name an existing directory")
+    return path.resolve()
 
 
 def validate_git_checkout(name: str, path: Path) -> None:

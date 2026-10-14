@@ -1,18 +1,8 @@
-"""Validate untrusted serialized values before exposing typed data."""
+"""Read container registry authentication configuration."""
 
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
-
-_MAPPING: TypeAdapter[dict[str, object]] = TypeAdapter(dict[str, object])
-
-
-def string_mapping(value: object, context: str) -> dict[str, object]:
-    """Require a mapping with string keys, preserving arbitrary YAML values."""
-    try:
-        return _MAPPING.validate_python(value, strict=True)
-    except ValidationError as exc:
-        raise ValueError(f"{context}: expected a mapping with string keys") from exc
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 
 class RegistryCredential(BaseModel):

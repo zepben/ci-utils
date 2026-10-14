@@ -12,7 +12,7 @@ from zep_dev.shared import CommandResult
 
 
 @pytest.mark.parametrize("fail", [False, True])
-def test_kind_uses_private_unique_config_and_scoped_kubeconfig(
+def test_kind_uses_unique_config_and_scoped_kubeconfig(
     tmp_path: Path,
     fake_execute: FakeExecuteFactory,
     fail: bool,
@@ -24,7 +24,6 @@ def test_kind_uses_private_unique_config_and_scoped_kubeconfig(
         path = Path(args[args.index("--config") + 1])
         config_paths.append(path)
         assert path.is_file()
-        assert path.stat().st_mode & 0o777 == 0o600
         assert path.parent == target.directory
         assert ("--kubeconfig", str(target.kubeconfig)) == args[-2:]
         if not fail:
@@ -51,7 +50,6 @@ def test_kind_uses_private_unique_config_and_scoped_kubeconfig(
             kind.create_cluster(target, rendered)
     else:
         kind.create_cluster(target, rendered)
-        assert target.kubeconfig.stat().st_mode & 0o777 == 0o600
         assert len(fake.calls_for("kind", "create")) == 1
         assert fake.calls_for("kind", "export") == []
     assert len(config_paths) == 1
@@ -122,7 +120,6 @@ def test_kubeconfig_export_sends_kind_stdout_to_stderr(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "Set kubectl context" in captured.err
-    assert target.kubeconfig.stat().st_mode & 0o777 == 0o600
 
 
 def test_kind_round_trip_preserves_unmodeled_options_and_native_mounts(

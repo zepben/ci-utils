@@ -5,7 +5,6 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 from pydantic import TypeAdapter
 
@@ -87,34 +86,6 @@ def execution_target(
 ) -> ExecutionTarget:
     valid_name = environment_name(name)
     return ExecutionTarget(name=valid_name, state_root=state_home(environ))
-
-
-def private_directory(path: Path) -> None:
-    if path.is_symlink():
-        raise ValueError(f"Environment-owned directory is a symlink: {path}")
-    path.mkdir(parents=True, exist_ok=True, mode=0o700)
-    path.chmod(0o700)
-
-
-def private_target_directory(target: ExecutionTarget, path: Path) -> None:
-    """Create each Environment-owned path component with private permissions."""
-    relative = path.relative_to(target.directory)
-    private_directory(target.directory)
-    current = target.directory
-    for part in relative.parts:
-        current = current / part
-        private_directory(current)
-
-
-def private_write(path: Path, content: str) -> None:
-    """Atomically replace generated content, cleaning files on every failure."""
-    private_directory(path.parent)
-    with TemporaryDirectory(prefix=f".{path.name}-", dir=path.parent) as directory:
-        temporary = Path(directory) / path.name
-        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(descriptor, "w", encoding="utf-8") as file:
-            file.write(content)
-        temporary.replace(path)
 
 
 def kubernetes_environment(target: ExecutionTarget) -> dict[str, str]:

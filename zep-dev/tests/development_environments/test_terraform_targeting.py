@@ -57,9 +57,6 @@ def test_runtime_root_targets_provider_and_preserves_state(
         == "postgres-rw.databases.svc.cluster.local"
     )
     assert variables["databases"]["eas"]["password"] == "private-password"
-    assert (root / "terraform.tfvars.json").stat().st_mode & 0o777 == 0o600
-    assert (target.directory / "terraform").stat().st_mode & 0o777 == 0o700
-    assert root.stat().st_mode & 0o777 == 0o700
     assert "private-password" not in (root / "main.tf.json").read_text()
     template.applications["eas"].database = None
     terraform.generate_runtime_root(
@@ -101,8 +98,6 @@ def test_standalone_state_and_subprocess_are_environment_scoped(
     for target in (first, second):
         state = terraform.apply_terraform(target, root, "test")
         assert state == target.standalone_state(root, "test")
-        assert state.parent.stat().st_mode & 0o777 == 0o700
-        assert (target.directory / "terraform").stat().st_mode & 0o777 == 0o700
     assert first.standalone_state(root, "test") != second.standalone_state(root, "test")
     assert seen == [str(first.kubeconfig)] * 2 + [str(second.kubeconfig)] * 2
     assert os.environ["KUBECONFIG"] == "/hostile/default"

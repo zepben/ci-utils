@@ -36,8 +36,8 @@ from zep_dev.development_environments.local_charts import (
     check_local_chart,
     resolve_local_chart,
 )
+from zep_dev.development_environments.registry_config import RegistryConfig
 from zep_dev.github_api import GitHubAPI
-from zep_dev.infrastructure.serialization import RegistryConfig
 from zep_dev.shared import execute, resolve_registry_config
 
 OCI_PROBE_TIMEOUT = 60

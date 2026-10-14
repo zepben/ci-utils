@@ -43,7 +43,6 @@ def test_supporting_only_create_uses_own_target_without_distribution(
         "integration", environ={"XDG_STATE_HOME": str(state_home)}
     )
     assert target.kubeconfig.read_text() == "targeted kubeconfig"
-    assert target.directory.stat().st_mode & 0o777 == 0o700
     assert len(kind_calls.calls_for("kind", "create")) == 1
     assert any(
         "--context=kind-zep-dev-integration" in call.args

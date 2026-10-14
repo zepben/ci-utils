@@ -17,11 +17,12 @@ Distribution, Bindings, Environment ownership, and command behavior. The
 | `distributions.py`, `bindings.py`, `names.py` | Chart selections, machine-local source declarations, and name constraints. |
 | `documents.py`, `local_inputs.py` | Duplicate-safe YAML loading, document-relative paths, and host input resolution. |
 | `lifecycle.py` | Preflight, creation, reuse, destruction, listing, and kubeconfig lookup. |
-| `target.py` | Explicit cluster targets, owned paths, private files, and child-process environment. |
+| `target.py` | Explicit cluster targets, owned paths and child-process environment. |
 | `chart_sources.py` | Chart resolution, Git cache, OCI checks, and Distribution builds. |
 | `local_charts.py` | Caller checkout resolution, staged chart packaging, and versioned local artifacts. |
 | `kind.py`, `kubernetes.py`, `helm.py`, `terraform.py` | Tool-specific commands and generated resources. |
 | `cnpg.py`, `argo.py`, `supporting.py`, `manifests.py` | Supporting services and application resources. |
+| `registry_config.py` | Container registry authentication configuration. |
 | `images.py`, `secrets.py` | Environment-targeted image and Secret operations. |
 | `cli.py` | Arguments, capability invocation, and command output. |
 

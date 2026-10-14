@@ -100,7 +100,7 @@ Before changing a cluster, the tool loads and validates the Template and any
 Distribution. It rejects duplicate YAML keys, unknown schema fields, and invalid
 references. Native Kind configuration, CNPG `spec`, and Helm `values` remain
 free-form mappings. It resolves required local inputs and files, checks mounts
-and manifest namespaces, and checks selected application-chart availability.
+and manifest-file readability, and checks selected application-chart availability.
 Creation uses the chart references resolved in this check; it does not request
 application builds.
 
@@ -115,6 +115,7 @@ readiness checks, then creates required Secrets, provisions application runtime
 resources, applies additional application manifests, and installs selected
 application charts. A namespaced application manifest must omit its namespace
 or use the Environment namespace; its path is relative to the Template.
+`kubectl apply` validates manifest contents and enforces the application namespace.
 
 Success means required provisioning and configured readiness checks completed.
 It does not mean application integration tests ran or passed.

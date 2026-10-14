@@ -16,8 +16,6 @@ from zep_dev.development_environments.services import CnpgService
 from zep_dev.development_environments.target import (
     ExecutionTarget,
     kubernetes_namespace,
-    private_target_directory,
-    private_write,
 )
 from zep_dev.development_environments.templates import EnvironmentTemplate
 from zep_dev.shared import execute
@@ -120,10 +118,12 @@ def generate_runtime_root(
         "context": target.context,
         "databases": inputs,
     }
-    private_target_directory(target, root)
-    private_write(root / "main.tf.json", json.dumps(config, indent=2) + "\n")
-    private_write(
-        root / "terraform.tfvars.json", json.dumps(variables, indent=2) + "\n"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "main.tf.json").write_text(
+        json.dumps(config, indent=2) + "\n", encoding="utf-8"
+    )
+    (root / "terraform.tfvars.json").write_text(
+        json.dumps(variables, indent=2) + "\n", encoding="utf-8"
     )
     return root
 
@@ -160,7 +160,7 @@ def _apply_with_state(
 ) -> Path:
     if state.is_symlink():
         raise ValueError(f"Terraform state is a symlink: {state}")
-    private_target_directory(target, state.parent)
+    state.parent.mkdir(parents=True, exist_ok=True)
     with terraform_environment(target) as env:
         terraform_init(root, env)
         execute(

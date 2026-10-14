@@ -10,6 +10,7 @@ from zep_dev.development_environments.documents import (
     load_template,
     load_yaml,
     read_mapping,
+    string_mapping,
 )
 from zep_dev.development_environments.local_inputs import (
     load_bindings,
@@ -20,7 +21,6 @@ from zep_dev.development_environments.templates import (
     EnvironmentTemplate,
     TemplateInputs,
 )
-from zep_dev.infrastructure.serialization import string_mapping
 
 EXAMPLES = PROJECT_ROOT / "examples"
 
@@ -34,7 +34,7 @@ def documentation_yaml(path: Path, heading: str) -> list[dict[str, object]]:
     ]
 
 
-def test_integration_example_resolves_inputs_and_validates_manifests(
+def test_integration_example_resolves_inputs_and_manifest_paths(
     tmp_path: Path,
     deployments_checkout: Path,
     write_bindings: WriteBindings,
@@ -51,7 +51,7 @@ def test_integration_example_resolves_inputs_and_validates_manifests(
 
     template, distribution = load_template(path)
     inputs = resolve_inputs(template, load_bindings(required=True))
-    manifests = resolve_application_manifests(path, template, template.metadata.name)
+    manifests = resolve_application_manifests(path, template)
 
     assert distribution is not None
     assert set(distribution.charts) == {"ewb", "eas", "eas-web-client"}

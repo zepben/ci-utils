@@ -81,7 +81,7 @@ def preflight(template_path: Path, image_archive: Path | None = None) -> Creatio
         if isinstance(service, HelmService)
     }
     application_manifests = manifests.resolve_application_manifests(
-        template_path, template, target.namespace
+        template_path, template
     )
 
     inputs = local_inputs.load_required_inputs(template)

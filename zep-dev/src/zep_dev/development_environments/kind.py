@@ -1,4 +1,4 @@
-"""Kind cluster operations with private, Environment-specific execution files."""
+"""Kind cluster operations with Environment-specific execution files."""
 
 import json
 import sys
@@ -12,7 +12,6 @@ import yaml
 from zep_dev.development_environments.target import (
     ExecutionTarget,
     kubernetes_environment,
-    private_directory,
 )
 from zep_dev.development_environments.templates import KindConfig, KindMount
 from zep_dev.shared import CommandResult, execute
@@ -86,7 +85,7 @@ def render_kind_config(
 
 
 def create_cluster(target: ExecutionTarget, config: str) -> None:
-    private_directory(target.directory)
+    target.directory.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile(
         mode="w",
         encoding="utf-8",
@@ -107,11 +106,10 @@ def create_cluster(target: ExecutionTarget, config: str) -> None:
             "--kubeconfig",
             str(target.kubeconfig),
         )
-    target.kubeconfig.chmod(0o600)
 
 
 def export_kubeconfig(target: ExecutionTarget) -> None:
-    private_directory(target.directory)
+    target.directory.mkdir(parents=True, exist_ok=True)
     result = kind(
         target,
         "export",
@@ -124,7 +122,6 @@ def export_kubeconfig(target: ExecutionTarget) -> None:
     )
     if result.stdout:
         print(result.stdout, file=sys.stderr, end="")
-    target.kubeconfig.chmod(0o600)
 
 
 def delete_cluster(target: ExecutionTarget) -> None:

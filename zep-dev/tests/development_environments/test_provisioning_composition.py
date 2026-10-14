@@ -24,7 +24,7 @@ from zep_dev.development_environments import (
 from zep_dev.development_environments.target import execution_target
 
 
-def test_manifest_namespace_checks_all_documents_and_lists_before_kind(
+def test_missing_manifest_fails_before_kind(
     write_distribution: WriteDistribution,
     state_home: Path,
     prepare_kind: PrepareKind,
@@ -34,11 +34,6 @@ def test_manifest_namespace_checks_all_documents_and_lists_before_kind(
 ) -> None:
     write_distribution(eas={"version": "1.0.0"})
     manifest = tmp_path / "resources.yaml"
-    manifest.write_text(
-        "apiVersion: v1\nkind: Namespace\nmetadata: {name: integration}\n---\n"
-        "apiVersion: v1\nkind: List\nitems:\n"
-        "- apiVersion: v1\n  kind: ConfigMap\n  metadata: {name: one, namespace: wrong}\n"
-    )
     basic_template.update(
         {
             "distribution": "dist.yaml",
@@ -46,7 +41,7 @@ def test_manifest_namespace_checks_all_documents_and_lists_before_kind(
         }
     )
     calls = prepare_kind()
-    with pytest.raises(ValueError, match="namespace 'wrong'"):
+    with pytest.raises(FileNotFoundError):
         lifecycle.create_environment(write_template(basic_template))
     assert calls.calls == []
     assert not execution_target("integration").directory.exists()

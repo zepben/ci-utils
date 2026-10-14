@@ -9,7 +9,7 @@ from typing import Literal
 
 from zep_dev.chart_version import calculate_chart_version
 from zep_dev.development_environments.distributions import ChartName
-from zep_dev.development_environments.target import private_directory, state_home
+from zep_dev.development_environments.target import state_home
 from zep_dev.models import ChartMetadata
 from zep_dev.shared import execute
 
@@ -65,7 +65,7 @@ def build_local_chart(
     """Always rebuild; dirty edits share HEAD's version. Publish only on success."""
     if progress is not None:
         progress(f"  packaging local {ref.label()} from {ref.repo}")
-    private_directory(ref.package.parent)
+    ref.package.parent.mkdir(parents=True, exist_ok=True)
     # Stage on the destination filesystem so the final replacement is atomic.
     with TemporaryDirectory(prefix=".build-", dir=ref.package.parent) as directory:
         staging = Path(directory)

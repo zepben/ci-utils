@@ -4,13 +4,23 @@ from pathlib import Path
 from typing import TextIO
 
 import yaml
+from pydantic import TypeAdapter, ValidationError
 
 from zep_dev.development_environments.distributions import Distribution
 from zep_dev.development_environments.templates import (
     EnvironmentTemplate,
     validate_distribution,
 )
-from zep_dev.infrastructure.serialization import string_mapping
+
+_MAPPING: TypeAdapter[dict[str, object]] = TypeAdapter(dict[str, object])
+
+
+def string_mapping(value: object, context: str) -> dict[str, object]:
+    """Require a mapping with string keys, preserving arbitrary YAML values."""
+    try:
+        return _MAPPING.validate_python(value, strict=True)
+    except ValidationError as exc:
+        raise ValueError(f"{context}: expected a mapping with string keys") from exc
 
 
 class UniqueKeyLoader(yaml.SafeLoader):

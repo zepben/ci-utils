@@ -11,12 +11,15 @@ from zep_dev.development_environments.kubernetes import (
     kubectl,
     resource_exists,
 )
+from zep_dev.development_environments.registry_config import (
+    RegistryConfig,
+    RegistryCredential,
+)
 from zep_dev.development_environments.services import OciRepository
 from zep_dev.development_environments.target import (
     ExecutionTarget,
     kubernetes_namespace,
 )
-from zep_dev.infrastructure.serialization import RegistryConfig, RegistryCredential
 from zep_dev.models import CiSecrets
 
 IMAGE_SECRET_NAME = "github-registry"

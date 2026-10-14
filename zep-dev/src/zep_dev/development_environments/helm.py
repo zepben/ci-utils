@@ -19,7 +19,6 @@ from zep_dev.development_environments.services import HelmService
 from zep_dev.development_environments.target import (
     ExecutionTarget,
     kubernetes_environment,
-    private_write,
 )
 from zep_dev.shared import CommandResult, execute, resolve
 
@@ -99,7 +98,9 @@ def install_service(
         ):
             if values:
                 path = Path(temporary_directory) / filename
-                private_write(path, yaml.safe_dump(values, default_flow_style=False))
+                path.write_text(
+                    yaml.safe_dump(values, default_flow_style=False), encoding="utf-8"
+                )
                 args.extend(["-f", str(path)])
         helm(target, *args)
 
@@ -166,9 +167,9 @@ def install_applications(
                 values_path: Path | None = None
                 if ref.name in values and values[ref.name]:
                     values_path = temporary / f"{ref.name}-values.yaml"
-                    private_write(
-                        values_path,
+                    values_path.write_text(
                         yaml.safe_dump(values[ref.name], default_flow_style=False),
+                        encoding="utf-8",
                     )
                 process = subprocess.Popen(
                     application_install_args(target, ref, values_path),

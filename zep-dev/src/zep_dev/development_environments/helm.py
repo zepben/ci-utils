@@ -3,6 +3,7 @@
 import os
 import signal
 import subprocess
+import sys
 from collections.abc import Mapping, Sequence
 from contextlib import suppress
 from pathlib import Path
@@ -137,7 +138,6 @@ def application_install_args(
         "--kube-context",
         target.context,
         "--wait",
-        "--rollback-on-failure",
         "--labels",
         f"{ENVIRONMENT_LABEL}={target.name}",
         f"--timeout={APP_HELM_TIMEOUT}",
@@ -204,6 +204,8 @@ def install_applications(
                     except subprocess.TimeoutExpired:
                         continue
                     if process.returncode:
+                        print(stdout, end="", flush=True)
+                        print(stderr, file=sys.stderr, end="", flush=True)
                         raise subprocess.CalledProcessError(
                             process.returncode,
                             process.args,

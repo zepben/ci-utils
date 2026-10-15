@@ -16,6 +16,7 @@ from pydantic import ValidationError
 from zep_dev.development_environments import (
     argo,
     cnpg,
+    diagnostics,
     documents,
     helm,
     kind,
@@ -212,22 +213,37 @@ def create_environment(
             shutil.rmtree(target.directory)
         kind.create_cluster(target, plan.kind_config)
 
-    if image_archive is not None:
-        kind.load_image_archive(target, image_archive)
-    kubernetes.ensure_namespace(target, target.namespace)
-    kubernetes.apply_builtin_storage_classes(target)
-    provision_services(plan)
-    if plan.charts:
-        secrets.create_image_pull_secret(target, target.namespace)
-    for key, secret in plan.template.inputs.secrets.items():
-        secrets.create_bound_secret(target, secret.name, plan.inputs.secrets[key])
-    terraform.apply_runtime(target, plan.runtime_databases)
-    manifests.apply_application_manifests(target, plan.application_manifests)
-    helm.install_applications(
-        target,
-        plan.charts,
-        {name: config.values for name, config in plan.template.applications.items()},
-    )
+    try:
+        if image_archive is not None:
+            kind.load_image_archive(target, image_archive)
+        kubernetes.ensure_namespace(target, target.namespace)
+        kubernetes.apply_builtin_storage_classes(target)
+        provision_services(plan)
+        if plan.charts:
+            secrets.create_image_pull_secret(target, target.namespace)
+        for key, secret in plan.template.inputs.secrets.items():
+            secrets.create_bound_secret(target, secret.name, plan.inputs.secrets[key])
+        terraform.apply_runtime(target, plan.runtime_databases)
+        manifests.apply_application_manifests(target, plan.application_manifests)
+        helm.install_applications(
+            target,
+            plan.charts,
+            {
+                name: config.values
+                for name, config in plan.template.applications.items()
+            },
+        )
+    except Exception:
+        print(
+            f"Environment {target.name} provisioning failed; collecting debug dump",
+            file=sys.stderr,
+            flush=True,
+        )
+        try:
+            diagnostics.take_debug_dump(target)
+        except Exception as error:
+            print(f"Debug dump failed: {error}", file=sys.stderr, flush=True)
+        raise
     return target
 
 

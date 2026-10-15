@@ -8,6 +8,7 @@ import pytest
 
 from tests.support.kind import FakeKind
 from zep_dev.development_environments import (
+    diagnostics,
     helm,
     kind,
     kubernetes,
@@ -65,6 +66,7 @@ def provisioning(monkeypatch: pytest.MonkeyPatch) -> Mock:
     """Record integration effects, retaining their real signatures."""
     effects = Mock()
     for module, name in (
+        (diagnostics, "take_debug_dump"),
         (kubernetes, "ensure_namespace"),
         (kubernetes, "apply_builtin_storage_classes"),
         (helm, "install_applications"),
@@ -170,8 +172,11 @@ def test_provisioning_failure_preserves_partial_environment(
         raise RuntimeError("provisioning failed")
 
     getattr(provisioning, phase).side_effect = fail
+    if phase == "install_applications":
+        provisioning.take_debug_dump.side_effect = RuntimeError("dump failed")
     with pytest.raises(RuntimeError, match="provisioning failed"):
         lifecycle.create_environment(Path("template.yaml"))
+    provisioning.take_debug_dump.assert_called_once_with(target)
     assert target.cluster_name in kind_runtime.clusters
     assert target.kubeconfig.is_file()
     assert state.read_text() == "partial"

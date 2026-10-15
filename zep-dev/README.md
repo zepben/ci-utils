@@ -34,6 +34,7 @@ cluster:
 zep-dev environment create --template minimal.yaml
 zep-dev environment list
 zep-dev environment kubeconfig minimal
+zep-dev environment describe minimal
 KUBECONFIG="$(zep-dev environment kubeconfig minimal)" kubectl get nodes
 zep-dev environment destroy minimal
 ```
@@ -47,6 +48,10 @@ tests.
 `environment list` prints the names of live zep-dev Kind clusters, one per line.
 It does not report state directories whose clusters are absent or indicate whether
 creation completed successfully.
+
+`environment describe <name>` prints JSON with the owned kubeconfig path, context,
+and discovered application namespaces and HTTP endpoints. See the
+[description scope](docs/reference.md#describe-an-environment).
 
 ## Templates and examples
 

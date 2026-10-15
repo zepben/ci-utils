@@ -1,11 +1,12 @@
 """Command-line entry points for development Environments."""
 
+import json
 from pathlib import Path
 
 import click
 
 from zep_dev.charts.images import pack_images
-from zep_dev.development_environments import images, secrets, terraform
+from zep_dev.development_environments import discovery, images, secrets, terraform
 from zep_dev.development_environments.chart_sources import (
     ChartResolver,
     build_distribution,
@@ -60,6 +61,13 @@ def destroy(name: str) -> None:
 @click.argument("name")
 def kubeconfig(name: str) -> None:
     click.echo(str(environment_kubeconfig(name)))
+
+
+@environment.command("describe")
+@click.argument("name")
+def describe(name: str) -> None:
+    description = discovery.describe_environment(require_environment(name))
+    click.echo(json.dumps(description, indent=2))
 
 
 @click.group(help="Resolve and build Distribution application charts")

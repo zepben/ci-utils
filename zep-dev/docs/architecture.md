@@ -24,6 +24,7 @@ Distribution, Bindings, Environment ownership, and command behavior. The
 | `cnpg.py`, `argo.py`, `supporting.py`, `manifests.py` | Supporting services and application resources. |
 | `registry_config.py` | Container registry authentication configuration. |
 | `images.py`, `secrets.py` | Environment-targeted image and Secret operations. |
+| `discovery.py` | Live application connection descriptions. |
 | `cli.py` | Arguments, capability invocation, and command output. |
 
 Generated payload types live with their integration: Kubernetes resource types in

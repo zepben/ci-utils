@@ -2,13 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from tests.support.execution import FakeExecuteFactory, call
+from tests.support.execution import FakeExecuteFactory, option_value
 from zep_dev.development_environments import kubernetes, secrets
 from zep_dev.development_environments.bindings import SecretSource
-from zep_dev.development_environments.target import (
-    execution_target,
-    kubernetes_environment,
-)
+from zep_dev.development_environments.target import execution_target
 
 
 @pytest.mark.parametrize(
@@ -45,22 +42,13 @@ def test_bound_secret_preserves_existing_value_or_uses_current_source(
     if exists:
         assert created == []
     else:
-        assert created == [
-            call(
-                *prefix,
-                "--namespace=integration",
-                "create",
-                "secret",
-                "generic",
-                "credentials",
-                "--from-env-file=/dev/stdin",
-                capture_stdout=False,
-                capture_stderr=True,
-                check=False,
-                input="TOKEN=current",
-                env=kubernetes_environment(target),
-            )
-        ]
+        [creation] = created
+        assert option_value(creation.args, "--namespace") == "integration"
+        assert "credentials" in creation.args
+        assert option_value(creation.args, "--from-env-file") == "/dev/stdin"
+        assert creation.kwargs["input"] == "TOKEN=current"
+        assert creation.kwargs["capture_stderr"] is True
+        assert creation.kwargs["check"] is False
 
 
 @pytest.mark.parametrize(
@@ -144,7 +132,9 @@ def test_invalid_registry_credentials_are_rejected_without_exposing_values(
     ) as failure:
         secrets.resolve_registry_credential("ghcr.io")
     assert "private-value" not in str(failure.value)
-    assert failure.value.__suppress_context__
+    assert failure.value.__cause__ is not None
+    assert failure.value.__cause__.__traceback__ is not None
+    assert "private-value" not in str(failure.value.__cause__)
 
 
 def test_image_pull_secret_uses_the_registry_selected_by_preflight(

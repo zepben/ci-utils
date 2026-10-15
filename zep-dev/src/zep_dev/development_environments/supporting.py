@@ -112,8 +112,8 @@ def apply_load_db_credentials(target: ExecutionTarget, service: HelmService) -> 
     )
     try:
         data = _Secret.model_validate_json(source.stdout).data
-    except ValidationError:
-        raise ValueError("kubectl returned invalid Secret data") from None
+    except ValidationError as error:
+        raise ValueError("kubectl returned invalid Secret data") from error
     config: DatabaseConnection = {
         "host": secret_data(data, "host"),
         "port": int(secret_data(data, "port")),

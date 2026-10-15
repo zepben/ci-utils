@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 from time import monotonic
 
 import yaml
-from pydantic import BaseModel, ConfigDict, TypeAdapter
+from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
 from zep_dev.development_environments.chart_sources import ChartRef
 from zep_dev.development_environments.distributions import APP_HELM_TIMEOUT
@@ -22,6 +22,7 @@ from zep_dev.development_environments.target import (
 )
 from zep_dev.shared import CommandResult, execute, resolve
 
+ENVIRONMENT_LABEL = "zepben.com/environment"
 _HELM_TERMINATION_GRACE_SECONDS = 2.0
 
 
@@ -32,7 +33,20 @@ class _Release(BaseModel):
     status: str
 
 
+class _ListedApplication(_Release):
+    revision: str
+
+
+class ApplicationRelease(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    name: str
+    namespace: str
+    chart: str
+
+
 _RELEASES: TypeAdapter[list[_Release]] = TypeAdapter(list[_Release])
+_LISTED_APPLICATIONS = TypeAdapter(list[_ListedApplication])
 
 
 def helm(
@@ -124,6 +138,8 @@ def application_install_args(
         target.context,
         "--wait",
         "--rollback-on-failure",
+        "--labels",
+        f"{ENVIRONMENT_LABEL}={target.name}",
         f"--timeout={APP_HELM_TIMEOUT}",
     ]
     if not isinstance(ref, LocalChartRef):
@@ -197,3 +213,47 @@ def install_applications(
                     processes.remove(process)
         finally:
             stop_helm_processes(list(processes))
+
+
+def observe_applications(target: ExecutionTarget) -> list[ApplicationRelease]:
+    result = helm(
+        target,
+        "list",
+        "--all-namespaces",
+        "--selector",
+        f"{ENVIRONMENT_LABEL}={target.name}",
+        "--deployed",
+        "--failed",
+        "--pending",
+        "--max=0",
+        "--output=json",
+        capture_stdout=True,
+        timeout=15,
+    )
+    try:
+        releases = _LISTED_APPLICATIONS.validate_json(result.stdout)
+    except ValidationError as error:
+        raise ValueError("Helm returned invalid application releases") from error
+    applications: list[ApplicationRelease] = []
+    for release in releases:
+        result = helm(
+            target,
+            "get",
+            "metadata",
+            release.name,
+            "--namespace",
+            release.namespace,
+            "--revision",
+            release.revision,
+            "--output=json",
+            capture_stdout=True,
+            timeout=15,
+        )
+        try:
+            application = ApplicationRelease.model_validate_json(result.stdout)
+        except ValidationError as error:
+            raise ValueError(
+                f"Helm returned invalid metadata for {release.namespace}/{release.name}"
+            ) from error
+        applications.append(application)
+    return applications

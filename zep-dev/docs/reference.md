@@ -271,6 +271,27 @@ absent cluster valid. Running-cluster image, Secret, and Terraform commands also
 require an explicit Environment target; they do not use the caller's default
 Kubernetes context.
 
+## Describe an Environment
+
+`zep-dev environment describe <name>` prints one JSON document containing `name`,
+`kubernetes: {kubeconfig, context}`, and `applications`, keyed by root chart name.
+Each application has `namespace` and `endpoints`; `http` is the supported endpoint.
+Empty application and endpoint maps are valid. Diagnostics go to stderr; failures
+exit nonzero without a description. The command does not check readiness.
+
+Application installs carry the Helm release label `zepben.com/environment=<name>`.
+Discovery includes marked deployed, failed, and pending releases across namespaces;
+unmarked and supporting releases are excluded. Duplicate application releases fail.
+Earlier installations need a successful application upgrade to receive the label.
+Rollback restores the target revision's labels.
+
+HTTP discovery supports TCP NodePorts named `http`, `externalTrafficPolicy: Cluster`,
+and actual Podman bindings on IPv4 loopback. Services must occupy their release's
+namespace and carry matching application labels and Helm ownership annotations.
+Equivalent URLs collapse; distinct HTTP URLs fail as ambiguous. Unsupported exposure
+is omitted with a diagnostic. The caller must share the runtime host's loopback
+network; remote-runtime address translation is unsupported.
+
 ## List Environments
 
 `zep-dev environment list` prints sorted Environment names for live zep-dev Kind

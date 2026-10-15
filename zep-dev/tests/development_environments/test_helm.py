@@ -55,6 +55,7 @@ def test_parallel_application_processes_receive_their_own_target(
             assert option_value(args, "--kubeconfig") == str(target.kubeconfig)
             assert option_value(args, "--kube-context") == target.context
             assert env["KUBECONFIG"] == str(target.kubeconfig)
+            assert option_value(args, "--labels") == f"{helm.ENVIRONMENT_LABEL}={name}"
     assert os.environ["KUBECONFIG"] == "/hostile/default"
 
 
@@ -113,6 +114,7 @@ def test_helm_service_values_layers_and_target(
     helm.install_service(target, "argo", service, overlay)
     assert layers == [service.values, overlay]
     [install] = calls.calls
+    assert "--labels" not in install.args
     assert option_value(install.args, "--kubeconfig") == str(target.kubeconfig)
     assert option_value(install.args, "--kube-context") == target.context
 

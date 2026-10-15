@@ -155,16 +155,16 @@ class GitCache:
     def branch_commit(self, repo: Path, branch: str) -> str:
         try:
             validated = self.git("check-ref-format", "--branch", branch, cwd=repo)
-        except subprocess.CalledProcessError:
-            raise ValueError(f"Invalid branch name: {branch!r}") from None
+        except subprocess.CalledProcessError as error:
+            raise ValueError(f"Invalid branch name: {branch!r}") from error
         if validated != branch:
             raise ValueError(f"Invalid branch name: {branch!r}")
         try:
             return self.commit(repo, f"refs/remotes/origin/{branch}")
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as error:
             raise ValueError(
                 f"Branch {branch!r} not found in source repository"
-            ) from None
+            ) from error
 
     def trusted_commit(self, repo: Path, sha: str) -> str:
         self.git("fetch", "origin", sha, cwd=repo)

@@ -59,8 +59,8 @@ class GitHubAPI:
         response = self.request("GET", f"/repos/zepben/{repo_name}/pulls/{number}")
         try:
             head = _PullRequest.model_validate_json(response.text).head
-        except ValidationError:
-            raise RuntimeError(f"Invalid head response for PR #{number}") from None
+        except ValidationError as error:
+            raise RuntimeError(f"Invalid head response for PR #{number}") from error
         sha = head.sha
         source = head.repo.full_name
         if source.lower() != f"zepben/{repo_name}".lower():

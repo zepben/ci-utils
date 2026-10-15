@@ -22,7 +22,7 @@ class RegistryConfig(BaseModel):
     def read(cls, path: Path) -> RegistryConfig:
         try:
             return cls.model_validate_json(path.read_text(encoding="utf-8"))
-        except ValidationError:
+        except ValidationError as error:
             raise ValueError(
                 f"{path}: invalid container registry configuration"
-            ) from None
+            ) from error

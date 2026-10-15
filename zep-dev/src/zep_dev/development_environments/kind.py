@@ -4,10 +4,12 @@ import json
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from ipaddress import IPv4Address, ip_address
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import yaml
+from pydantic import BaseModel, ConfigDict, TypeAdapter
 
 from zep_dev.development_environments.target import (
     ExecutionTarget,
@@ -25,13 +27,17 @@ class HostMount:
 
 
 def kind(
-    target: ExecutionTarget, *args: str, capture_stdout: bool = False
+    target: ExecutionTarget,
+    *args: str,
+    capture_stdout: bool = False,
+    timeout: float | None = None,
 ) -> CommandResult:
     return execute(
         "kind",
         *args,
         capture_stdout=capture_stdout,
         env=kubernetes_environment(target),
+        timeout=timeout,
     )
 
 
@@ -186,3 +192,75 @@ def load_image_archive(target: ExecutionTarget, archive: Path) -> None:
     if not archive.is_file() or archive.stat().st_size == 0:
         raise ValueError(f"image archive is missing or empty: {archive}")
     kind(target, "load", "image-archive", str(archive), "--name", target.cluster_name)
+
+
+@dataclass(frozen=True)
+class PublishedPort:
+    node: str
+    node_port: int
+    host_ip: str
+    host_port: int
+
+
+class _PortBinding(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    HostIp: str
+    HostPort: str
+
+
+_PORT_BINDINGS = TypeAdapter(dict[str, list[_PortBinding] | None])
+
+
+def observe_published_ports(target: ExecutionTarget) -> list[PublishedPort]:
+    nodes = kind(
+        target,
+        "get",
+        "nodes",
+        "--name",
+        target.cluster_name,
+        capture_stdout=True,
+        timeout=15,
+    ).stdout.splitlines()
+    if not nodes:
+        raise ValueError(f"Kind returned no nodes for {target.cluster_name}")
+    ports: list[PublishedPort] = []
+    for node in nodes:
+        result = execute(
+            "podman",
+            "inspect",
+            node,
+            "--format",
+            "{{json .NetworkSettings.Ports}}",
+            skip_resolve=True,
+            capture_stdout=True,
+            timeout=15,
+        )
+        try:
+            bindings = _PORT_BINDINGS.validate_json(result.stdout)
+            for key, addresses in bindings.items():
+                port, protocol = key.split("/")
+                if protocol != "tcp":
+                    continue
+                node_port = int(port)
+                for address in addresses or []:
+                    host_ip = ip_address(address.HostIp)
+                    if isinstance(host_ip, IPv4Address) and host_ip.is_loopback:
+                        ports.append(
+                            PublishedPort(
+                                node,
+                                node_port,
+                                str(host_ip),
+                                int(address.HostPort),
+                            )
+                        )
+                    else:
+                        print(
+                            f"Ignoring unsupported binding on {node}: {key} -> {address.HostIp}:{address.HostPort}",
+                            file=sys.stderr,
+                        )
+        except ValueError as error:
+            raise ValueError(
+                f"Podman returned invalid port mappings for {node}"
+            ) from error
+    return ports

@@ -1,0 +1,8 @@
+# Copy to .zep-dev/bindings.yaml or set ZEP_DEV_BINDINGS to its path.
+# Replace these absolute paths with existing machine-local directories.
+# The deployments checkout must contain the EAS/HCS Kind runtime wrappers
+# when used with integration/template.yaml.
+mounts:
+  ewb-data: /home/alice/data/network
+repositories:
+  deployments: /home/alice/git/deployments

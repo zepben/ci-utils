@@ -14,7 +14,7 @@ format-zep-dev: $(VENV)
 check-zep-dev: $(VENV)
 	$(BIN)/ruff format --check $(ZEP_DEV)
 	$(BIN)/ruff check $(ZEP_DEV)
-	$(BIN)/mypy .
+	cd $(ZEP_DEV) && ../$(BIN)/mypy --config-file pyproject.toml src tests
 
 test-zep-dev: $(VENV)
 	cd $(ZEP_DEV) && ../$(BIN)/pytest

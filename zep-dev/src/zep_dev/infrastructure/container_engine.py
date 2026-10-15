@@ -1,5 +1,6 @@
 """Choose an available host container engine."""
 
+import os
 from collections.abc import Sequence
 from pathlib import Path
 from subprocess import CalledProcessError
@@ -8,6 +9,14 @@ from zep_dev.shared import execute
 
 
 def choose_engine() -> str:
+    provider = os.environ.get("KIND_EXPERIMENTAL_PROVIDER")
+    if provider:
+        if provider not in {"podman", "docker"}:
+            raise ValueError(
+                f"Unsupported KIND_EXPERIMENTAL_PROVIDER={provider!r}; "
+                "expected podman or docker"
+            )
+        return provider
     for engine in ("podman", "docker"):
         try:
             execute(

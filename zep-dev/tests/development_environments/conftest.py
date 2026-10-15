@@ -27,6 +27,11 @@ from zep_dev.development_environments import (
 )
 
 
+@pytest.fixture(autouse=True)
+def container_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KIND_EXPERIMENTAL_PROVIDER", "podman")
+
+
 @pytest.fixture
 def write_template(tmp_path: Path) -> Callable[[dict[str, Any]], Path]:
     def write(body: dict[str, Any]) -> Path:

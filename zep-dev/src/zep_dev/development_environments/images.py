@@ -72,6 +72,7 @@ def list_images(
         "nodes",
         "--name",
         target.cluster_name,
+        engine=engine,
         capture_stdout=True,
     ).stdout.splitlines()
     refs: set[str] = set()

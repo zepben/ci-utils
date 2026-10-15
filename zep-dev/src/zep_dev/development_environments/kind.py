@@ -1,6 +1,7 @@
 """Kind cluster operations with Environment-specific execution files."""
 
 import json
+import os
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from zep_dev.development_environments.target import (
     kubernetes_environment,
 )
 from zep_dev.development_environments.templates import KindConfig, KindMount
+from zep_dev.infrastructure.container_engine import choose_engine
 from zep_dev.shared import CommandResult, execute
 
 
@@ -29,14 +31,17 @@ class HostMount:
 def kind(
     target: ExecutionTarget,
     *args: str,
+    engine: str | None = None,
     capture_stdout: bool = False,
     timeout: float | None = None,
 ) -> CommandResult:
+    child_env = kubernetes_environment(target)
+    child_env["KIND_EXPERIMENTAL_PROVIDER"] = engine or choose_engine()
     return execute(
         "kind",
         *args,
         capture_stdout=capture_stdout,
-        env=kubernetes_environment(target),
+        env=child_env,
         timeout=timeout,
     )
 
@@ -48,7 +53,14 @@ def cluster_exists(target: ExecutionTarget) -> bool:
 
 def list_clusters() -> list[str]:
     """Return cluster names reported by the local Kind provider."""
-    result = execute("kind", "get", "clusters", "--quiet", capture_stdout=True)
+    result = execute(
+        "kind",
+        "get",
+        "clusters",
+        "--quiet",
+        capture_stdout=True,
+        env={**os.environ, "KIND_EXPERIMENTAL_PROVIDER": choose_engine()},
+    )
     return result.stdout.splitlines()
 
 
@@ -134,9 +146,12 @@ def delete_cluster(target: ExecutionTarget) -> None:
     kind(target, "delete", "cluster", "--name", target.cluster_name)
 
 
-def inspect_bind_mounts(worker: str) -> set[tuple[str, str, bool]]:
+def inspect_bind_mounts(
+    worker: str, *, engine: str | None = None
+) -> set[tuple[str, str, bool]]:
+    engine = engine or choose_engine()
     result = execute(
-        "podman",
+        engine,
         "inspect",
         worker,
         "--format",
@@ -146,7 +161,7 @@ def inspect_bind_mounts(worker: str) -> set[tuple[str, str, bool]]:
     )
     mounts: object = json.loads(result.stdout)
     if not isinstance(mounts, list):
-        raise RuntimeError(f"podman inspect returned invalid mounts for {worker}")
+        raise RuntimeError(f"{engine} inspect returned invalid mounts for {worker}")
     bind_mounts: set[tuple[str, str, bool]] = set()
     for mount in mounts:
         if not isinstance(mount, dict) or mount.get("Type") != "bind":
@@ -156,10 +171,10 @@ def inspect_bind_mounts(worker: str) -> set[tuple[str, str, bool]]:
         writable = mount.get("RW")
         if not isinstance(source, str) or not isinstance(destination, str):
             raise RuntimeError(
-                f"podman inspect returned invalid bind mount for {worker}"
+                f"{engine} inspect returned invalid bind mount for {worker}"
             )
         if not isinstance(writable, bool):
-            raise RuntimeError(f"podman inspect omitted bind mount mode for {worker}")
+            raise RuntimeError(f"{engine} inspect omitted bind mount mode for {worker}")
         bind_mounts.add((str(Path(source).resolve()), destination, not writable))
     return bind_mounts
 
@@ -167,12 +182,14 @@ def inspect_bind_mounts(worker: str) -> set[tuple[str, str, bool]]:
 def validate_existing_worker_mounts(
     target: ExecutionTarget, mounts: Sequence[HostMount]
 ) -> None:
+    engine = choose_engine()
     nodes = kind(
         target,
         "get",
         "nodes",
         "--name",
         target.cluster_name,
+        engine=engine,
         capture_stdout=True,
     ).stdout.splitlines()
     workers = [node for node in nodes if not node.endswith("-control-plane")]
@@ -182,7 +199,9 @@ def validate_existing_worker_mounts(
     destinations = {node_path for _, node_path, _ in expected}
     for worker in workers:
         actual = {
-            pair for pair in inspect_bind_mounts(worker) if pair[1] in destinations
+            pair
+            for pair in inspect_bind_mounts(worker, engine=engine)
+            if pair[1] in destinations
         }
         if actual != expected:
             raise RuntimeError(f"worker {worker} mounts differ from requested mounts")
@@ -213,12 +232,14 @@ _PORT_BINDINGS = TypeAdapter(dict[str, list[_PortBinding] | None])
 
 
 def observe_published_ports(target: ExecutionTarget) -> list[PublishedPort]:
+    engine = choose_engine()
     nodes = kind(
         target,
         "get",
         "nodes",
         "--name",
         target.cluster_name,
+        engine=engine,
         capture_stdout=True,
         timeout=15,
     ).stdout.splitlines()
@@ -227,7 +248,7 @@ def observe_published_ports(target: ExecutionTarget) -> list[PublishedPort]:
     ports: list[PublishedPort] = []
     for node in nodes:
         result = execute(
-            "podman",
+            engine,
             "inspect",
             node,
             "--format",
@@ -261,6 +282,6 @@ def observe_published_ports(target: ExecutionTarget) -> list[PublishedPort]:
                         )
         except ValueError as error:
             raise ValueError(
-                f"Podman returned invalid port mappings for {node}"
+                f"{engine} returned invalid port mappings for {node}"
             ) from error
     return ports

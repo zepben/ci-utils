@@ -91,7 +91,9 @@ def test_reuse_rejects_wrong_worker_mount_mode(
     monkeypatch.setattr(
         kind,
         "inspect_bind_mounts",
-        lambda _worker: {(str(mount.host_path.resolve()), mount.node_path, False)},
+        lambda _worker, **_kwargs: {
+            (str(mount.host_path.resolve()), mount.node_path, False)
+        },
     )
     with pytest.raises(RuntimeError, match="mounts differ"):
         kind.validate_existing_worker_mounts(target, [mount])

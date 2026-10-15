@@ -37,7 +37,15 @@ def load_bindings(cwd: Path | None = None, *, required: bool = True) -> Bindings
     candidates = bindings_candidates(cwd)
     for path in candidates:
         if path.is_file():
-            return Bindings.model_validate(read_mapping(path))
+            bindings = Bindings.model_validate(read_mapping(path))
+            base = path.absolute().parent
+            for paths in (bindings.mounts, bindings.repositories):
+                for name, value in paths.items():
+                    paths[name] = base / value
+            for source in bindings.secrets.values():
+                if source.file is not None:
+                    source.file = base / source.file
+            return bindings
         if path.exists():
             raise ValueError(f"Bindings path is not a file: {path}")
     if not required:

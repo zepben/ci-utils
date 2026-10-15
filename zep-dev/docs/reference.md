@@ -35,8 +35,10 @@ resources only and `applications` must be empty. With a Distribution, every
 `applications` entry must name a selected chart. A selected chart need not have
 an `applications` entry; another service can install it later.
 
-An `applications.<name>.database.service` reference must name a CNPG supporting
-service. Database configuration is supported for EAS and HCS and requires a
+Each `applications.<name>.databases.<connection>` reference must specify a CNPG
+`service` and an explicit `database` declared by that service. Named connections
+are passed as a sensitive `databases` map to the application’s Kind Terraform
+wrapper. Database configuration is supported for EAS and HCS and requires a
 declared `deployments` repository input. Application resources use the Environment
 namespace even when the CNPG service uses another namespace.
 

@@ -44,7 +44,9 @@ def test_distribution_is_template_relative_and_cross_namespace_cnpg_is_valid(
             },
             "applications": {
                 "eas": {
-                    "database": {"service": "eas-postgres"},
+                    "databases": {
+                        "primary": {"service": "eas-postgres", "database": "eas"}
+                    },
                     "values": {"deploymentProfile": "kindTest"},
                 }
             },
@@ -56,7 +58,7 @@ def test_distribution_is_template_relative_and_cross_namespace_cnpg_is_valid(
     template, distribution = load_template(path)
     assert distribution is not None
     assert list(distribution.charts) == ["eas"]
-    assert template.applications["eas"].database is not None
+    assert "primary" in template.applications["eas"].databases
 
 
 @pytest.mark.parametrize("source", ["123: value\n", "true: value\n"])

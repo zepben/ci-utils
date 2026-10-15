@@ -1,5 +1,5 @@
-# Application/database example. Published application charts and the two Kind runtime
-# wrappers in the bound deployments checkout must be available before creation.
+# Application/database example. Published application charts and the EAS Kind runtime
+# wrapper in the bound deployments checkout must be available before creation.
 # CNPG password is disposable development data. Host ports 8080/8081 are exclusive.
 metadata:
   name: integration
@@ -43,6 +43,8 @@ services:
     database: eas
     owner: eas
     password: eas
+    databases:
+      input: {}
     spec:
       instances: 1
       enableSuperuserAccess: false
@@ -99,8 +101,13 @@ applications:
         browser:
           clientId: 00000000-0000-0000-0000-000000000001
           mapboxToken: pk.eyJ1IjoiemVwYmVuIiwiYSI6ImNpdXluMXRiOTAwMTcyeWt5aDZtbGV5d20ifQ.oGUqfSPfHD-xR103Y7LetQ
-    database:
-      service: eas-kind-pg
+    databases:
+      primary:
+        service: eas-kind-pg
+        database: eas
+      opendss_input:
+        service: eas-kind-pg
+        database: input
     manifests:
     - access/eas-nodeport.yaml
   eas-web-client:

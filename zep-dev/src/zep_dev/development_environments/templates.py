@@ -85,13 +85,14 @@ class DatabaseReference(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     service: KubernetesName
+    database: NonEmptyStr
 
 
 class ApplicationConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     values: dict[str, object] = Field(default_factory=dict)
-    database: DatabaseReference | None = None
+    databases: dict[NonEmptyStr, DatabaseReference] = Field(default_factory=dict)
     manifests: list[NonEmptyStr] = Field(default_factory=list)
 
 
@@ -173,18 +174,27 @@ class EnvironmentTemplate(BaseModel):
 
     def validate_database_references(self) -> None:
         for app, config in self.applications.items():
-            if config.database is None:
+            if not config.databases:
                 continue
-            service_name = config.database.service
             if app not in {"eas", "hcs"}:
-                raise ValueError(f"applications.{app}.database is unsupported")
-            if not isinstance(self.services.get(service_name), CnpgService):
-                raise ValueError(
-                    f"applications.{app}.database.service must name a CNPG service: {service_name}"
-                )
+                raise ValueError(f"applications.{app}.databases is unsupported")
+            for name, reference in config.databases.items():
+                path = f"applications.{app}.databases.{name}"
+                service = self.services.get(reference.service)
+                if not isinstance(service, CnpgService):
+                    raise ValueError(
+                        f"{path}.service must name a CNPG service: {reference.service}"
+                    )
+                if (
+                    reference.database != service.database
+                    and reference.database not in service.databases
+                ):
+                    raise ValueError(
+                        f"{path}.database is not declared by service {reference.service}: {reference.database}"
+                    )
             if "deployments" not in self.inputs.repositories:
                 raise ValueError(
-                    f"applications.{app}.database requires inputs.repositories.deployments"
+                    f"applications.{app}.databases requires inputs.repositories.deployments"
                 )
 
 

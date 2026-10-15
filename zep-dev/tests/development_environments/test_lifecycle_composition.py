@@ -200,7 +200,11 @@ def test_reuse_without_runtime_state_still_attempts_database_apply(
                     "spec": {},
                 }
             },
-            "applications": {"eas": {"database": {"service": "database"}}},
+            "applications": {
+                "eas": {
+                    "databases": {"primary": {"service": "database", "database": "eas"}}
+                }
+            },
         }
     )
     repo = deployments_checkout
@@ -214,12 +218,12 @@ def test_reuse_without_runtime_state_still_attempts_database_apply(
     attempted: list[Path] = []
 
     def apply_runtime(
-        target: object, databases: tuple[terraform.RuntimeDatabase, ...]
+        target: object, applications: tuple[terraform.RuntimeApplication, ...]
     ) -> None:
-        [database] = databases
-        assert database.application == "eas"
+        [application] = applications
+        assert application.application == "eas"
         assert (
-            database.module
+            application.module
             == repo / "terraform/modules/kubernetes/eas-kind-runtime-contract"
         )
         assert target == execution_target("integration")

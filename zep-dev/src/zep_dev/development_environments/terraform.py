@@ -24,14 +24,13 @@ from zep_dev.shared import execute
 class RuntimeModule(TypedDict):
     source: str
     namespace: str
-    database: str
+    databases: str
 
 
 @dataclass(frozen=True)
-class RuntimeDatabase:
+class RuntimeApplication:
     application: ChartName
-    service_name: str
-    service: CnpgService
+    databases: dict[str, DatabaseConnection]
     module: Path
 
 
@@ -39,17 +38,15 @@ def runtime_state(target: ExecutionTarget) -> Path:
     return target.runtime_root / "terraform.tfstate"
 
 
-def resolve_runtime_databases(
-    template: EnvironmentTemplate, deployments_checkout: Path | None
-) -> tuple[RuntimeDatabase, ...]:
-    databases: list[RuntimeDatabase] = []
+def resolve_runtime_applications(
+    target: ExecutionTarget,
+    template: EnvironmentTemplate,
+    deployments_checkout: Path | None,
+) -> tuple[RuntimeApplication, ...]:
+    applications: list[RuntimeApplication] = []
     for app, application in template.applications.items():
-        if application.database is None:
+        if not application.databases:
             continue
-        service_name = application.database.service
-        service = template.services[service_name]
-        if not isinstance(service, CnpgService):
-            raise ValueError(f"database service {service_name} is not CNPG")
         if deployments_checkout is None:
             raise ValueError("deployments repository is required for runtime databases")
         module = (
@@ -58,35 +55,40 @@ def resolve_runtime_databases(
         ).resolve()
         if not module.is_dir():
             raise FileNotFoundError(f"runtime wrapper for {app} not found: {module}")
-        databases.append(RuntimeDatabase(app, service_name, service, module))
-    return tuple(databases)
+        databases: dict[str, DatabaseConnection] = {}
+        for name, reference in application.databases.items():
+            service = template.services[reference.service]
+            if not isinstance(service, CnpgService):
+                raise ValueError(f"database service {reference.service} is not CNPG")
+            namespace = service.namespace or target.namespace
+            databases[name] = {
+                "host": f"{reference.service}-rw.{namespace}.svc.cluster.local",
+                "port": 5432,
+                "name": reference.database,
+                "username": service.owner,
+                "password": service.password,
+            }
+        applications.append(RuntimeApplication(app, databases, module))
+    return tuple(applications)
 
 
 def generate_runtime_root(
     target: ExecutionTarget,
-    databases: Sequence[RuntimeDatabase],
+    applications: Sequence[RuntimeApplication],
 ) -> Path:
     """Regenerate configuration, never deleting an existing runtime state file."""
     root = target.runtime_root
     modules: dict[str, RuntimeModule] = {}
-    inputs: dict[ChartName, DatabaseConnection] = {}
-    for database in databases:
-        app = database.application
-        service = database.service
-        source = os.path.relpath(database.module, start=root)
+    inputs: dict[ChartName, dict[str, DatabaseConnection]] = {}
+    for application in applications:
+        app = application.application
+        source = os.path.relpath(application.module, start=root)
         modules[f"{app}_runtime_contract"] = {
             "source": source if source.startswith(".") else f"./{source}",
             "namespace": "${var.namespace}",
-            "database": f"${{var.databases.{app}}}",
+            "databases": f"${{var.databases.{app}}}",
         }
-        namespace = service.namespace or target.namespace
-        inputs[app] = {
-            "host": f"{database.service_name}-rw.{namespace}.svc.cluster.local",
-            "port": 5432,
-            "name": service.database,
-            "username": service.owner,
-            "password": service.password,
-        }
+        inputs[app] = application.databases
     config = {
         "terraform": {
             "required_version": ">= 1.10.0",
@@ -105,7 +107,7 @@ def generate_runtime_root(
             "kubeconfig": {"type": "string"},
             "context": {"type": "string"},
             "databases": {
-                "type": "map(object({host=string, port=number, name=string, username=string, password=string}))",
+                "type": "map(map(object({host=string, port=number, name=string, username=string, password=string})))",
                 "sensitive": True,
             },
         },
@@ -213,9 +215,9 @@ def destroy_terraform(target: ExecutionTarget, root: Path, namespace: str) -> No
 
 def apply_runtime(
     target: ExecutionTarget,
-    databases: Sequence[RuntimeDatabase],
+    applications: Sequence[RuntimeApplication],
 ) -> Path | None:
-    if not databases and not runtime_state(target).is_file():
+    if not applications and not runtime_state(target).is_file():
         return None
-    root = generate_runtime_root(target, databases)
+    root = generate_runtime_root(target, applications)
     return _apply_with_state(target, root, target.namespace, runtime_state(target))

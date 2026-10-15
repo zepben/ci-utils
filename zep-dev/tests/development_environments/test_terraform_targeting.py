@@ -23,9 +23,24 @@ def database_template(basic_template: dict[str, Any]) -> EnvironmentTemplate:
                 "owner": "eas",
                 "password": "private-password",
                 "spec": {"instances": 1},
+            },
+            "hcs-postgres": {
+                "type": "cnpg",
+                "database": "hcs",
+                "databases": {"input": {}},
+                "owner": "hcs",
+                "password": "input-password",
+                "spec": {"instances": 1},
+            },
+        },
+        applications={
+            "eas": {
+                "databases": {
+                    "primary": {"service": "postgres", "database": "eas"},
+                    "opendss_input": {"service": "hcs-postgres", "database": "input"},
+                }
             }
         },
-        applications={"eas": {"database": {"service": "postgres"}}},
         inputs={"repositories": ["deployments"]},
     )
     return EnvironmentTemplate.model_validate(basic_template)
@@ -39,8 +54,8 @@ def test_runtime_root_targets_provider_and_preserves_state(
     deployments = tmp_path / "deployments"
     module = deployments / "terraform/modules/kubernetes/eas-kind-runtime-contract"
     module.mkdir(parents=True)
-    databases = terraform.resolve_runtime_databases(template, deployments)
-    root = terraform.generate_runtime_root(target, databases)
+    applications = terraform.resolve_runtime_applications(target, template, deployments)
+    root = terraform.generate_runtime_root(target, applications)
     state = root / "terraform.tfstate"
     state.write_text("preserve")
     assert root == target.directory / "terraform/runtime"
@@ -53,14 +68,26 @@ def test_runtime_root_targets_provider_and_preserves_state(
     assert variables["context"] == target.context
     assert variables["namespace"] == target.namespace
     assert (
-        variables["databases"]["eas"]["host"]
+        variables["databases"]["eas"]["primary"]["host"]
         == "postgres-rw.databases.svc.cluster.local"
     )
-    assert variables["databases"]["eas"]["password"] == "private-password"
+    assert variables["databases"]["eas"]["primary"]["password"] == "private-password"
+    assert variables["databases"]["eas"]["opendss_input"] == {
+        "host": "hcs-postgres-rw.integration.svc.cluster.local",
+        "port": 5432,
+        "name": "input",
+        "username": "hcs",
+        "password": "input-password",
+    }
+    assert (
+        config["module"]["eas_runtime_contract"]["databases"] == "${var.databases.eas}"
+    )
+    assert config["variable"]["databases"]["sensitive"] is True
     assert "private-password" not in (root / "main.tf.json").read_text()
-    template.applications["eas"].database = None
+    assert "input-password" not in (root / "main.tf.json").read_text()
+    template.applications["eas"].databases.clear()
     terraform.generate_runtime_root(
-        target, terraform.resolve_runtime_databases(template, None)
+        target, terraform.resolve_runtime_applications(target, template, None)
     )
     assert state.read_text() == "preserve"
     assert "module" not in json.loads((root / "main.tf.json").read_text())
@@ -153,13 +180,14 @@ def test_destroy_failure_preserves_state(
 def test_database_repository_requires_native_wrapper(
     basic_template: dict[str, Any], tmp_path: Path
 ) -> None:
+    target = execution_target("integration", environ={"XDG_STATE_HOME": str(tmp_path)})
     template = database_template(basic_template)
     with pytest.raises(FileNotFoundError, match="eas-kind-runtime-contract"):
-        terraform.resolve_runtime_databases(template, tmp_path)
+        terraform.resolve_runtime_applications(target, template, tmp_path)
     wrapper = tmp_path / "terraform/modules/kubernetes/eas-kind-runtime-contract"
     wrapper.mkdir(parents=True)
-    [database] = terraform.resolve_runtime_databases(template, tmp_path)
-    assert database.module == wrapper
+    [application] = terraform.resolve_runtime_applications(target, template, tmp_path)
+    assert application.module == wrapper
 
 
 def test_runtime_preflight_does_not_create_files_for_missing_wrapper(
@@ -168,7 +196,9 @@ def test_runtime_preflight_does_not_create_files_for_missing_wrapper(
     target = execution_target("integration", environ={"XDG_STATE_HOME": str(tmp_path)})
     template = database_template(basic_template)
     with pytest.raises(FileNotFoundError, match="runtime wrapper"):
-        terraform.resolve_runtime_databases(template, tmp_path / "deployments")
+        terraform.resolve_runtime_applications(
+            target, template, tmp_path / "deployments"
+        )
     assert not target.directory.exists()
 
 
@@ -202,13 +232,13 @@ def test_runtime_applies_empty_module_set_when_state_remains(
         .on("terraform", f"-chdir={target.runtime_root}", "init")
         .on("terraform", f"-chdir={target.runtime_root}", "apply")
     )
-    databases = terraform.resolve_runtime_databases(template, None)
-    assert terraform.apply_runtime(target, databases) is None
+    applications = terraform.resolve_runtime_applications(target, template, None)
+    assert terraform.apply_runtime(target, applications) is None
     assert fake.calls == []
     state = terraform.runtime_state(target)
     state.parent.mkdir(parents=True)
     state.write_text("preserve")
-    assert terraform.apply_runtime(target, databases) == state
+    assert terraform.apply_runtime(target, applications) == state
     assert "module" not in json.loads(
         (target.runtime_root / "main.tf.json").read_text()
     )

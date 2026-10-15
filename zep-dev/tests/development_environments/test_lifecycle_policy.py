@@ -55,7 +55,7 @@ def creation_plan(
         charts=(),
         config_maps={},
         application_manifests=(),
-        runtime_databases=(),
+        runtime_applications=(),
     )
     monkeypatch.setattr(lifecycle, "preflight", lambda *_args: plan)
     return plan
@@ -250,7 +250,7 @@ def test_runtime_precedes_manifests_and_application_install(
         in {"apply_runtime", "apply_application_manifests", "install_applications"}
     ]
     assert ordered == [
-        call.apply_runtime(target, application_plan.runtime_databases),
+        call.apply_runtime(target, application_plan.runtime_applications),
         call.apply_application_manifests(
             target, application_plan.application_manifests
         ),

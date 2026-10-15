@@ -66,10 +66,7 @@ def resolve_inputs(template: EnvironmentTemplate, bindings: Bindings) -> Resolve
         for name in service.integration.repositories
     }
     required_repositories = argo_names.copy()
-    if any(
-        application.database is not None
-        for application in template.applications.values()
-    ):
+    if any(application.databases for application in template.applications.values()):
         required_repositories.add("deployments")
     repositories = {
         name: resolve_directory(

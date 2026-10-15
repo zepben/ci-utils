@@ -53,7 +53,7 @@ class CreationPlan:
     charts: tuple[ChartRef, ...]
     config_maps: dict[str, tuple[supporting.ResolvedConfigMap, ...]]
     application_manifests: tuple[Path, ...]
-    runtime_databases: tuple[terraform.RuntimeDatabase, ...]
+    runtime_applications: tuple[terraform.RuntimeApplication, ...]
 
 
 def list_environments() -> list[str]:
@@ -86,8 +86,8 @@ def preflight(template_path: Path, image_archive: Path | None = None) -> Creatio
     )
 
     inputs = local_inputs.load_required_inputs(template)
-    runtime_databases = terraform.resolve_runtime_databases(
-        template, inputs.repositories.get("deployments")
+    runtime_applications = terraform.resolve_runtime_applications(
+        target, template, inputs.repositories.get("deployments")
     )
     mounts = tuple(
         kind.HostMount(inputs.mounts[mount.slot], mount.node_path)
@@ -119,7 +119,7 @@ def preflight(template_path: Path, image_archive: Path | None = None) -> Creatio
         charts=charts,
         config_maps=config_maps,
         application_manifests=application_manifests,
-        runtime_databases=runtime_databases,
+        runtime_applications=runtime_applications,
     )
 
 
@@ -223,7 +223,7 @@ def create_environment(
             secrets.create_image_pull_secret(target, target.namespace)
         for key, secret in plan.template.inputs.secrets.items():
             secrets.create_bound_secret(target, secret.name, plan.inputs.secrets[key])
-        terraform.apply_runtime(target, plan.runtime_databases)
+        terraform.apply_runtime(target, plan.runtime_applications)
         manifests.apply_application_manifests(target, plan.application_manifests)
         helm.install_applications(
             target,

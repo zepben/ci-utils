@@ -52,7 +52,9 @@ def test_cnpg_reference_must_name_cnpg_and_deployments(
     basic_template: dict[str, Any],
 ) -> None:
     basic_template["distribution"] = "dist.yaml"
-    basic_template["applications"] = {"eas": {"database": {"service": "missing"}}}
+    basic_template["applications"] = {
+        "eas": {"databases": {"primary": {"service": "missing", "database": "eas"}}}
+    }
     with pytest.raises(ValidationError, match="CNPG"):
         EnvironmentTemplate.model_validate(basic_template)
     basic_template["services"] = {
@@ -65,6 +67,37 @@ def test_cnpg_reference_must_name_cnpg_and_deployments(
         }
     }
     with pytest.raises(ValidationError, match="deployments"):
+        EnvironmentTemplate.model_validate(basic_template)
+
+
+@pytest.mark.parametrize(
+    "database", [None, "undeclared"], ids=["missing-name", "undeclared-name"]
+)
+def test_database_reference_requires_an_explicit_declared_database(
+    basic_template: dict[str, Any], database: str | None
+) -> None:
+    reference = {"service": "postgres"}
+    if database is not None:
+        reference["database"] = database
+    basic_template.update(
+        distribution="dist.yaml",
+        inputs={"repositories": ["deployments"]},
+        services={
+            "postgres": {
+                "type": "cnpg",
+                "database": "eas",
+                "databases": {"input": {}},
+                "owner": "eas",
+                "password": "test",
+                "spec": {},
+            }
+        },
+        applications={"eas": {"databases": {"opendss_input": reference}}},
+    )
+    message = (
+        "Field required" if database is None else "not declared by service postgres"
+    )
+    with pytest.raises(ValidationError, match=message):
         EnvironmentTemplate.model_validate(basic_template)
 
 
@@ -182,9 +215,13 @@ def test_database_reference_is_limited_to_supported_applications(
                 "spec": {},
             }
         },
-        applications={application: {"database": {"service": "database"}}},
+        applications={
+            application: {
+                "databases": {"primary": {"service": "database", "database": "app"}}
+            }
+        },
     )
-    with pytest.raises(ValidationError, match="database is unsupported"):
+    with pytest.raises(ValidationError, match="databases is unsupported"):
         EnvironmentTemplate.model_validate(basic_template)
 
 

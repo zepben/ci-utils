@@ -43,7 +43,7 @@ if [[ -z ${args[0]} ]]; then
 else
     debug "1=${args[0]}"
     version=${args[0]}
-    tag=$(git tag -l | grep "$version\.[0-9]*" | tail -1)
+    tag=$(git tag -l | grep "$version\.[0-9]*" | sort -V | tail -1)
     version=${tag/v/}
     COMMIT_ID=$(git rev-list -n 1 $tag)
     debug "COMMIT_ID=$COMMIT_ID"

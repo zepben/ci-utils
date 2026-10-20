@@ -2,6 +2,7 @@ import os
 from contextlib import suppress
 from dataclasses import dataclass
 from enum import StrEnum
+from glob import glob
 from pathlib import Path
 from typing import Any, Literal, Self, TextIO
 from urllib.parse import urlsplit
@@ -9,6 +10,7 @@ from urllib.parse import urlsplit
 import yaml
 from click import ClickException
 from pydantic import (
+    AliasPath,
     BaseModel,
     ConfigDict,
     Field,
@@ -183,6 +185,38 @@ class ClusterComponents(BaseModel):
         return components
 
 
+class ImageDiscoveryConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    helm_dir: Path | None = Field(default=None, alias="helm-dir")
+    components: Path | None = None
+    applications: list[Path] = Field(default_factory=list)
+    repositories: dict[str, Path] = Field(default_factory=dict)
+
+    @classmethod
+    def from_path(cls, path: Path) -> Self:
+        config = cls.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+        root = path.resolve().parent
+        if config.helm_dir is not None:
+            config.helm_dir = (root / config.helm_dir).resolve()
+        if config.components is not None:
+            config.components = (root / config.components).resolve()
+        applications: set[Path] = set()
+        for pattern in config.applications:
+            matches = glob(str(pattern), root_dir=root, recursive=True)
+            if not matches:
+                raise FileNotFoundError(
+                    f"Application pattern matched no files: {pattern}"
+                )
+            applications.update((root / match).resolve() for match in matches)
+        config.applications = sorted(applications)
+        config.repositories = {
+            url: (root / directory).resolve()
+            for url, directory in config.repositories.items()
+        }
+        return config
+
+
 class ChartTestingConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -280,3 +314,31 @@ class ChartValues(BaseModel):
         (chart_dir / "values.yaml").write_text(
             yaml.safe_dump(self.model_dump(mode="json"), sort_keys=False)
         )
+
+
+class ApplicationHelm(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    releaseName: str | None = None
+    valueFiles: list[str] = Field(default_factory=list)
+
+
+class ApplicationSource(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    repoURL: str
+    targetRevision: str = ""
+    chart: str | None = None
+    ref: str | None = None
+    helm: dict[str, Any] = Field(default_factory=dict)
+
+
+class ImageApplication(BaseModel):
+    name: str = Field(validation_alias=AliasPath("metadata", "name"))
+    namespace: str | None = Field(
+        default=None, validation_alias=AliasPath("spec", "destination", "namespace")
+    )
+    sources: list[ApplicationSource] = Field(
+        validation_alias=AliasPath("spec", "sources")
+    )
+    source: None = Field(default=None, validation_alias=AliasPath("spec", "source"))

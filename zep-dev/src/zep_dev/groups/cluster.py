@@ -6,6 +6,7 @@ from zep_dev import cluster_images
 from zep_dev.commands.cluster.create import create
 from zep_dev.commands.cluster.debug_dump import debug_dump
 from zep_dev.commands.cluster.teardown import teardown
+from zep_dev.models import ClusterComponents, ImageDiscoveryConfig
 
 
 @click.group("cluster", help="Manage the local kind cluster")
@@ -50,22 +51,82 @@ def dump_images(output: Path, includes: tuple[str, ...]) -> None:
 
 @images.command("pack")
 @click.option(
+    "--config",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Discovery YAML; paths and Application globs are relative to this file",
+)
+@click.option(
     "--helm-dir",
-    required=True,
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     help="Root directory containing ct.yaml and application charts",
 )
 @click.option(
-    "--output",
-    required=True,
-    type=click.Path(dir_okay=False, path_type=Path),
-    help="Write the image archive here",
+    "--components",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Cluster components YAML containing bootstrap Helm charts",
 )
-def pack_images(helm_dir: Path, output: Path) -> None:
-    cluster_images.pack_images(
-        helm_dir.resolve(),
-        output,
-    )
+@click.option(
+    "--application",
+    "applications",
+    multiple=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Argo Application YAML to discover images from; repeatable",
+)
+@click.option(
+    "--repository",
+    "repositories",
+    multiple=True,
+    help="Map a Git source URL to an existing local checkout: URL=PATH; repeatable",
+)
+@click.option(
+    "--list-only",
+    is_flag=True,
+    help="Print packable image references without pulling or saving images",
+)
+@click.option(
+    "--output",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Write the image archive here (required unless --list-only)",
+)
+def pack_images(
+    config: Path | None,
+    helm_dir: Path | None,
+    components: Path | None,
+    applications: tuple[Path, ...],
+    repositories: tuple[str, ...],
+    list_only: bool,
+    output: Path | None,
+) -> None:
+    if config is not None:
+        if (
+            helm_dir is not None
+            or components is not None
+            or applications
+            or repositories
+        ):
+            raise click.UsageError("--config cannot be combined with discovery options")
+        discovery = ImageDiscoveryConfig.from_path(config)
+        helm_dir, components = discovery.helm_dir, discovery.components
+        applications = tuple(discovery.applications)
+        mappings = discovery.repositories
+    else:
+        mappings = cluster_images.parse_repository_mappings(repositories)
+    if helm_dir is None and components is None and not applications:
+        raise click.UsageError(
+            "at least one of --helm-dir, --components or --application is required"
+        )
+    if not list_only and output is None:
+        raise click.UsageError("--output is required unless --list-only is used")
+    source = ClusterComponents.from_path(components) if components is not None else None
+    chart_dir = helm_dir.resolve() if helm_dir is not None else None
+    if list_only:
+        for ref in cluster_images.discover_pack_image_refs(
+            chart_dir, source, applications, mappings
+        ):
+            click.echo(ref)
+    else:
+        assert output is not None
+        cluster_images.pack_images(chart_dir, output, source, applications, mappings)
 
 
 @images.command("load")

@@ -21,6 +21,7 @@ from zep_dev.models import LOCAL_REPO_MOUNT_ROOT, ClusterComponents
 )
 @click.option(
     "--image-archive",
+    envvar="IMAGE_ARCHIVE",
     type=click.Path(dir_okay=False, path_type=Path),
     help="Load images from this archive before installing cluster components",
 )

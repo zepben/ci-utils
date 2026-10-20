@@ -44,24 +44,24 @@ def create_cluster(
     local_repos: Sequence[Path] = (),
     image_archive: Path | None = None,
 ) -> None:
+    if image_archive is not None:
+        require_nonempty_image_archive(image_archive)
     repos = load_local_repos(local_repos)
     create_kind_cluster(kind_config, repos)
     if image_archive is not None:
-        if image_archive.exists():
-            load_image_archive(image_archive)
-        else:
-            LOG.info(
-                "Image archive not found; continuing without it: %s",
-                image_archive,
-            )
+        load_image_archive(image_archive)
     apply_builtin_storage_classes()
     add_helm_repos(components)
     install_helm_components(components, repos)
 
 
-def load_image_archive(archive: Path) -> None:
+def require_nonempty_image_archive(archive: Path) -> None:
     if not archive.is_file() or archive.stat().st_size == 0:
         raise ClickException(f"image archive is missing or empty: {archive}")
+
+
+def load_image_archive(archive: Path) -> None:
+    require_nonempty_image_archive(archive)
     kind("load", "image-archive", str(archive), "--name", CLUSTER_NAME)
 
 
@@ -215,7 +215,9 @@ def inject_repo_mounts(kind_config: Path, repos: Sequence[LocalRepo]) -> str:
     return yaml.safe_dump(config, default_flow_style=False)
 
 
-def add_helm_repos(components: ClusterComponents) -> None:
+def add_helm_repos(
+    components: ClusterComponents, *, capture_stdout: bool = False
+) -> None:
     if components.helm_repos:
         LOG.info("Adding helm repos")
         repo_out = helm("repo", "list", "--no-headers", capture_stdout=True)
@@ -224,8 +226,8 @@ def add_helm_repos(components: ClusterComponents) -> None:
             if (name, repo) in existing_repos:
                 LOG.info("Not adding %s -> %s as already present", name, repo)
             else:
-                helm("repo", "add", name, repo)
-        helm("repo", "update")
+                helm("repo", "add", name, repo, capture_stdout=capture_stdout)
+        helm("repo", "update", capture_stdout=capture_stdout)
 
 
 def apply_builtin_storage_classes() -> None:

@@ -1,9 +1,7 @@
 from contextlib import chdir
 from pathlib import Path
-from subprocess import CalledProcessError
 
 import click
-from click import ClickException
 
 from zep_dev.commands.chart.utils import execute_ct_lint, validate_dependencies_present
 from zep_dev.models import ChartMetadata, ChartTestingConfig
@@ -42,7 +40,7 @@ def lint(helm_dir: Path, chart: Path) -> None:
     helm_dir = helm_dir.resolve()
     ct_path = helm_dir / CT_YAML
     if not ct_path.is_file():
-        raise ClickException(f"{CT_YAML} is required in the root of --helm-dir")
+        raise FileNotFoundError(f"{CT_YAML} is required in the root of --helm-dir")
 
     resolved_chart = resolve_chart(helm_dir, chart)
     ct_config = ChartTestingConfig.from_chart_dir(helm_dir)
@@ -54,17 +52,14 @@ def lint(helm_dir: Path, chart: Path) -> None:
 
 
 def run_chart_testing_lint(resolved_chart: ResolvedChart) -> None:
-    try:
-        execute_ct_lint(
-            "lint",
-            "--config",
-            str(CT_YAML),
-            "--charts",
-            str(resolved_chart.path_relative_to_helm_dir),
-            "--check-version-increment=true",
-        )
-    except CalledProcessError as e:
-        raise ClickException(f"lint failed with rc={e.returncode}") from e
+    execute_ct_lint(
+        "lint",
+        "--config",
+        str(CT_YAML),
+        "--charts",
+        str(resolved_chart.path_relative_to_helm_dir),
+        "--check-version-increment=true",
+    )
 
 
 def validate_chart_manifests(
@@ -98,28 +93,17 @@ def validate_chart_manifests(
 
 def execute_kubeconform(helm_args: list[str], variant: str) -> None:
     click.echo(f"Validating Kubernetes schemas for {variant}")
-    try:
-        rendered = execute(*helm_args, capture_stdout=True)
-    except CalledProcessError as e:
-        raise ClickException(
-            f"helm template failed for {variant} with rc={e.returncode}"
-        ) from e
-
-    try:
-        execute(
-            "kubeconform",
-            "-kubernetes-version",
-            KUBERNETES_VERSION,
-            "-strict",
-            "-ignore-missing-schemas",
-            "-schema-location",
-            "default",
-            "-schema-location",
-            DATREE_CRD_SCHEMA_LOCATION,
-            "-summary",
-            input=rendered.stdout,
-        )
-    except CalledProcessError as e:
-        raise ClickException(
-            f"kubeconform failed for {variant} with rc={e.returncode}"
-        ) from e
+    rendered = execute(*helm_args, capture_stdout=True)
+    execute(
+        "kubeconform",
+        "-kubernetes-version",
+        KUBERNETES_VERSION,
+        "-strict",
+        "-ignore-missing-schemas",
+        "-schema-location",
+        "default",
+        "-schema-location",
+        DATREE_CRD_SCHEMA_LOCATION,
+        "-summary",
+        input=rendered.stdout,
+    )

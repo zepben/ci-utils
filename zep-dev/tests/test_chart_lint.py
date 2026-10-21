@@ -123,6 +123,8 @@ def test_lint_dependency_repository_missing_from_ct_config_fails(
     )
 
     assert result.exit_code != 0
-    assert "https://example.com/helm-charts not found" in result.output
-    assert "ct.yaml" in result.output
+    assert result.exception is not None
+    message = str(result.exception)
+    assert "https://example.com/helm-charts not found" in message
+    assert "ct.yaml" in message
     assert fake.calls_for("ct") == []

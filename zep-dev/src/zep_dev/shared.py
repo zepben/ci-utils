@@ -6,8 +6,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from click import ClickException
-
 from zep_dev.static import TOOLS_BY_NAME
 
 LOG = logging.getLogger(__name__)
@@ -46,9 +44,8 @@ def resolve_chart(helm_dir: Path, chart: Path) -> ResolvedChart:
     try:
         path_relative_to_helm_dir = absolute_path.relative_to(helm_dir)
     except ValueError as e:
-        raise ClickException(
-            f"--chart {chart} is not inside --helm-dir {helm_dir}"
-        ) from e
+        e.add_note(f"--chart {chart} is not inside --helm-dir {helm_dir}")
+        raise
     return ResolvedChart(
         absolute_path=absolute_path,
         path_relative_to_helm_dir=path_relative_to_helm_dir,

@@ -94,6 +94,7 @@ def execute(
     check: bool = True,
     input: str | None = None,
     env: Mapping[str, str] | None = None,
+    timeout: float | None = None,
 ) -> CommandResult:
     if not skip_resolve:
         resolve(args[0])
@@ -106,6 +107,7 @@ def execute(
         stderr=subprocess.PIPE if capture_stderr else None,
         check=False,
         env=env,
+        timeout=timeout,
     )
     result = CommandResult(
         returncode=completed.returncode,

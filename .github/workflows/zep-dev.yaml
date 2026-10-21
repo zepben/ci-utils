@@ -17,5 +17,3 @@ jobs:
         run: |
           make check-zep-dev
           make test-zep-dev
-          make setup-k8s
-          make teardown-k8s

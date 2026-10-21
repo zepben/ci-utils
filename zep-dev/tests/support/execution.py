@@ -1,0 +1,101 @@
+import subprocess
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from types import ModuleType
+
+from zep_dev.shared import CommandResult
+
+ExecuteHook = Callable[[tuple[str, ...], dict[str, object]], None]
+
+
+@dataclass(frozen=True)
+class CommandCall:
+    args: tuple[str, ...]
+    kwargs: dict[str, object]
+
+
+def call(*args: str, **kwargs: object) -> CommandCall:
+    return CommandCall(args, kwargs)
+
+
+@dataclass
+class _Rule:
+    prefix: tuple[str, ...]
+    result: CommandResult
+    match_kwargs: dict[str, object] | None = None
+    raises: BaseException | None = None
+    hook: ExecuteHook | None = None
+
+    def matches(self, args: tuple[str, ...], kwargs: dict[str, object]) -> bool:
+        return args[: len(self.prefix)] == self.prefix and (
+            self.match_kwargs is None
+            or all(kwargs.get(key) == value for key, value in self.match_kwargs.items())
+        )
+
+
+@dataclass
+class FakeExecute:
+    _rules: list[_Rule] = field(default_factory=list)
+    calls: list[CommandCall] = field(default_factory=list)
+
+    def on(
+        self,
+        *prefix: str,
+        stdout: str = "",
+        stderr: str = "",
+        returncode: int = 0,
+        match_kwargs: dict[str, object] | None = None,
+        raises: BaseException | None = None,
+        hook: ExecuteHook | None = None,
+    ) -> FakeExecute:
+        self._rules.append(
+            _Rule(
+                prefix=prefix,
+                result=CommandResult(returncode, stdout, stderr),
+                match_kwargs=match_kwargs,
+                raises=raises,
+                hook=hook,
+            )
+        )
+        return self
+
+    def calls_for(self, *prefix: str) -> list[CommandCall]:
+        return [c for c in self.calls if c.args[: len(prefix)] == prefix]
+
+    def __call__(self, *args: str, **kwargs: object) -> CommandResult:
+        self.calls.append(call(*args, **kwargs))
+        for rule in self._rules:
+            if rule.matches(args, kwargs):
+                result, raises, hook = rule.result, rule.raises, rule.hook
+                break
+        else:
+            prefixes = [rule.prefix for rule in self._rules]
+            raise AssertionError(
+                f"No rule matched execute{args!r} with {kwargs!r}; "
+                f"configured prefixes: {prefixes!r}"
+            )
+        if hook is not None:
+            hook(args, kwargs)
+        if raises is not None:
+            raise raises
+        if kwargs.get("check", True) and result.returncode != 0:
+            raise subprocess.CalledProcessError(
+                result.returncode,
+                list(args),
+                output=result.stdout,
+                stderr=result.stderr,
+            )
+        return result
+
+
+type FakeExecuteFactory = Callable[[ModuleType], FakeExecute]
+
+
+def option_value(args: tuple[str, ...] | list[str], option: str) -> str:
+    """Read a command option without depending on its position among other flags."""
+    for index, argument in enumerate(args):
+        if argument.startswith(f"{option}="):
+            return argument.removeprefix(f"{option}=")
+        if argument == option:
+            return args[index + 1]
+    raise AssertionError(f"Missing {option} in {args!r}")

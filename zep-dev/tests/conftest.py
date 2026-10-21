@@ -1,13 +1,24 @@
-from collections.abc import Callable
+import os
 from pathlib import Path
 from types import ModuleType
 
 import pytest
-import yaml
 
-from _fake_execute import FakeExecute, FakeExecuteFactory
-from zep_dev import k8s_secrets
-from zep_dev.models import ChartTestingConfig
+from tests.support.execution import FakeExecute, FakeExecuteFactory
+from zep_dev import shared
+
+
+@pytest.fixture
+def cli_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Isolate CLI startup and restore variables it changes directly."""
+    bin_dir = tmp_path / "cli-bin"
+    bin_dir.mkdir()
+    monkeypatch.setattr("zep_dev.cli.get_bin_dir", lambda: bin_dir)
+    monkeypatch.setattr(shared, "get_bin_dir", lambda: bin_dir)
+    # Register restoration before Click callbacks mutate os.environ.
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    monkeypatch.delenv("HELM_REGISTRY_CONFIG", raising=False)
+    monkeypatch.setattr(shared, "REGISTRY_CONFIG_PATHS", ())
 
 
 @pytest.fixture
@@ -20,50 +31,3 @@ def fake_execute(
         return fake
 
     return _install
-
-
-@pytest.fixture
-def auth_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    path = tmp_path / "auth.json"
-    path.write_text("{}\n")
-    monkeypatch.setattr(k8s_secrets, "IMAGE_SECRET_PATHS", [path])
-    return path
-
-
-@pytest.fixture
-def helm_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "helm"
-    d.mkdir()
-    (d / "ct.yaml").write_text("namespace: test-ns\n")
-    return d
-
-
-@pytest.fixture
-def chart_testing_config() -> ChartTestingConfig:
-    return ChartTestingConfig.model_validate(
-        {
-            "remote": "origin",
-            "target-branch": "main",
-            "chart-dirs": ["charts"],
-            "chart-repos": ["example-repo=https://example.com/helm-charts"],
-            "validate-maintainers": False,
-            "check-version-increment": False,
-            "namespace": "chart-testing",
-            "release-label": "app.kubernetes.io/instance",
-            "additional-commands": [],
-        }
-    )
-
-
-@pytest.fixture
-def write_chart_testing_config(
-    helm_dir: Path,
-) -> Callable[[ChartTestingConfig], None]:
-    def write(config: ChartTestingConfig) -> None:
-        (helm_dir / "ct.yaml").write_text(
-            yaml.safe_dump(
-                config.model_dump(by_alias=True, mode="json"), sort_keys=False
-            )
-        )
-
-    return write

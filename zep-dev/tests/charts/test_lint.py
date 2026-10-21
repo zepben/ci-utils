@@ -1,16 +1,18 @@
 from collections.abc import Callable
+from importlib.resources import files
 from pathlib import Path
-from unittest.mock import call
 
 import pytest
 from click.testing import CliRunner
 
-from _charts import write_chart
-from _fake_execute import FakeExecuteFactory
+from tests.support.charts import write_chart
+from tests.support.execution import FakeExecuteFactory, call
+from zep_dev.charts import utils as ct_module
 from zep_dev.cli import cli
 from zep_dev.commands.chart import lint as lint_module
-from zep_dev.commands.chart import utils as ct_module
 from zep_dev.models import ChartTestingConfig
+
+pytestmark = pytest.mark.usefixtures("cli_environment")
 
 
 @pytest.fixture
@@ -66,9 +68,9 @@ def test_lint_dependency_repository_present_runs_ct(
         "charts/example-chart",
         "--check-version-increment=true",
         "--chart-yaml-schema",
-        str(ct_module.files("zep_dev.resources").joinpath("chart_schema.yaml")),
+        str(files("zep_dev.resources").joinpath("chart_schema.yaml")),
         "--lint-conf",
-        str(ct_module.files("zep_dev.resources").joinpath("lintconf.yaml")),
+        str(files("zep_dev.resources").joinpath("lintconf.yaml")),
     )
 
 

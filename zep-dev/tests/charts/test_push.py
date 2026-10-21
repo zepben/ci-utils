@@ -1,16 +1,17 @@
 from collections.abc import Callable
 from pathlib import Path
 from subprocess import CalledProcessError
-from unittest.mock import call
 
 import pytest
 from click.testing import CliRunner
 
-from _charts import write_chart
-from _fake_execute import FakeExecuteFactory
+from tests.support.charts import write_chart
+from tests.support.execution import FakeExecuteFactory, call
 from zep_dev.cli import cli
 from zep_dev.commands.chart import push as push_module
 from zep_dev.models import ChartTestingConfig
+
+pytestmark = pytest.mark.usefixtures("cli_environment")
 
 
 def test_push_adds_configured_repo_before_building_dependencies(

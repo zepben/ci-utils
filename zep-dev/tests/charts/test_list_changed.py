@@ -1,11 +1,13 @@
 from pathlib import Path
-from unittest.mock import call
 
+import pytest
 from click.testing import CliRunner
 
-from _fake_execute import FakeExecuteFactory
+from tests.support.execution import FakeExecuteFactory, call
 from zep_dev.cli import cli
 from zep_dev.commands.chart import list_changed as list_changed_module
+
+pytestmark = pytest.mark.usefixtures("cli_environment")
 
 
 def test_list_changed_passes_repo_relative_paths(
@@ -22,16 +24,7 @@ def test_list_changed_passes_repo_relative_paths(
     )
 
     assert result.exit_code == 0
-    assert fake.calls == [
-        call(
-            "git",
-            "-C",
-            str(helm_dir.absolute()),
-            "rev-parse",
-            "--show-toplevel",
-            skip_resolve=True,
-            capture_stdout=True,
-        ),
+    assert fake.calls_for("ct", "list-changed") == [
         call(
             "ct",
             "list-changed",

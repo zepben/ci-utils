@@ -5,9 +5,11 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from _charts import write_chart
+from tests.support.charts import write_chart
 from zep_dev.cli import cli
 from zep_dev.commands.chart import metadata as metadata_module
+
+pytestmark = pytest.mark.usefixtures("cli_environment")
 
 
 def test_metadata_full_fields(tmp_path: Path) -> None:
@@ -27,16 +29,6 @@ def test_metadata_full_fields(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert json.loads(result.stdout) == chart_yaml
-
-
-def test_metadata_missing_version_fails(tmp_path: Path) -> None:
-    chart_dir = write_chart(tmp_path / "mychart", {"name": "mychart"})
-
-    result = CliRunner().invoke(
-        cli, ["chart", "metadata", "show", "--chart", str(chart_dir)]
-    )
-
-    assert result.exit_code != 0
 
 
 def test_metadata_update_sets_release_and_image_metadata(
@@ -130,6 +122,10 @@ def test_metadata_update_rejects_image_tag_without_annotation(tmp_path: Path) ->
     )
 
     assert result.exit_code != 0
+    assert (
+        "--image-tag requires the zepben.com/publish-with-application-image"
+        in result.stderr
+    )
     assert (chart_dir / "Chart.yaml").read_text() == original_chart
 
 

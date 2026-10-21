@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 import click
 
-from zep_dev.commands.chart.utils import validate_dependencies_present
+from zep_dev.charts.utils import validate_dependencies_present
 from zep_dev.models import ChartMetadata, ChartTestingConfig
 from zep_dev.shared import execute
 from zep_dev.static import CT_YAML

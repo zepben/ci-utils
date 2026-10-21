@@ -1,15 +1,17 @@
 import pytest
 from click.testing import CliRunner
 
-from _fake_execute import FakeExecuteFactory
-from zep_dev.cli import cli
-from zep_dev.commands.chart import version as version_module
-from zep_dev.commands.chart.version import (
+from tests.support.execution import FakeExecuteFactory
+from zep_dev import chart_version as chart_version_module
+from zep_dev.chart_version import (
     GitDescribe,
     calculate_chart_version,
     parse_git_describe,
     to_chart_version,
 )
+from zep_dev.cli import cli
+
+pytestmark = pytest.mark.usefixtures("cli_environment")
 
 
 @pytest.mark.parametrize(
@@ -62,7 +64,7 @@ def test_resolve_chart_version_uses_snapshot_tag(
     tag: str,
     chart_version: str,
 ) -> None:
-    fake = fake_execute(version_module)
+    fake = fake_execute(chart_version_module)
     fake.on("git", "tag", stdout=f"{tag}\n")
 
     assert calculate_chart_version() == chart_version
@@ -72,7 +74,7 @@ def test_resolve_chart_version_uses_snapshot_tag(
 def test_version_uses_stable_release_tags(
     fake_execute: FakeExecuteFactory,
 ) -> None:
-    fake = fake_execute(version_module)
+    fake = fake_execute(chart_version_module)
     fake.on("git", "tag")
     fake.on("git", "describe", stdout="v1.37.0-5-gd95cc75\n")
 

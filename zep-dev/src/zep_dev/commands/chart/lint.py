@@ -3,7 +3,7 @@ from pathlib import Path
 
 import click
 
-from zep_dev.commands.chart.utils import execute_ct_lint, validate_dependencies_present
+from zep_dev.charts.utils import execute_ct_lint, validate_dependencies_present
 from zep_dev.models import ChartMetadata, ChartTestingConfig
 from zep_dev.shared import ResolvedChart, execute, resolve_chart
 from zep_dev.static import CT_YAML

@@ -19,14 +19,6 @@ def bin_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return d
 
 
-@pytest.fixture
-def kind_binary(bin_dir: Path) -> Path:
-    tool = bin_dir / "kind"
-    tool.write_text("#!/bin/sh\n")
-    tool.chmod(0o755)
-    return tool
-
-
 def test_resolve_missing(bin_dir: Path) -> None:
     with pytest.raises(Exception, match="not installed"):
         resolve("kind")

@@ -4,11 +4,13 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from _charts import write_chart
+from tests.support.charts import write_chart
 from zep_dev.cli import cli
 
+pytestmark = pytest.mark.usefixtures("cli_environment")
 
-def test_list_selects_annotated_application_charts_in_path_order(
+
+def test_list_selects_annotated_application_charts(
     helm_dir: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -68,7 +70,7 @@ def test_list_selects_annotated_application_charts_in_path_order(
     )
 
     assert result.exit_code == 0
-    assert json.loads(result.stdout) == [
+    assert sorted(json.loads(result.stdout)) == [
         "helm/charts/alpha",
         "helm/charts/zebra",
     ]

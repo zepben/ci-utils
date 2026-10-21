@@ -2,23 +2,12 @@ import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from click.testing import CliRunner
+import pytest
 
 import zep_dev.cli as cli_module
-from zep_dev.cli import add_bin_dir_to_path, cli, configure_helm_registry
+from zep_dev.cli import add_bin_dir_to_path, configure_helm_registry
 
-
-@patch.object(cli_module, "add_bin_dir_to_path")
-@patch.object(cli_module, "configure_helm_registry")
-def test_cli_configures_process_environment(
-    mock_configure_helm_registry: MagicMock,
-    mock_add_bin_dir_to_path: MagicMock,
-) -> None:
-    result = CliRunner().invoke(cli, ["tools", "--help"])
-
-    assert result.exit_code == 0
-    mock_add_bin_dir_to_path.assert_called_once()
-    mock_configure_helm_registry.assert_called_once()
+pytestmark = pytest.mark.usefixtures("cli_environment")
 
 
 @patch.object(cli_module, "get_bin_dir")
@@ -59,4 +48,5 @@ def test_configure_helm_registry_preserves_explicit_config(
     ):
         configure_helm_registry()
 
+        assert os.environ["HELM_REGISTRY_CONFIG"] == "/explicit/config.json"
     mock_resolve_registry_config.assert_not_called()

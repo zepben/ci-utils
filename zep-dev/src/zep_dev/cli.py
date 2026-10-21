@@ -3,17 +3,21 @@ import os
 
 import click
 
+from zep_dev.development_environments.cli import (
+    distribution,
+    environment,
+    images_group,
+    secrets_group,
+    terraform_group,
+)
 from zep_dev.groups.chart import chart
-from zep_dev.groups.cluster import cluster
-from zep_dev.groups.secrets import secrets
-from zep_dev.groups.terraform import terraform
 from zep_dev.groups.tools import tools
 from zep_dev.shared import get_bin_dir, resolve_registry_config
 
 LOG = logging.getLogger(__name__)
 
 
-@click.group(help="Manage a local kind cluster for chart testing")
+@click.group(help="Manage local development Environments and chart utilities")
 @click.option(
     "-v", "--verbose", count=True, help="Increase log verbosity (-v=INFO, -vv=DEBUG)"
 )
@@ -55,8 +59,10 @@ def configure_logging(verbose: int) -> None:
     logging.basicConfig(level=level)
 
 
-cli.add_command(cluster)
+cli.add_command(environment)
+cli.add_command(distribution)
+cli.add_command(images_group)
 cli.add_command(tools)
 cli.add_command(chart)
-cli.add_command(secrets)
-cli.add_command(terraform)
+cli.add_command(secrets_group)
+cli.add_command(terraform_group)

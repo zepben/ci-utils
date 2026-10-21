@@ -1,129 +1,11 @@
 import os
 from contextlib import suppress
-from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal, Self, TextIO
-from urllib.parse import urlsplit
+from typing import Self
 
 import yaml
-from click import ClickException
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    PrivateAttr,
-    field_validator,
-    model_validator,
-)
-
-# Path inside kind workers. Argo file:// URLs and repo-server hostPath both assume it.
-LOCAL_REPO_MOUNT_ROOT = "/mnt/local-repos"
-
-
-@dataclass(frozen=True)
-class LocalRepo:
-    path: Path
-
-    @property
-    def basename(self) -> str:
-        return self.path.name
-
-    @property
-    def container_path(self) -> str:
-        return f"{LOCAL_REPO_MOUNT_ROOT}/{self.basename}"
-
-
-class OciRepository(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    name: str = Field(min_length=1)
-    registry: str = Field(min_length=1)
-    repository: str = Field(min_length=1)
-
-    @property
-    def url(self) -> str:
-        return f"{self.registry}/{self.repository}"
-
-
-class LocalRepoIntegration(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    type: Literal["argo-cd"]
-    oci_repositories: list[OciRepository] = Field(default_factory=list)
-
-
-class ConfigMapFromFile(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    name: str = Field(min_length=1)
-    from_file: dict[str, str] = Field(min_length=1)
-
-    def manifest(self, namespace: str, source_dir: Path | None) -> dict[str, Any]:
-        if source_dir is None:
-            raise ClickException(
-                "config_maps_from_file requires a components file path"
-            )
-
-        return {
-            "apiVersion": "v1",
-            "kind": "ConfigMap",
-            "metadata": {"name": self.name, "namespace": namespace},
-            "data": {
-                key: (source_dir / path).read_text(encoding="utf-8")
-                for key, path in self.from_file.items()
-            },
-        }
-
-
-class WaitFor(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    resource: str
-    for_: str = Field(alias="for")
-    timeout: str
-    namespace: str | None = None
-
-
-class LoadDbCredentials(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    from_secret: str
-    database: str
-
-
-class ClusterComponent(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    name: str
-    chart: str
-    version: str
-    namespace: str
-    local_repo_integration: LocalRepoIntegration | None = None
-    config_maps_from_file: list[ConfigMapFromFile] = Field(default_factory=list)
-    wait_for: list[WaitFor] = Field(default_factory=list)
-    load_db_credentials: LoadDbCredentials | None = None
-    values: dict[str, Any] = Field(default_factory=dict)
-
-    @model_validator(mode="after")
-    def validate_unique_config_map_names(self) -> Self:
-        names = [config_map.name for config_map in self.config_maps_from_file]
-        if len(names) != len(set(names)):
-            raise ValueError("duplicate config_maps_from_file name")
-        return self
-
-
-class RawManifestComponent(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    name: str
-    raw_manifests: list[str] = Field(min_length=1)
-    wait_timeout: str = Field(default="60s", min_length=1)
-
-    @field_validator("raw_manifests")
-    @classmethod
-    def validate_manifest_urls(cls, values: list[str]) -> list[str]:
-        for value in values:
-            url = urlsplit(value)
-            if url.scheme != "https" or not url.netloc:
-                raise ValueError("raw_manifests must contain only HTTPS URLs")
-        return values
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ArchiveFormat(StrEnum):
@@ -160,29 +42,6 @@ class RequiredTool(BaseModel):
         (hash_dir / self.name).write_text(self.to_hash())
 
 
-class ClusterComponents(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    helm_repos: dict[str, str]
-    cluster_components: list[ClusterComponent | RawManifestComponent]
-    _source_dir: Path | None = PrivateAttr(default=None)
-
-    @property
-    def source_dir(self) -> Path | None:
-        return self._source_dir
-
-    @classmethod
-    def from_text_io(cls, input_data: TextIO) -> Self:
-        data: Any = yaml.safe_load(input_data.read())
-        return cls.model_validate(data)
-
-    @classmethod
-    def from_path(cls, path: Path) -> Self:
-        with path.open(encoding="utf-8") as input_data:
-            components = cls.from_text_io(input_data)
-        components._source_dir = path.parent.resolve()
-        return components
-
-
 class ChartTestingConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -209,13 +68,13 @@ class ChartTestingConfig(BaseModel):
 class CiSecret(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str
-    env_var: str
+    name: str = Field(min_length=1)
+    env_var: str = Field(min_length=1)
 
     def resolve_value(self) -> str:
         value = os.environ.get(self.env_var)
-        if value is None:
-            raise ValueError(f"{self.env_var} is not set. This is required ")
+        if value is None or value == "":
+            raise ValueError(f"{self.env_var} is not set")
         return value
 
 

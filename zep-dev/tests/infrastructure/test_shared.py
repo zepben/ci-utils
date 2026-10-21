@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -64,3 +66,44 @@ def test_resolve_chart_outside_helm_dir_raises(tmp_path: Path) -> None:
     assert caught.value.__notes__ == [
         f"--chart {outside_chart} is not inside --helm-dir {helm_dir}"
     ]
+
+
+def test_execute_forwards_input_environment_and_captured_streams() -> None:
+    result = shared.execute(
+        sys.executable,
+        "-c",
+        "import os, sys; print(os.environ['ZEP_TEST']); print(sys.stdin.read()); print('diagnostic', file=sys.stderr)",
+        input="payload",
+        env={"ZEP_TEST": "selected"},
+        capture_stdout=True,
+        capture_stderr=True,
+        skip_resolve=True,
+        timeout=10,
+    )
+    assert result == shared.CommandResult(0, "selected\npayload\n", "diagnostic\n")
+
+
+@pytest.mark.parametrize("check", [False, True], ids=["return-result", "raise-failure"])
+def test_execute_preserves_failure_code_and_streams(check: bool) -> None:
+    args = (
+        sys.executable,
+        "-c",
+        "import sys; print('output'); print('error', file=sys.stderr); sys.exit(3)",
+    )
+    if check:
+        with pytest.raises(subprocess.CalledProcessError) as failure:
+            shared.execute(
+                *args, capture_stdout=True, capture_stderr=True, skip_resolve=True
+            )
+        assert failure.value.returncode == 3
+        assert failure.value.cmd == list(args)
+        assert failure.value.stdout == "output\n"
+        assert failure.value.stderr == "error\n"
+    else:
+        assert shared.execute(
+            *args,
+            capture_stdout=True,
+            capture_stderr=True,
+            skip_resolve=True,
+            check=False,
+        ) == shared.CommandResult(3, "output\n", "error\n")

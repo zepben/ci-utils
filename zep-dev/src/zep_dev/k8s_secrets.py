@@ -58,14 +58,18 @@ def resolve_registry_credential(registry: str) -> tuple[str, str]:
         ) from error
 
 
-def create_image_pull_secret(namespace: str) -> None:
-    LOG.info("Creating imagePullSecret")
+def find_image_secret_path() -> Path:
     auth_json_path = next((path for path in IMAGE_SECRET_PATHS if path.exists()), None)
     if auth_json_path is None:
         raise ClickException(
-            f"Failed to locate auth.json to populate {IMAGE_SECRET_NAME} "
-            f"at paths: {IMAGE_SECRET_PATHS}"
+            f"Failed to locate auth.json at paths: {IMAGE_SECRET_PATHS}"
         )
+    return auth_json_path
+
+
+def create_image_pull_secret(namespace: str) -> None:
+    LOG.info("Creating imagePullSecret")
+    auth_json_path = find_image_secret_path()
 
     if not resource_exists("secret", IMAGE_SECRET_NAME, namespace=namespace):
         kubectl(

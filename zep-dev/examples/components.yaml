@@ -40,6 +40,12 @@ cluster_components:
           create: false
       notifications:
         enabled: false
+      # The chart default (ecr-public.aws.com) is rate limited for anonymous pulls
+      # from shared CI IPs. Docker Hub is pulled using the credentials zep-dev
+      # mounts into the kind nodes.
+      redis:
+        image:
+          repository: docker.io/library/redis
       redis-ha:
         enabled: false
       repoServer:

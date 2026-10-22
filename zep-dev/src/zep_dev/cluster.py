@@ -13,7 +13,7 @@ import yaml
 from click import ClickException
 
 from zep_dev.k8s import KUBECONF_PATH, kube_guard, kubectl, resource_exists
-from zep_dev.k8s_secrets import resolve_registry_credential
+from zep_dev.k8s_secrets import find_image_secret_path, resolve_registry_credential
 from zep_dev.models import (
     LOCAL_REPO_MOUNT_ROOT,
     ClusterComponent,
@@ -112,7 +112,9 @@ def create_kind_cluster(kind_config: Path, local_repos: Sequence[LocalRepo]) -> 
         LOG.info("Reusing existing cluster: %s", CLUSTER_NAME)
         return
 
-    rendered_config = inject_repo_mounts(kind_config, local_repos)
+    rendered_config = inject_repo_mounts(
+        kind_config, local_repos, find_image_secret_path().resolve()
+    )
 
     config_path = Path("/tmp/kind-config.yaml")
     config_path.write_text(rendered_config, encoding="utf-8")
@@ -187,7 +189,9 @@ def inspect_live_mounts(worker: str) -> set[tuple[str, str]]:
     return local_mounts
 
 
-def inject_repo_mounts(kind_config: Path, repos: Sequence[LocalRepo]) -> str:
+def inject_repo_mounts(
+    kind_config: Path, repos: Sequence[LocalRepo], registry_auth: Path
+) -> str:
     config: Any = yaml.safe_load(kind_config.read_text(encoding="utf-8"))
     if not isinstance(config, dict):
         raise ClickException(f"kind config must be a mapping: {kind_config}")
@@ -210,6 +214,15 @@ def inject_repo_mounts(kind_config: Path, repos: Sequence[LocalRepo]) -> str:
                 "readOnly": True,
             }
             for repo in repos
+        )
+        # Kubelet reads registry credentials from this path, so image pulls
+        # made inside the node are authenticated rather than anonymous.
+        mounts.append(
+            {
+                "hostPath": str(registry_auth),
+                "containerPath": "/var/lib/kubelet/config.json",
+                "readOnly": True,
+            }
         )
 
     return yaml.safe_dump(config, default_flow_style=False)

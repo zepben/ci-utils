@@ -13,6 +13,13 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version-file: .python-version
+      # zep-dev mounts the resulting ~/.docker/config.json into the kind nodes,
+      # so redis is pulled authenticated instead of from the shared runner IP.
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Lint and test zep-dev
         run: |
           make check-zep-dev

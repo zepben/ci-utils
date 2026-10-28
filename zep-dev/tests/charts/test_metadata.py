@@ -6,6 +6,8 @@ import yaml
 from click.testing import CliRunner
 
 from tests.support.charts import write_chart
+from tests.support.execution import FakeExecuteFactory
+from zep_dev import runtime_contract as runtime_contract_module
 from zep_dev.cli import cli
 from zep_dev.commands.chart import metadata as metadata_module
 
@@ -179,3 +181,51 @@ def test_metadata_update_requires_existing_image_tag_before_writing(
     assert result.exit_code != 0
     assert "must define image.tag" in result.stderr
     assert yaml.safe_load((chart_dir / "Chart.yaml").read_text())["version"] == "0.0.0"
+
+
+def test_metadata_update_annotates_the_last_commit_touching_the_runtime_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_execute: FakeExecuteFactory,
+) -> None:
+    chart_dir = write_chart(tmp_path / "eas", {"name": "eas", "version": "0.0.0"})
+    (chart_dir / "runtime-contract").mkdir()
+    fake_execute(runtime_contract_module).on(
+        "git",
+        "-C",
+        str(chart_dir),
+        "log",
+        "-1",
+        "--format=%H",
+        "--",
+        "runtime-contract",
+        stdout="abc123\n",
+    )
+    monkeypatch.setattr(metadata_module, "calculate_chart_version", lambda: "2.0.0")
+
+    result = CliRunner().invoke(
+        cli, ["chart", "metadata", "update", "--chart", str(chart_dir)]
+    )
+
+    assert result.exit_code == 0
+    assert yaml.safe_load((chart_dir / "Chart.yaml").read_text())["annotations"] == {
+        "zepben.com/runtime-contract-ref": "abc123"
+    }
+
+
+def test_metadata_update_refuses_a_runtime_contract_with_no_commit(
+    tmp_path: Path,
+    fake_execute: FakeExecuteFactory,
+) -> None:
+    chart_dir = write_chart(tmp_path / "eas", {"name": "eas", "version": "0.0.0"})
+    (chart_dir / "runtime-contract").mkdir()
+    fake_execute(runtime_contract_module).on("git", "-C", str(chart_dir), "log")
+    original_chart = (chart_dir / "Chart.yaml").read_text()
+
+    result = CliRunner().invoke(
+        cli, ["chart", "metadata", "update", "--chart", str(chart_dir)]
+    )
+
+    assert result.exit_code != 0
+    assert "no commit touches" in result.stderr
+    assert (chart_dir / "Chart.yaml").read_text() == original_chart

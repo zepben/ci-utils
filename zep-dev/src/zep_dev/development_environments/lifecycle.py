@@ -29,7 +29,10 @@ from zep_dev.development_environments import (
     terraform,
 )
 from zep_dev.development_environments.chart_sources import ChartRef, ChartResolver
-from zep_dev.development_environments.distributions import GHCR_REGISTRY
+from zep_dev.development_environments.distributions import (
+    GHCR_REGISTRY,
+    ChartName,
+)
 from zep_dev.development_environments.names import CLUSTER_PREFIX
 from zep_dev.development_environments.services import (
     CnpgService,
@@ -87,9 +90,6 @@ def preflight(template_path: Path, image_archive: Path | None = None) -> Creatio
     )
 
     inputs = local_inputs.load_required_inputs(template)
-    runtime_applications = terraform.resolve_runtime_applications(
-        target, template, inputs.repositories.get("deployments")
-    )
     mounts = tuple(
         kind.HostMount(inputs.mounts[mount.slot], mount.node_path)
         for mount in template.cluster.mounts
@@ -101,12 +101,20 @@ def preflight(template_path: Path, image_archive: Path | None = None) -> Creatio
         raise ValueError(f"image archive is missing or empty: {image_archive}")
 
     charts: tuple[ChartRef, ...] = ()
+    kind_wrappers: dict[ChartName, Path | str] = {}
     if distribution is not None:
         resolver = ChartResolver()
         resolved = resolver.resolve_all(distribution.charts)
-        resolver.check_all(resolved)
+        published = resolver.check_all(resolved)
         secrets.resolve_registry_credential(GHCR_REGISTRY)
         charts = tuple(resolved)
+        for ref, chart in zip(resolved, published, strict=True):
+            application = template.applications.get(ref.name)
+            if application is not None and application.databases:
+                kind_wrappers[ref.name] = resolver.kind_wrapper(ref, chart)
+    runtime_applications = terraform.resolve_runtime_applications(
+        target, template, kind_wrappers
+    )
     for service in template.services.values():
         if isinstance(service, HelmService) and service.integration is not None:
             for repository in service.integration.oci_repositories:

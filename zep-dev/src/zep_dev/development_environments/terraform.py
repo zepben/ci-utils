@@ -42,7 +42,7 @@ class RuntimeModule(TypedDict):
 class RuntimeApplication:
     application: ChartName
     databases: dict[str, DatabaseConnection]
-    module: Path
+    module: Path | str
 
 
 def runtime_state(target: ExecutionTarget) -> Path:
@@ -62,20 +62,13 @@ def database_address(
 def resolve_runtime_applications(
     target: ExecutionTarget,
     template: EnvironmentTemplate,
-    deployments_checkout: Path | None,
+    kind_wrappers: Mapping[ChartName, Path | str],
 ) -> tuple[RuntimeApplication, ...]:
     applications: list[RuntimeApplication] = []
     for app, application in template.applications.items():
         if not application.databases:
             continue
-        if deployments_checkout is None:
-            raise ValueError("deployments repository is required for runtime databases")
-        module = (
-            deployments_checkout
-            / f"terraform/modules/kubernetes/{app}-kind-runtime-contract"
-        ).resolve()
-        if not module.is_dir():
-            raise FileNotFoundError(f"runtime wrapper for {app} not found: {module}")
+        module = kind_wrappers[app]
         databases: dict[str, DatabaseConnection] = {}
         for name, reference in application.databases.items():
             service = template.database_service(reference.service)
@@ -103,9 +96,15 @@ def generate_runtime_root(
     inputs: dict[ChartName, dict[str, DatabaseConnection]] = {}
     for application in applications:
         app = application.application
-        source = os.path.relpath(application.module, start=root)
+        match application.module:
+            case Path():
+                source = os.path.relpath(application.module, start=root)
+                if not source.startswith("."):
+                    source = f"./{source}"
+            case str():
+                source = application.module
         modules[f"{app}_runtime_contract"] = {
-            "source": source if source.startswith(".") else f"./{source}",
+            "source": source,
             "namespace": "${var.namespace}",
             "databases": f"${{var.databases.{app}}}",
         }

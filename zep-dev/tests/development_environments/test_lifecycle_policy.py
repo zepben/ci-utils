@@ -47,9 +47,7 @@ def creation_plan(
     plan = lifecycle.CreationPlan(
         template=EnvironmentTemplate.model_validate(basic_template),
         target=execution_target("integration"),
-        inputs=local_inputs.ResolvedInputs(
-            mounts={}, repositories={}, secrets={}, argo_repositories={}
-        ),
+        inputs=local_inputs.ResolvedInputs(mounts={}, secrets={}, argo_repositories={}),
         mounts=(),
         kind_config=kind.render_kind_config(basic_template["cluster"]["kind"]),
         charts=(),

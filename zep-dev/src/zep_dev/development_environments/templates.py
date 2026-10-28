@@ -5,7 +5,10 @@ from typing import Literal, Self, assert_never
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from zep_dev.development_environments.distributions import ChartName, Distribution
+from zep_dev.development_environments.distributions import (
+    ChartName,
+    Distribution,
+)
 from zep_dev.development_environments.names import (
     EnvironmentName,
     KubernetesName,
@@ -194,10 +197,6 @@ class EnvironmentTemplate(BaseModel):
                     raise ValueError(
                         f"{path}.database is not declared by service {reference.service}: {reference.database}"
                     )
-            if "deployments" not in self.inputs.repositories:
-                raise ValueError(
-                    f"applications.{app}.databases requires inputs.repositories.deployments"
-                )
 
     def database_service(self, name: str) -> DatabaseService | None:
         service = self.services.get(name)

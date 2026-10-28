@@ -5,6 +5,8 @@ import pytest
 
 from zep_dev.chart_version import calculate_chart_version
 from zep_dev.development_environments import chart_sources as git_cache
+from zep_dev.development_environments.chart_sources import VersionChartRef
+from zep_dev.models import ChartMetadata
 
 
 def git(*args: str) -> str:
@@ -104,3 +106,49 @@ def test_branch_tracks_remote_head_and_rejects_deleted_branch(
     cache.ensure_repo("ewb")
     with pytest.raises(ValueError, match="not found in source repository"):
         cache.branch_commit(repo, branch)
+
+
+def published_at(commit: str) -> ChartMetadata:
+    return ChartMetadata(
+        name="eas",
+        version="1.2.3",
+        annotations={"zepben.com/source-commit": commit},
+    )
+
+
+def test_published_chart_kind_wrapper_is_fetched_at_its_source_commit(
+    repository: tuple[Path, Path],
+) -> None:
+    _remote, work = repository
+    wrapper = work / "helm/charts/eas/kind-runtime-contract"
+    wrapper.mkdir(parents=True)
+    (wrapper / "main.tf").write_text("", encoding="utf-8")
+    git("-C", str(work), "add", "helm")
+    git("-C", str(work), "commit", "-m", "kind wrapper")
+    git("-C", str(work), "push", "origin", "main")
+    commit = git("-C", str(work), "rev-parse", "HEAD")
+    ref = VersionChartRef(name="eas", version="1.2.3")
+
+    assert git_cache.ChartResolver().kind_wrapper(ref, published_at(commit)) == (
+        "git::ssh://git@github.com/zepben/evolve-app-server.git"
+        f"//helm/charts/eas/kind-runtime-contract?ref={commit}"
+    )
+
+
+def test_published_chart_without_kind_wrapper_at_its_source_commit_is_refused(
+    repository: tuple[Path, Path],
+) -> None:
+    _remote, work = repository
+    commit = git("-C", str(work), "rev-parse", "HEAD")
+    ref = VersionChartRef(name="eas", version="1.2.3")
+
+    with pytest.raises(FileNotFoundError, match="Kind wrapper for eas"):
+        git_cache.ChartResolver().kind_wrapper(ref, published_at(commit))
+
+
+def test_published_chart_without_source_commit_is_refused() -> None:
+    ref = VersionChartRef(name="eas", version="1.2.3")
+    published = ChartMetadata(name="eas", version="1.2.3")
+
+    with pytest.raises(ValueError, match="no zepben.com/source-commit annotation"):
+        git_cache.ChartResolver().kind_wrapper(ref, published)

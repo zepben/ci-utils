@@ -48,25 +48,14 @@ def test_argo_repository_must_be_declared(basic_template: dict[str, Any]) -> Non
     )
 
 
-def test_database_reference_must_name_database_service_and_deployments(
+def test_database_reference_must_name_database_service(
     basic_template: dict[str, Any],
 ) -> None:
     basic_template["distribution"] = "dist.yaml"
     basic_template["applications"] = {
-        "eas": {"databases": {"primary": {"service": "missing", "database": "eas"}}}
+        "hcs": {"databases": {"primary": {"service": "missing", "database": "hcs"}}}
     }
     with pytest.raises(ValidationError, match="must name a database service"):
-        EnvironmentTemplate.model_validate(basic_template)
-    basic_template["services"] = {
-        "missing": {
-            "type": "cnpg",
-            "database": "eas",
-            "owner": "eas",
-            "password": "test",
-            "spec": {},
-        }
-    }
-    with pytest.raises(ValidationError, match="deployments"):
         EnvironmentTemplate.model_validate(basic_template)
 
 

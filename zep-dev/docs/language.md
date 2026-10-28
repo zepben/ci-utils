@@ -27,7 +27,8 @@ means the environment variables given to a child process.
 | **Preflight** | Everything that is loaded, validated and resolved before the cluster or operational directory changes. | `lifecycle.preflight` |
 | **Creation plan** | The result of preflight: Template, resolved inputs, execution target, chart references and provisioning data. Resolved once. Provisioning only consumes it. | `lifecycle.CreationPlan` |
 | **Provisioning** | Applying a creation plan to a cluster: namespace and storage classes, supporting services, secrets, runtime resources, application manifests, then application charts. | `lifecycle.create_environment` |
-| **Runtime resources** | Kubernetes resources created from the production Terraform runtime-contract wrappers, for Applications that need databases. | `terraform.RuntimeApplication`, `terraform.apply_runtime` |
+| **Kind wrapper** | The Terraform module zep-dev applies to give an Application its runtime contract in an Environment. It calls the Application's runtime contract with the Environment's namespace and database connections, and fills in test settings that production would supply. An Application keeps it in its own repository at `helm/charts/<app>/kind-runtime-contract`, and zep-dev takes it from the same revision as the chart. | `chart_sources.ChartResolver.kind_wrapper`, `terraform.RuntimeApplication.module` |
+| **Runtime resources** | The Kubernetes resources an Application's Kind wrapper creates, for Applications that need databases. | `terraform.RuntimeApplication`, `terraform.apply_runtime` |
 
 ## External terms
 
@@ -37,5 +38,5 @@ These come from outside this repository. Do not rename them.
 | --- | --- |
 | **Distribution** | The concept in the deployments wiki ("Distribution Concept to Assist Integration Testing"). |
 | **EWB**, **EAS**, **HCS**, **web client** | Zepben applications. Chart names `ewb`, `eas`, `hcs`, `eas-web-client`. Source repositories in `chart_sources.REPOSITORIES`: `energy-workbench-server`, `evolve-app-server`, `hosting-capacity-service`, `evolve-web-app`. |
-| **Runtime contract** | Terraform modules in the `deployments` repository (`<app>-kind-runtime-contract`) that define what an Application expects at runtime. |
+| **Runtime contract** | Terraform modules that create the Kubernetes objects, mostly Secrets and ConfigMaps, that an Application's chart expects by name. An Application keeps them in its own repository under `helm/charts/<app>/runtime-contract/`. |
 | **Kind**, **Helm**, **kubectl**, **Terraform**, **CNPG**, **Argo CD** | Tool vocabulary. Kind cluster options, CNPG `spec` and Helm `values` pass through unmodelled. |

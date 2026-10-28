@@ -10,6 +10,7 @@ import yaml
 from click.testing import CliRunner
 from pydantic import ValidationError
 
+from tests.support.charts import pull_chart_package
 from tests.support.execution import FakeExecute, FakeExecuteFactory, option_value
 from tests.support.fixtures import PrepareKind, WriteDistribution
 from zep_dev.cli import cli
@@ -244,7 +245,7 @@ def test_mixed_distribution_build_and_preflight(
 ) -> None:
     distribution = write_distribution(ewb={"local": True}, eas={"version": "2.0.0"})
     original = distribution.read_bytes()
-    remote = fake_execute(chart_sources).on("helm", "show", "chart")
+    remote = fake_execute(chart_sources).on("helm", "pull", hook=pull_chart_package)
     result = CliRunner().invoke(
         cli, ["distribution", "build", "--distribution", str(distribution)]
     )
@@ -256,7 +257,7 @@ def test_mixed_distribution_build_and_preflight(
     assert isinstance(plan.charts[0], LocalChartRef)
     assert plan.charts[1].chart.endswith("/eas")
     assert len(build_tools.calls_for("helm", "package")) == 1
-    assert all(call.args[3].endswith("/eas") for call in remote.calls)
+    assert all(call.args[2].endswith("/eas") for call in remote.calls)
 
 
 @pytest.mark.parametrize("output", [None, b""])

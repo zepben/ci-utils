@@ -3,6 +3,7 @@
 import pytest
 from click.testing import CliRunner
 
+from tests.support.charts import pull_chart_package
 from tests.support.execution import FakeExecuteFactory
 from tests.support.fixtures import WriteDistribution
 from zep_dev.cli import cli
@@ -20,7 +21,7 @@ def test_build_checks_selected_versions_and_preserves_document(
         eas={"version": "1.1.0"},
     )
     original = path.read_text(encoding="utf-8")
-    fake = fake_execute(chart_sources).on("helm", "show", "chart")
+    fake = fake_execute(chart_sources).on("helm", "pull", hook=pull_chart_package)
 
     result = CliRunner().invoke(
         cli, ["distribution", "build", "--distribution", str(path)]
@@ -28,8 +29,8 @@ def test_build_checks_selected_versions_and_preserves_document(
 
     assert result.exit_code == 0, result.exception or result.output
     assert sorted(
-        (entry.args[3], entry.args[entry.args.index("--version") + 1])
-        for entry in fake.calls_for("helm", "show", "chart")
+        (entry.args[2], entry.args[entry.args.index("--version") + 1])
+        for entry in fake.calls_for("helm", "pull")
     ) == [
         ("oci://ghcr.io/zepben/charts/eas", "1.1.0"),
         ("oci://ghcr.io/zepben/charts/ewb", "1.0.0"),
@@ -43,7 +44,7 @@ def test_missing_version_stops_distribution_build(
 ) -> None:
     path = write_distribution(ewb={"version": "9.9.9"}, eas={"version": "1.0.0"})
     fake = fake_execute(chart_sources).on(
-        "helm", "show", "chart", returncode=1, stderr="manifest unknown"
+        "helm", "pull", returncode=1, stderr="manifest unknown"
     )
 
     result = CliRunner().invoke(

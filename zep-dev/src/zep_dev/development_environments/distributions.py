@@ -15,6 +15,8 @@ from zep_dev.development_environments.names import NonEmptyStr
 
 type ChartName = Literal["ewb", "eas", "hcs", "eas-web-client"]
 
+APPLICATION_RUNTIME_CONTRACTS: frozenset[ChartName] = frozenset({"eas"})
+
 CHART_OCI_PREFIX = "oci://ghcr.io/zepben/charts"
 GHCR_REGISTRY = "ghcr.io"
 APP_HELM_TIMEOUT = "10m"

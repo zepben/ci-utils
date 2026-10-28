@@ -2,6 +2,3 @@
 mounts:
   # Change this path to point to your local network
   ewb-data: /home/alice/data/network
-repositories:
-  # Change this one to point to the deployments repo
-  deployments: /home/alice/git/deployments

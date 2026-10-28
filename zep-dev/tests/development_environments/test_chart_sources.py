@@ -18,7 +18,7 @@ def test_wait_for_oci_times_out_with_actions_context(
     fake_clock: FakeClock,
 ) -> None:
     monkeypatch.setattr(chart_sources, "_TIMEOUT", 100)
-    monkeypatch.setattr(chart_sources, "probe_oci_chart", lambda *args, **kwargs: False)
+    monkeypatch.setattr(chart_sources, "probe_oci_chart", lambda *args, **kwargs: None)
     ref = SourceChartRef(
         name="ewb",
         version="1.2.3",
@@ -45,7 +45,7 @@ def test_wait_for_oci_times_out_with_actions_context(
 def test_oci_probe_propagates_errors_other_than_missing_chart(
     fake_execute: FakeExecuteFactory, detail: str
 ) -> None:
-    fake_execute(chart_sources).on("helm", "show", "chart", returncode=1, stderr=detail)
+    fake_execute(chart_sources).on("helm", "pull", returncode=1, stderr=detail)
     with pytest.raises(RuntimeError, match=detail):
         chart_sources.probe_oci_chart("eas", "1.2.3", report=False)
 
@@ -54,5 +54,5 @@ def test_oci_probe_propagates_errors_other_than_missing_chart(
 def test_oci_probe_identifies_missing_chart(
     fake_execute: FakeExecuteFactory, detail: str
 ) -> None:
-    fake_execute(chart_sources).on("helm", "show", "chart", returncode=1, stderr=detail)
-    assert chart_sources.probe_oci_chart("eas", "1.2.3", report=False) is False
+    fake_execute(chart_sources).on("helm", "pull", returncode=1, stderr=detail)
+    assert chart_sources.probe_oci_chart("eas", "1.2.3", report=False) is None

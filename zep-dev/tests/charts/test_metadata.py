@@ -53,8 +53,9 @@ def test_metadata_update_sets_release_and_image_metadata(
         encoding="utf-8",
     )
     monkeypatch.setattr(
-        metadata_module, "calculate_chart_version", lambda: "1.2.3-4+abc1234"
+        metadata_module, "calculate_chart_version", lambda _chart: "1.2.3-4+abc1234"
     )
+    monkeypatch.setattr(metadata_module, "source_commit", lambda _chart: "abc1234")
 
     result = CliRunner().invoke(
         cli,
@@ -77,6 +78,7 @@ def test_metadata_update_sets_release_and_image_metadata(
     assert chart_yaml["annotations"] == {
         "zepben.com/publish-with-application-image": "true",
         "example.com/owner": "platform",
+        "zepben.com/source-commit": "abc1234",
     }
     assert values_yaml == {"replicas": 2, "image": {"tag": "sha-abc1234"}}
 
@@ -90,7 +92,10 @@ def test_metadata_update_without_image_tag_leaves_values_unchanged(
     )
     values_yaml = chart_dir / "values.yaml"
     values_yaml.write_text("unchanged: true\n", encoding="utf-8")
-    monkeypatch.setattr(metadata_module, "calculate_chart_version", lambda: "2.0.0")
+    monkeypatch.setattr(
+        metadata_module, "calculate_chart_version", lambda _chart: "2.0.0"
+    )
+    monkeypatch.setattr(metadata_module, "source_commit", lambda _chart: "abc1234")
 
     result = CliRunner().invoke(
         cli, ["chart", "metadata", "update", "--chart", str(chart_dir)]
@@ -98,9 +103,9 @@ def test_metadata_update_without_image_tag_leaves_values_unchanged(
 
     assert result.exit_code == 0
     assert values_yaml.read_text(encoding="utf-8") == "unchanged: true\n"
-    assert "annotations" not in yaml.safe_load(
-        (chart_dir / "Chart.yaml").read_text(encoding="utf-8")
-    )
+    assert yaml.safe_load((chart_dir / "Chart.yaml").read_text(encoding="utf-8"))[
+        "annotations"
+    ] == {"zepben.com/source-commit": "abc1234"}
 
 
 def test_metadata_update_rejects_image_tag_without_annotation(tmp_path: Path) -> None:
@@ -201,7 +206,10 @@ def test_metadata_update_annotates_the_last_commit_touching_the_runtime_contract
         "runtime-contract",
         stdout="abc123\n",
     )
-    monkeypatch.setattr(metadata_module, "calculate_chart_version", lambda: "2.0.0")
+    monkeypatch.setattr(
+        metadata_module, "calculate_chart_version", lambda _chart: "2.0.0"
+    )
+    monkeypatch.setattr(metadata_module, "source_commit", lambda _chart: "abc1234")
 
     result = CliRunner().invoke(
         cli, ["chart", "metadata", "update", "--chart", str(chart_dir)]
@@ -209,7 +217,8 @@ def test_metadata_update_annotates_the_last_commit_touching_the_runtime_contract
 
     assert result.exit_code == 0
     assert yaml.safe_load((chart_dir / "Chart.yaml").read_text())["annotations"] == {
-        "zepben.com/runtime-contract-ref": "abc123"
+        "zepben.com/source-commit": "abc1234",
+        "zepben.com/runtime-contract-ref": "abc123",
     }
 
 

@@ -18,6 +18,7 @@ from zep_dev.development_environments.distributions import (
     PullRequestLocator,
 )
 from zep_dev.github_api import GitHubAPI
+from zep_dev.models import ChartMetadata
 
 SHA = "a" * 40
 
@@ -105,7 +106,8 @@ def test_present_source_chart_preserves_sha_without_dispatch(
     locator: PullRequestLocator | BranchLocator | CommitLocator,
     expected: tuple[object, ...],
 ) -> None:
-    monkeypatch.setattr(chart_sources, "probe_oci_chart", lambda *args, **kw: True)
+    published = ChartMetadata(name="ewb", version="1.2.3")
+    monkeypatch.setattr(chart_sources, "probe_oci_chart", lambda *args, **kw: published)
 
     ref = resolver.resolve("ewb", locator)
     resolver.ensure(ref)
@@ -148,7 +150,7 @@ def test_missing_ghcr_entry_fails_before_dispatch(
     registry = tmp_path / "registry.json"
     registry.write_text('{"auths": {}}\n', encoding="utf-8")
     monkeypatch.setenv("HELM_REGISTRY_CONFIG", str(registry))
-    monkeypatch.setattr(chart_sources, "probe_oci_chart", lambda *args, **kw: False)
+    monkeypatch.setattr(chart_sources, "probe_oci_chart", lambda *args, **kw: None)
     ref = resolver.resolve("ewb", CommitLocator(commit=SHA))
 
     with pytest.raises(FileNotFoundError, match="GHCR credentials missing"):
@@ -177,10 +179,10 @@ def test_missing_source_chart_dispatches_and_waits_for_oci(
         report: bool = True,
         timeout: float = chart_sources.OCI_PROBE_TIMEOUT,
         progress: Callable[[str], None] | None = None,
-    ) -> bool:
+    ) -> ChartMetadata | None:
         assert (name, version) == ("ewb", "1.2.3")
         reports.append(report)
-        return len(reports) == 3
+        return ChartMetadata(name=name, version=version) if len(reports) == 3 else None
 
     monkeypatch.setattr(chart_sources, "probe_oci_chart", probe)
     ref = resolver.resolve("ewb", CommitLocator(commit=SHA))

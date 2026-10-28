@@ -14,7 +14,6 @@ from zep_dev.development_environments.templates import EnvironmentTemplate
 @dataclass(frozen=True)
 class ResolvedInputs:
     mounts: dict[str, Path]
-    repositories: dict[str, Path]
     secrets: dict[str, SecretSource]
     argo_repositories: dict[str, Path]
 
@@ -65,16 +64,12 @@ def resolve_inputs(template: EnvironmentTemplate, bindings: Bindings) -> Resolve
         if isinstance(service, HelmService) and service.integration is not None
         for name in service.integration.repositories
     }
-    required_repositories = argo_names.copy()
-    if any(application.databases for application in template.applications.values()):
-        required_repositories.add("deployments")
-    repositories = {
+    argo_repositories = {
         name: resolve_directory(
             bindings.repositories.get(name), f"bindings.repositories.{name}"
         )
-        for name in sorted(required_repositories)
+        for name in sorted(argo_names)
     }
-    argo_repositories = {name: repositories[name] for name in sorted(argo_names)}
     for name, path in argo_repositories.items():
         validate_git_checkout(name, path)
     secrets: dict[str, SecretSource] = {}
@@ -86,7 +81,6 @@ def resolve_inputs(template: EnvironmentTemplate, bindings: Bindings) -> Resolve
         secrets[key] = source
     return ResolvedInputs(
         mounts=mounts,
-        repositories=repositories,
         secrets=secrets,
         argo_repositories=argo_repositories,
     )

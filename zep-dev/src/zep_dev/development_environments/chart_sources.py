@@ -9,7 +9,6 @@ import os
 import re
 import shutil
 import subprocess
-import tarfile
 import tempfile
 import time
 from collections.abc import Callable
@@ -17,11 +16,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, assert_never
 
-import yaml
-
 from zep_dev.chart_version import SOURCE_COMMIT_ANNOTATION, calculate_chart_version
+from zep_dev.charts.published import CHART_OCI_PREFIX, published_chart_metadata
 from zep_dev.development_environments.distributions import (
-    CHART_OCI_PREFIX,
     BranchLocator,
     ChartLocator,
     ChartName,
@@ -42,9 +39,8 @@ from zep_dev.development_environments.local_charts import (
 from zep_dev.development_environments.registry_config import RegistryConfig
 from zep_dev.github_api import GitHubAPI
 from zep_dev.models import ChartMetadata
-from zep_dev.shared import execute, resolve_registry_config
+from zep_dev.shared import resolve_registry_config
 
-OCI_PROBE_TIMEOUT = 60
 _POLL_INTERVAL = 30
 _PROGRESS_INTERVAL = 5 * 60
 _TIMEOUT = 60 * 60
@@ -203,50 +199,15 @@ def probe_oci_chart(
     version: str,
     *,
     report: bool = True,
-    timeout: float = OCI_PROBE_TIMEOUT,
     progress: Callable[[str], None] | None = None,
 ) -> ChartMetadata | None:
-    """Return the published chart's metadata, or None if it is not in OCI.
-
-    Fail on errors other than not-found. Auth and network errors are not
-    the same as a missing chart.
-    """
-    oci_ref = f"{CHART_OCI_PREFIX}/{name}"
+    """Return the published chart's metadata, or None if it is not in OCI."""
     if report and progress is not None:
         progress(f"  checking OCI {name}:{version}")
-    with tempfile.TemporaryDirectory(prefix="zep-dev-chart-") as destination:
-        result = execute(
-            "helm",
-            "pull",
-            oci_ref,
-            "--version",
-            version,
-            "--destination",
-            destination,
-            capture_stdout=True,
-            capture_stderr=True,
-            check=False,
-            timeout=timeout,
-        )
-        if result.returncode == 0:
-            if report and progress is not None:
-                progress(f"  OCI present {name}:{version}")
-            package = Path(destination) / f"{name}-{version}.tgz"
-            return packaged_chart_metadata(package, name)
-
-    detail = (result.stderr or result.stdout).strip() or f"exit {result.returncode}"
-    message = detail.lower()
-    if any(token in message for token in ("not found", "manifest unknown", "404")):
-        return None
-    raise RuntimeError(f"OCI error for {oci_ref}:{version}: {detail}.")
-
-
-def packaged_chart_metadata(package: Path, name: ChartName) -> ChartMetadata:
-    with tarfile.open(package, "r:gz") as archive:
-        chart_yaml = archive.extractfile(f"{name}/Chart.yaml")
-        if chart_yaml is None:
-            raise RuntimeError(f"{package} has no {name}/Chart.yaml")
-        return ChartMetadata.model_validate(yaml.safe_load(chart_yaml))
+    metadata = published_chart_metadata(name, version)
+    if metadata is not None and report and progress is not None:
+        progress(f"  OCI present {name}:{version}")
+    return metadata
 
 
 def require_ghcr_credentials() -> None:

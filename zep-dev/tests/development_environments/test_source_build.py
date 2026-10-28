@@ -177,7 +177,6 @@ def test_missing_source_chart_dispatches_and_waits_for_oci(
         version: str,
         *,
         report: bool = True,
-        timeout: float = chart_sources.OCI_PROBE_TIMEOUT,
         progress: Callable[[str], None] | None = None,
     ) -> ChartMetadata | None:
         assert (name, version) == ("ewb", "1.2.3")

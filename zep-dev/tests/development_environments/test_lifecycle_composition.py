@@ -8,6 +8,7 @@ import pytest
 from tests.support.execution import FakeExecute, FakeExecuteFactory, option_value
 from tests.support.fixtures import PrepareKind, WriteDistribution
 from tests.support.resolvers import RecordingChartResolver
+from zep_dev.charts import published
 from zep_dev.development_environments import (
     chart_sources,
     cnpg,
@@ -322,7 +323,7 @@ def test_missing_source_chart_is_refused_without_build_or_cluster_mutation(
     )
     ensure = Mock(side_effect=AssertionError("creation requested a build"))
     monkeypatch.setattr(chart_sources.ChartResolver, "ensure", ensure)
-    probe = fake_execute(chart_sources).on(
+    probe = fake_execute(published).on(
         "helm", "pull", returncode=1, stderr="manifest unknown"
     )
     cluster = prepare_kind()

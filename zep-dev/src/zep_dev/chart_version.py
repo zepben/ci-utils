@@ -60,6 +60,17 @@ def git_prefix(repo: Path | None) -> tuple[str, ...]:
     return ("git", "-C", str(repo)) if repo is not None else ("git",)
 
 
+def git_toplevel(directory: Path) -> Path:
+    toplevel = execute(
+        *git_prefix(directory),
+        "rev-parse",
+        "--show-toplevel",
+        skip_resolve=True,
+        capture_stdout=True,
+    ).stdout.strip()
+    return Path(toplevel).resolve()
+
+
 def git_tags_at_head(repo: Path | None = None, ref: str = "HEAD") -> list[str]:
     return execute(
         *git_prefix(repo),

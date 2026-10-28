@@ -4,6 +4,7 @@ from pathlib import Path
 
 import click
 
+from zep_dev.chart_version import git_toplevel
 from zep_dev.shared import execute
 from zep_dev.static import CT_YAML
 
@@ -27,18 +28,7 @@ def list_changed(helm_dir: Path, target_branch: str, since: str | None) -> None:
     if not ct_path.is_file():
         raise FileNotFoundError(f"{CT_YAML} is required in the root of --helm-dir")
 
-    # Get the root of our git repo.
-    repo_root = Path(
-        execute(
-            "git",
-            "-C",
-            str(helm_dir),
-            "rev-parse",
-            "--show-toplevel",
-            skip_resolve=True,
-            capture_stdout=True,
-        ).stdout.strip()
-    ).resolve()
+    repo_root = git_toplevel(helm_dir)
 
     # ct list-changed operates a bit differently to the other CT commands.
     # It must be executed from the root of the repo, and the paths to

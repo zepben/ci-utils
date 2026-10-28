@@ -196,10 +196,10 @@ load-database configuration in `supporting.py`. A database service's provider
 module supplies only its in-cluster address (`kubernetes.ServiceAddress`).
 
 Outside the package: `shared.py`, `github_api.py`, `infrastructure/` (generic
-helpers); `charts/`, `commands/chart/`, `commands/tools/`, `chart_version.py`,
-`runtime_contract.py`, `models.py` (chart CI and tool installation, a future
-context). `images pack` is
-registered in this context's CLI but implemented in `charts/images.py`.
+helpers); `charts/`, `commands/chart/`, `commands/runtime_contract/`,
+`commands/tools/`, `chart_version.py`, `runtime_contract.py`, `models.py` (chart
+CI and tool installation, a future context). `images pack` is registered in
+this context's CLI but implemented in `charts/images.py`.
 
 ## Tests
 

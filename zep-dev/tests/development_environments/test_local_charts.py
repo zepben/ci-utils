@@ -13,9 +13,10 @@ from pydantic import ValidationError
 from tests.support.charts import published_chart
 from tests.support.execution import FakeExecute, FakeExecuteFactory, option_value
 from tests.support.fixtures import PrepareKind, WriteDistribution
+from tests.support.git import commit_all, git, init_repository
+from zep_dev.charts import published
 from zep_dev.cli import cli
 from zep_dev.development_environments import (
-    chart_sources,
     helm,
     lifecycle,
     local_charts,
@@ -245,7 +246,9 @@ def test_mixed_distribution_build_and_preflight(
 ) -> None:
     distribution = write_distribution(ewb={"local": True}, eas={"version": "2.0.0"})
     original = distribution.read_bytes()
-    remote = fake_execute(chart_sources).on("helm", "pull", hook=pull_chart_package)
+    remote = fake_execute(published).on(
+        "helm", "show", "chart", stdout=published_chart("eas", "2.0.0")
+    )
     result = CliRunner().invoke(
         cli, ["distribution", "build", "--distribution", str(distribution)]
     )

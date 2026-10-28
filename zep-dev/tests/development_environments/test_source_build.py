@@ -170,21 +170,13 @@ def test_missing_source_chart_dispatches_and_waits_for_oci(
     registry = tmp_path / "registry.json"
     registry.write_text('{"auths": {"ghcr.io": {}}}\n', encoding="utf-8")
     monkeypatch.setenv("HELM_REGISTRY_CONFIG", str(registry))
-    reports: list[bool] = []
+    probes: list[tuple[str, str]] = []
 
-    def probe(
-        name: str,
-        version: str,
-        *,
-        report: bool = True,
-        timeout: float = chart_sources.OCI_PROBE_TIMEOUT,
-        progress: Callable[[str], None] | None = None,
-    ) -> ChartMetadata | None:
-        assert (name, version) == ("ewb", "1.2.3")
-        reports.append(report)
-        return ChartMetadata(name=name, version=version) if len(reports) == 3 else None
+    def published(name: str, version: str) -> ChartMetadata | None:
+        probes.append((name, version))
+        return ChartMetadata(name=name, version=version) if len(probes) == 3 else None
 
-    monkeypatch.setattr(chart_sources, "probe_oci_chart", probe)
+    monkeypatch.setattr(chart_sources, "published_chart_metadata", published)
     ref = resolver.resolve("ewb", CommitLocator(commit=SHA))
     resolver.ensure(ref)
 

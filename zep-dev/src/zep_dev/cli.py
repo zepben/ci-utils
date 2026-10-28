@@ -11,6 +11,7 @@ from zep_dev.development_environments.cli import (
     terraform_group,
 )
 from zep_dev.groups.chart import chart
+from zep_dev.groups.runtime_contract import runtime_contract
 from zep_dev.groups.tools import tools
 from zep_dev.shared import get_bin_dir, resolve_registry_config
 
@@ -64,5 +65,6 @@ cli.add_command(distribution)
 cli.add_command(images_group)
 cli.add_command(tools)
 cli.add_command(chart)
+cli.add_command(runtime_contract)
 cli.add_command(secrets_group)
 cli.add_command(terraform_group)

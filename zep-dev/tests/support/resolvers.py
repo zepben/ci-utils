@@ -7,6 +7,7 @@ from zep_dev.development_environments.distributions import (
     ChartName,
     Charts,
 )
+from zep_dev.models import ChartMetadata
 
 
 @dataclass
@@ -27,8 +28,9 @@ class RecordingChartResolver(ChartResolver):
         return self.refs
 
     @override
-    def check_all(self, refs: list[ChartRef]) -> None:
+    def check_all(self, refs: list[ChartRef]) -> list[ChartMetadata | None]:
         self.checked.extend(refs)
+        return [None for _ref in refs]
 
     @override
     def resolve(self, name: ChartName, locator: ChartLocator) -> ChartRef:

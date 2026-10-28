@@ -18,7 +18,10 @@ from zep_dev.development_environments.target import (
     ExecutionTarget,
     kubernetes_namespace,
 )
-from zep_dev.development_environments.templates import EnvironmentTemplate
+from zep_dev.development_environments.templates import (
+    DatabaseReference,
+    EnvironmentTemplate,
+)
 from zep_dev.shared import execute
 
 
@@ -42,7 +45,7 @@ class RuntimeModule(TypedDict):
 class RuntimeApplication:
     application: ChartName
     databases: dict[str, DatabaseConnection]
-    module: Path
+    module: Path | str
 
 
 def runtime_state(target: ExecutionTarget) -> Path:
@@ -59,36 +62,36 @@ def database_address(
             assert_never(service)
 
 
+def database_connection(
+    target: ExecutionTarget, template: EnvironmentTemplate, reference: DatabaseReference
+) -> DatabaseConnection:
+    service = template.database_service(reference.service)
+    if service is None:
+        raise ValueError(f"{reference.service} is not a database service")
+    address = database_address(target, reference.service, service)
+    return {
+        "host": address.host,
+        "port": address.port,
+        "name": reference.database,
+        "username": service.owner,
+        "password": service.password,
+    }
+
+
 def resolve_runtime_applications(
     target: ExecutionTarget,
     template: EnvironmentTemplate,
-    deployments_checkout: Path | None,
+    kind_wrappers: Mapping[ChartName, Path | str],
 ) -> tuple[RuntimeApplication, ...]:
+    """One runtime application per located Kind wrapper; `databases` may be empty."""
     applications: list[RuntimeApplication] = []
-    for app, application in template.applications.items():
-        if not application.databases:
-            continue
-        if deployments_checkout is None:
-            raise ValueError("deployments repository is required for runtime databases")
-        module = (
-            deployments_checkout
-            / f"terraform/modules/kubernetes/{app}-kind-runtime-contract"
-        ).resolve()
-        if not module.is_dir():
-            raise FileNotFoundError(f"runtime wrapper for {app} not found: {module}")
-        databases: dict[str, DatabaseConnection] = {}
-        for name, reference in application.databases.items():
-            service = template.database_service(reference.service)
-            if service is None:
-                raise ValueError(f"{reference.service} is not a database service")
-            address = database_address(target, reference.service, service)
-            databases[name] = {
-                "host": address.host,
-                "port": address.port,
-                "name": reference.database,
-                "username": service.owner,
-                "password": service.password,
-            }
+    for app, module in kind_wrappers.items():
+        application = template.applications.get(app)
+        references = application.databases if application is not None else {}
+        databases = {
+            name: database_connection(target, template, reference)
+            for name, reference in references.items()
+        }
         applications.append(RuntimeApplication(app, databases, module))
     return tuple(applications)
 
@@ -103,9 +106,15 @@ def generate_runtime_root(
     inputs: dict[ChartName, dict[str, DatabaseConnection]] = {}
     for application in applications:
         app = application.application
-        source = os.path.relpath(application.module, start=root)
+        match application.module:
+            case Path():
+                source = os.path.relpath(application.module, start=root)
+                if not source.startswith("."):
+                    source = f"./{source}"
+            case str():
+                source = application.module
         modules[f"{app}_runtime_contract"] = {
-            "source": source if source.startswith(".") else f"./{source}",
+            "source": source,
             "namespace": "${var.namespace}",
             "databases": f"${{var.databases.{app}}}",
         }

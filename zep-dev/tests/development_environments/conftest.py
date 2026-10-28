@@ -108,14 +108,7 @@ def write_bindings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> WriteBind
 
 @pytest.fixture
 def deployments_checkout(tmp_path: Path) -> Path:
-    """Local input shape only; wrapper compatibility belongs to its owning repository."""
-    checkout = tmp_path / "deployments"
-    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
-    for name in ("eas", "hcs"):
-        (checkout / f"terraform/modules/kubernetes/{name}-kind-runtime-contract").mkdir(
-            parents=True
-        )
-    return checkout
+    return init_repository(tmp_path / "deployments")
 
 
 @pytest.fixture

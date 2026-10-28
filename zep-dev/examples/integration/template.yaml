@@ -1,5 +1,5 @@
-# Application/database example. Published application charts and the EAS Kind runtime
-# wrapper in the bound deployments checkout must be available before creation.
+# Application/database example. Published application charts must be available before
+# creation; EAS's Kind wrapper comes from evolve-app-server at the chart's source commit.
 # CNPG password is disposable development data. Host ports 8080/8081 are exclusive.
 # EWB needs a network model in the ewb-data Binding (see networkDate under ewb).
 metadata:
@@ -160,5 +160,3 @@ applications:
 inputs:
   mounts:
   - ewb-data
-  repositories:
-  - deployments

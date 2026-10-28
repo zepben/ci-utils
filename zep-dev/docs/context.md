@@ -24,7 +24,7 @@ together.
 
 | Neighbour | Direction | Relationship |
 | --- | --- | --- |
-| Kind, kubectl, Helm, Terraform, Podman/Docker, GHCR/OCI, GitHub API and Actions, and the `deployments` repository (`<app>-kind-runtime-contract` Terraform wrappers) | Upstream | We conform to their commands and formats. `kind.py`, `kubernetes.py`, `helm.py`, `terraform.py` and `github_api.py` translate our model into their terms and keep tool details out of the core. |
+| Kind, kubectl, Helm, Terraform, Podman/Docker, GHCR/OCI, GitHub API and Actions, and the Kind wrappers in Application repositories | Upstream | We conform to their commands and formats. `kind.py`, `kubernetes.py`, `helm.py`, `terraform.py` and `github_api.py` translate our model into their terms and keep tool details out of the core. |
 | Application teams' integration tests, CI | Downstream | They consume `environment describe` JSON and the kubeconfig path (see Contracts and limits). |
 | Chart CI (`zep-dev chart ...`), tool installation | Separate | A future CI context will own them. They must not import this package (enforced). In that code "chart" means a directory under a Helm directory. |
 
@@ -49,7 +49,8 @@ rejected) and `local_inputs.py` for Bindings.
 - Different names never share a cluster, namespace or files.
 
 **Creation, reuse and failure** (tests: `test_lifecycle_policy.py`,
-`test_lifecycle_composition.py`, `test_provisioning_composition.py`)
+`test_lifecycle_composition.py`, `test_provisioning_composition.py`,
+`test_git_cache.py`)
 
 - Preflight resolves and validates everything before the cluster or operational
   directory changes.
@@ -59,6 +60,15 @@ rejected) and `local_inputs.py` for Bindings.
   change.
 - Supporting services run in Template order, with no dependency graph. Runtime
   resources are applied before application manifests and charts.
+- Every selected chart whose revision has a Kind wrapper gets it applied, with the
+  Application's `databases` connections, which may be none. For `local: true` the
+  revision is the chart's checkout. For other Locators it is the commit recorded in
+  the published chart's `zepben.com/source-commit` annotation, which Terraform
+  fetches with a `git::` source. A wrapper applies a runtime contract, so a published
+  chart without `zepben.com/runtime-contract-ref`, or without its source commit, is
+  treated as having no wrapper and its repository is not fetched. Preflight refuses
+  `databases` declared for an Application whose wrapper cannot be located, and a
+  commit that is not on a branch or tag.
 - On reuse, a supporting Helm release that is absent or `uninstalled` is installed, one
   that is `deployed` is not reinstalled, and any other status is an error.
 - A failure after creation begins keeps the partial Environment.
@@ -134,11 +144,13 @@ Limits and their reasons:
 - Argo repository integration needs a Kind worker node, because repo-server is
   scheduled away from control-plane nodes. It mounts the checkout read-only and
   registers the repository. It creates no Argo Applications.
+- A Kind wrapper's required `databases` keys are checked by Terraform at apply time,
+  after the cluster and supporting services exist. Preflight does not read the
+  wrapper's variables.
 - Database connections are passed as a sensitive `databases` map to the
-  application's `<app>-kind-runtime-contract` Kind wrapper in the `deployments`
-  repository. They require the `deployments` input, and application resources use the
-  Environment namespace even when the database service uses another. The base
-  runtime-contract modules are not interchangeable with those wrappers.
+  application's Kind wrapper. Application resources use the Environment namespace
+  even when the database service uses another. Runtime contracts cannot be applied
+  directly; only their Kind wrappers can.
 - `environment describe` assumes the caller shares the container host's loopback
   network. Remote-runtime address translation is unsupported.
 
@@ -171,7 +183,7 @@ predictable. **Supporting**: translates the model into tool commands, or serves 
 | `templates.py`, `services.py` | core | Template and supporting-service schemas, cross-reference rules |
 | `distributions.py` | core | Distribution schema, Locators, chart order |
 | `bindings.py` | core | Bindings schema |
-| `chart_sources.py` | core | Locator resolution, OCI checks, Distribution build (and a generic Git cache) |
+| `chart_sources.py` | core | Locator resolution, OCI checks, Kind wrapper location, Distribution build (and a generic Git cache) |
 | `lifecycle.py` | core | Preflight, creation plan, create, reuse, destroy, list, kubeconfig |
 | `target.py` | core | Execution target, operational directory paths, child process environment |
 | `local_inputs.py` | supporting | Bindings discovery, resolving host inputs |
@@ -210,7 +222,10 @@ Tests are grouped by what they isolate:
 A test's name states the rule it protects, so search the rule's words to find it.
 Shared fixtures live in `conftest.py`, reusable test doubles in `tests/support/`.
 Tests stub cluster and network boundaries. They do not establish compatibility with
-live tools or with the `deployments` wrappers.
+live tools or with Kind wrappers. Test repositories come from `tests/support/git.py`,
+which isolates Git from the developer's own configuration. The root `conftest.py`
+pins the container engine, clears `CI_DUMP_DEBUG` and redirects `XDG_CACHE_HOME`
+for every test.
 
 ## To change X, look at Y
 

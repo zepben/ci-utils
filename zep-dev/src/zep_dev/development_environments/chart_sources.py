@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import subprocess
+import tarfile
 import tempfile
 import time
 from collections.abc import Callable
@@ -16,7 +17,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, assert_never
 
-from zep_dev.chart_version import calculate_chart_version
+import yaml
+
+from zep_dev.chart_version import SOURCE_COMMIT_ANNOTATION, calculate_chart_version
 from zep_dev.development_environments.distributions import (
     CHART_OCI_PREFIX,
     BranchLocator,
@@ -38,6 +41,7 @@ from zep_dev.development_environments.local_charts import (
 )
 from zep_dev.development_environments.registry_config import RegistryConfig
 from zep_dev.github_api import GitHubAPI
+from zep_dev.models import ChartMetadata
 from zep_dev.shared import execute, resolve_registry_config
 
 OCI_PROBE_TIMEOUT = 60
@@ -52,6 +56,8 @@ REPOSITORIES: dict[ChartName, str] = {
     "hcs": "hosting-capacity-service",
     "eas-web-client": "evolve-web-app",
 }
+
+KIND_WRAPPER = "kind-runtime-contract"
 
 
 @dataclass(frozen=True)
@@ -199,8 +205,8 @@ def probe_oci_chart(
     report: bool = True,
     timeout: float = OCI_PROBE_TIMEOUT,
     progress: Callable[[str], None] | None = None,
-) -> bool:
-    """Return True if the chart is in OCI.
+) -> ChartMetadata | None:
+    """Return the published chart's metadata, or None if it is not in OCI.
 
     Fail on errors other than not-found. Auth and network errors are not
     the same as a missing chart.
@@ -208,28 +214,39 @@ def probe_oci_chart(
     oci_ref = f"{CHART_OCI_PREFIX}/{name}"
     if report and progress is not None:
         progress(f"  checking OCI {name}:{version}")
-    result = execute(
-        "helm",
-        "show",
-        "chart",
-        oci_ref,
-        "--version",
-        version,
-        capture_stdout=True,
-        capture_stderr=True,
-        check=False,
-        timeout=timeout,
-    )
-    if result.returncode == 0:
-        if report and progress is not None:
-            progress(f"  OCI present {name}:{version}")
-        return True
+    with tempfile.TemporaryDirectory(prefix="zep-dev-chart-") as destination:
+        result = execute(
+            "helm",
+            "pull",
+            oci_ref,
+            "--version",
+            version,
+            "--destination",
+            destination,
+            capture_stdout=True,
+            capture_stderr=True,
+            check=False,
+            timeout=timeout,
+        )
+        if result.returncode == 0:
+            if report and progress is not None:
+                progress(f"  OCI present {name}:{version}")
+            package = Path(destination) / f"{name}-{version}.tgz"
+            return packaged_chart_metadata(package, name)
 
     detail = (result.stderr or result.stdout).strip() or f"exit {result.returncode}"
     message = detail.lower()
     if any(token in message for token in ("not found", "manifest unknown", "404")):
-        return False
+        return None
     raise RuntimeError(f"OCI error for {oci_ref}:{version}: {detail}.")
+
+
+def packaged_chart_metadata(package: Path, name: ChartName) -> ChartMetadata:
+    with tarfile.open(package, "r:gz") as archive:
+        chart_yaml = archive.extractfile(f"{name}/Chart.yaml")
+        if chart_yaml is None:
+            raise RuntimeError(f"{package} has no {name}/Chart.yaml")
+        return ChartMetadata.model_validate(yaml.safe_load(chart_yaml))
 
 
 def require_ghcr_credentials() -> None:
@@ -258,7 +275,7 @@ def wait_for_oci(
     start = time.monotonic()
     next_progress = _PROGRESS_INTERVAL
     while True:
-        if probe_oci_chart(ref.name, ref.version, report=False):
+        if published_chart_metadata(ref.name, ref.version) is not None:
             return
         elapsed = time.monotonic() - start
         if elapsed >= next_progress:
@@ -344,30 +361,65 @@ class ChartResolver:
     def resolve_all(self, charts: Charts) -> list[ChartRef]:
         return [self.resolve(name, locator) for name, locator in ordered_charts(charts)]
 
-    def check(self, ref: ChartRef) -> None:
+    def check(self, ref: ChartRef) -> ChartMetadata | None:
         """Require the resolved chart artifact. Do not start a build."""
         match ref:
             case LocalChartRef():
                 check_local_chart(ref)
+                return None
             case VersionChartRef():
-                if not probe_oci_chart(ref.name, ref.version, progress=self._progress):
-                    raise FileNotFoundError(
-                        f"OCI not-found for {ref.chart}:{ref.version}. "
-                        "Publish this version or change the Distribution selection; "
-                        "distribution build cannot build a version: locator."
-                    )
+                missing = (
+                    f"OCI not-found for {ref.chart}:{ref.version}. "
+                    "Publish this version or change the Distribution selection; "
+                    "distribution build cannot build a version: locator."
+                )
             case SourceChartRef():
-                if not probe_oci_chart(ref.name, ref.version, progress=self._progress):
-                    raise FileNotFoundError(
-                        f"Missing OCI chart for charts.{ref.name}.{ref.source} "
-                        f"({ref.version}); run distribution build first"
-                    )
+                missing = (
+                    f"Missing OCI chart for charts.{ref.name}.{ref.source} "
+                    f"({ref.version}); run distribution build first"
+                )
             case _:
                 assert_never(ref)
+        published = probe_oci_chart(ref.name, ref.version, self._progress)
+        if published is None:
+            raise ZepDevError(missing)
+        return published
 
-    def check_all(self, refs: list[ChartRef]) -> None:
-        for ref in refs:
-            self.check(ref)
+    def check_all(self, refs: list[ChartRef]) -> list[ChartMetadata | None]:
+        return [self.check(ref) for ref in refs]
+
+    def kind_wrapper(
+        self, ref: ChartRef, published: ChartMetadata | None
+    ) -> Path | str | None:
+        """Return the Terraform source of the Kind wrapper at the chart's revision.
+
+        None when that revision has no wrapper. A wrapper applies a runtime
+        contract, so a published chart without one has no wrapper and is not
+        fetched; nor is a chart published without its source commit.
+        """
+        path = f"helm/charts/{ref.name}/{KIND_WRAPPER}"
+        match ref:
+            case LocalChartRef():
+                module = ref.repo / path
+                return module if module.is_dir() else None
+            case SourceChartRef() | VersionChartRef():
+                annotations = published.annotations if published is not None else {}
+                commit = annotations.get(SOURCE_COMMIT_ANNOTATION)
+                if commit is None or RUNTIME_CONTRACT_REF_ANNOTATION not in annotations:
+                    return None
+                cache, _api = self.services()
+                repo = cache.ensure_repo(ref.name)
+                cache.trusted_commit(repo, commit)
+                try:
+                    cache.git("cat-file", "-e", f"{commit}:{path}", cwd=repo)
+                except subprocess.CalledProcessError:
+                    return None
+                return (
+                    f"git::ssh://git@github.com/zepben/{REPOSITORIES[ref.name]}.git"
+                    f"//{path}?ref={commit}"
+                )
+            case _:
+                assert_never(ref)
 
     def ensure(self, ref: ChartRef) -> None:
         """Build local charts; ensure remote charts, starting CI when needed."""
@@ -383,7 +435,7 @@ class ChartResolver:
 
     def ensure_source(self, ref: SourceChartRef) -> None:
         """Use the published source chart, or start its CI build and wait for it."""
-        if probe_oci_chart(ref.name, ref.version, progress=self._progress):
+        if probe_oci_chart(ref.name, ref.version, self._progress) is not None:
             self.report(f"  ready {ref.label()}")
             return
 

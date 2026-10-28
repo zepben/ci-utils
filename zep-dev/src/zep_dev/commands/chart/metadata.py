@@ -3,7 +3,11 @@ from pathlib import Path
 
 import click
 
-from zep_dev.chart_version import calculate_chart_version
+from zep_dev.chart_version import (
+    SOURCE_COMMIT_ANNOTATION,
+    calculate_chart_version,
+    source_commit,
+)
 from zep_dev.models import ChartMetadata, ChartValues
 from zep_dev.runtime_contract import (
     RUNTIME_CONTRACT_REF_ANNOTATION,
@@ -88,15 +92,14 @@ def update(chart: Path, image_tag: str) -> None:
     except ValueError as error:
         raise click.ClickException(str(error)) from error
 
-    release_version = calculate_chart_version()
+    release_version = calculate_chart_version(chart)
     chart_metadata.version = release_version
     chart_metadata.appVersion = release_version
+    annotations = {SOURCE_COMMIT_ANNOTATION: source_commit(chart)}
     if contract_ref is not None:
-        # Assign, not mutate: write() keeps only fields that were set.
-        chart_metadata.annotations = {
-            **chart_metadata.annotations,
-            RUNTIME_CONTRACT_REF_ANNOTATION: contract_ref,
-        }
+        annotations[RUNTIME_CONTRACT_REF_ANNOTATION] = contract_ref
+    # Assign, not mutate: write() keeps only fields that were set.
+    chart_metadata.annotations = {**chart_metadata.annotations, **annotations}
     if values is not None:
         values.image.tag = image_tag
 

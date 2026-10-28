@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from tests.support.execution import FakeExecute, FakeExecuteFactory, option_value
-from tests.support.fixtures import PrepareKind, WriteBindings, WriteDistribution
+from tests.support.fixtures import PrepareKind, WriteDistribution
 from tests.support.resolvers import RecordingChartResolver
 from zep_dev.development_environments import (
     chart_sources,
@@ -22,6 +22,7 @@ from zep_dev.development_environments.chart_sources import (
     SourceChartRef,
     VersionChartRef,
 )
+from zep_dev.development_environments.local_charts import LocalChartRef
 from zep_dev.development_environments.target import (
     ExecutionTarget,
     execution_target,
@@ -174,8 +175,8 @@ def test_two_environment_names_use_distinct_clusters_and_files(
 
 
 def test_reuse_without_runtime_state_still_attempts_database_apply(
-    deployments_checkout: Path,
-    write_bindings: WriteBindings,
+    tmp_path: Path,
+    fake_execute: FakeExecuteFactory,
     write_distribution: WriteDistribution,
     chart_resolver: RecordingChartResolver,
     registry_auth: Path,
@@ -186,11 +187,83 @@ def test_reuse_without_runtime_state_still_attempts_database_apply(
     basic_template: dict[str, Any],
     write_template: Callable[[dict[str, Any]], Path],
 ) -> None:
-    write_distribution(eas={"version": "1.0.0"})
+    write_distribution(hcs={"local": True})
     basic_template.update(
         {
             "distribution": "dist.yaml",
-            "inputs": {"repositories": ["deployments"]},
+            "services": {
+                "database": {
+                    "type": "cnpg",
+                    "database": "hcs",
+                    "owner": "hcs",
+                    "password": "development",
+                    "spec": {},
+                }
+            },
+            "applications": {
+                "hcs": {
+                    "databases": {"primary": {"service": "database", "database": "hcs"}}
+                }
+            },
+        }
+    )
+    checkout = tmp_path / "hosting-capacity-service"
+    wrapper = checkout / "helm/charts/hcs/kind-runtime-contract"
+    wrapper.mkdir(parents=True)
+    chart_resolver.refs = [
+        LocalChartRef(
+            name="hcs", version="1.0.0", repo=checkout, package=tmp_path / "hcs.tgz"
+        )
+    ]
+
+    monkeypatch.setattr(cnpg, "apply_cnpg_service", lambda *_args: None)
+    monkeypatch.setattr(helm, "install_applications", lambda *_args: None)
+    runtime_root = execution_target("integration").runtime_root
+    terraform_calls = (
+        fake_execute(terraform)
+        .on("terraform", f"-chdir={runtime_root}", "init")
+        .on("terraform", f"-chdir={runtime_root}", "apply")
+    )
+    calls = prepare_kind(present=True)
+    prepare_kubectl()
+    lifecycle.create_environment(write_template(basic_template), allow_reuse=True)
+    [apply] = terraform_calls.calls_for("terraform", f"-chdir={runtime_root}", "apply")
+    assert f"-state={runtime_root / 'terraform.tfstate'}" in apply.args
+    config = json.loads((runtime_root / "main.tf.json").read_text())
+    source = config["module"]["hcs_runtime_contract"]["source"]
+    assert (runtime_root / source).resolve() == wrapper
+    assert len(calls.calls_for("kind", "export")) == 1
+
+
+def test_missing_image_archive_is_refused_before_kind(
+    state_home: Path,
+    prepare_kind: PrepareKind,
+    basic_template: dict[str, Any],
+    write_template: Callable[[dict[str, Any]], Path],
+    tmp_path: Path,
+) -> None:
+    calls = prepare_kind()
+    with pytest.raises(ZepDevError, match="image archive is missing or empty"):
+        lifecycle.create_environment(
+            write_template(basic_template), image_archive=tmp_path / "images.tar"
+        )
+    assert calls.calls == []
+
+
+@pytest.fixture
+def local_eas_template(
+    write_distribution: WriteDistribution,
+    chart_resolver: RecordingChartResolver,
+    registry_auth: Path,
+    basic_template: dict[str, Any],
+    write_template: Callable[[dict[str, Any]], Path],
+    tmp_path: Path,
+) -> tuple[Path, Path]:
+    """A Template whose EAS, with a database, comes from a local checkout."""
+    write_distribution(eas={"local": True})
+    basic_template.update(
+        {
+            "distribution": "dist.yaml",
             "services": {
                 "database": {
                     "type": "cnpg",
@@ -207,35 +280,66 @@ def test_reuse_without_runtime_state_still_attempts_database_apply(
             },
         }
     )
-    repo = deployments_checkout
-    write_bindings(repositories={"deployments": str(repo)})
-    ref = VersionChartRef(name="eas", version="1.0.0", source="version")
-
-    chart_resolver.refs = [ref]
-
-    monkeypatch.setattr(cnpg, "apply_cnpg_service", lambda *_args: None)
-    monkeypatch.setattr(helm, "install_applications", lambda *_args: None)
-    attempted: list[Path] = []
-
-    def apply_runtime(
-        target: object, applications: tuple[terraform.RuntimeApplication, ...]
-    ) -> None:
-        [application] = applications
-        assert application.application == "eas"
-        assert (
-            application.module
-            == repo / "terraform/modules/kubernetes/eas-kind-runtime-contract"
+    checkout = tmp_path / "evolve-app-server"
+    chart_resolver.refs = [
+        LocalChartRef(
+            name="eas", version="1.0.0", repo=checkout, package=tmp_path / "eas.tgz"
         )
-        assert target == execution_target("integration")
-        assert not execution_target("integration").runtime_root.exists()
-        attempted.append(repo)
+    ]
+    return write_template(basic_template), checkout
 
-    monkeypatch.setattr(terraform, "apply_runtime", apply_runtime)
-    calls = prepare_kind(present=True)
-    prepare_kubectl()
-    lifecycle.create_environment(write_template(basic_template), allow_reuse=True)
-    assert attempted == [repo]
-    assert len(calls.calls_for("kind", "export")) == 1
+
+def test_local_chart_supplies_its_own_kind_wrapper(
+    local_eas_template: tuple[Path, Path],
+) -> None:
+    template, checkout = local_eas_template
+    wrapper = checkout / "helm/charts/eas/kind-runtime-contract"
+    wrapper.mkdir(parents=True)
+
+    [application] = lifecycle.preflight(template).runtime_applications
+
+    assert application.module == wrapper
+
+
+def test_databases_without_a_kind_wrapper_are_refused_in_preflight(
+    local_eas_template: tuple[Path, Path],
+) -> None:
+    template, _checkout = local_eas_template
+
+    with pytest.raises(ZepDevError, match="no Kind wrapper was found for eas"):
+        lifecycle.preflight(template)
+
+
+@pytest.mark.parametrize("has_wrapper", [True, False], ids=["wrapper", "no-wrapper"])
+def test_kind_wrapper_is_applied_whenever_the_chart_revision_has_one(
+    write_distribution: WriteDistribution,
+    chart_resolver: RecordingChartResolver,
+    registry_auth: Path,
+    basic_template: dict[str, Any],
+    write_template: Callable[[dict[str, Any]], Path],
+    tmp_path: Path,
+    has_wrapper: bool,
+) -> None:
+    write_distribution(eas={"local": True})
+    basic_template.update(
+        {"distribution": "dist.yaml", "applications": {"eas": {"values": {"a": 1}}}}
+    )
+    checkout = tmp_path / "evolve-app-server"
+    wrapper = checkout / "helm/charts/eas/kind-runtime-contract"
+    if has_wrapper:
+        wrapper.mkdir(parents=True)
+    chart_resolver.refs = [
+        LocalChartRef(
+            name="eas", version="1.0.0", repo=checkout, package=tmp_path / "eas.tgz"
+        )
+    ]
+
+    plan = lifecycle.preflight(write_template(basic_template))
+
+    expected = (
+        (terraform.RuntimeApplication("eas", {}, wrapper),) if has_wrapper else ()
+    )
+    assert plan.runtime_applications == expected
 
 
 def test_missing_source_chart_is_refused_without_build_or_cluster_mutation(
@@ -264,7 +368,7 @@ def test_missing_source_chart_is_refused_without_build_or_cluster_mutation(
     ensure = Mock(side_effect=AssertionError("creation requested a build"))
     monkeypatch.setattr(chart_sources.ChartResolver, "ensure", ensure)
     probe = fake_execute(chart_sources).on(
-        "helm", "show", "chart", returncode=1, stderr="manifest unknown"
+        "helm", "pull", returncode=1, stderr="manifest unknown"
     )
     cluster = prepare_kind()
     with pytest.raises(FileNotFoundError, match="run distribution build first"):

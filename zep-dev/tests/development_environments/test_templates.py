@@ -48,25 +48,14 @@ def test_argo_repository_must_be_declared(basic_template: dict[str, Any]) -> Non
     )
 
 
-def test_database_reference_must_name_database_service_and_deployments(
+def test_database_reference_must_name_database_service(
     basic_template: dict[str, Any],
 ) -> None:
     basic_template["distribution"] = "dist.yaml"
     basic_template["applications"] = {
-        "eas": {"databases": {"primary": {"service": "missing", "database": "eas"}}}
+        "hcs": {"databases": {"primary": {"service": "missing", "database": "hcs"}}}
     }
     with pytest.raises(ValidationError, match="must name a database service"):
-        EnvironmentTemplate.model_validate(basic_template)
-    basic_template["services"] = {
-        "missing": {
-            "type": "cnpg",
-            "database": "eas",
-            "owner": "eas",
-            "password": "test",
-            "spec": {},
-        }
-    }
-    with pytest.raises(ValidationError, match="deployments"):
         EnvironmentTemplate.model_validate(basic_template)
 
 
@@ -197,31 +186,7 @@ def test_declared_mount_requires_a_consumer(basic_template: dict[str, Any]) -> N
     basic_template["inputs"] = {"mounts": ["unused"]}
     with pytest.raises(ValidationError, match="no consumer"):
         EnvironmentTemplate.model_validate(basic_template)
-
-
-@pytest.mark.parametrize("application", ["ewb", "eas-web-client"])
-def test_database_reference_is_limited_to_supported_applications(
-    basic_template: dict[str, Any], application: str
 ) -> None:
-    basic_template.update(
-        distribution="distribution.yaml",
-        inputs={"repositories": ["deployments"]},
-        services={
-            "database": {
-                "type": "cnpg",
-                "database": "app",
-                "owner": "app",
-                "password": "test",
-                "spec": {},
-            }
-        },
-        applications={
-            application: {
-                "databases": {"primary": {"service": "database", "database": "app"}}
-            }
-        },
-    )
-    with pytest.raises(ValidationError, match="databases is unsupported"):
         EnvironmentTemplate.model_validate(basic_template)
 
 

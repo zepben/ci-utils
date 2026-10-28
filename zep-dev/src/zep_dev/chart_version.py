@@ -6,6 +6,7 @@ from pathlib import Path
 
 from zep_dev.shared import execute
 
+SOURCE_COMMIT_ANNOTATION = "zepben.com/source-commit"
 GIT_DESCRIBE_PATTERN = re.compile(
     r"^v(?P<base>\d+\.\d+\.\d+)-(?P<height>\d+)-g(?P<sha>[0-9a-f]+)$"
 )
@@ -102,3 +103,14 @@ def calculate_chart_version(repo: Path | None = None, ref: str = "HEAD") -> str:
     if snapshot_version is not None:
         return snapshot_version
     return to_chart_version(parse_git_describe(git_describe(repo, ref)))
+
+
+def source_commit(repo: Path | None = None) -> str:
+    return execute(
+        *git_prefix(repo),
+        "rev-parse",
+        "--verify",
+        "HEAD^{commit}",
+        skip_resolve=True,
+        capture_stdout=True,
+    ).stdout.strip()

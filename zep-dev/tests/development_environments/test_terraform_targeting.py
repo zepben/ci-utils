@@ -41,7 +41,6 @@ def database_template(basic_template: dict[str, Any]) -> EnvironmentTemplate:
                 }
             }
         },
-        inputs={"repositories": ["deployments"]},
     )
     return EnvironmentTemplate.model_validate(basic_template)
 
@@ -51,10 +50,11 @@ def test_runtime_root_targets_provider_and_preserves_state(
 ) -> None:
     target = execution_target("integration", environ={"XDG_STATE_HOME": str(tmp_path)})
     template = database_template(basic_template)
-    deployments = tmp_path / "deployments"
-    module = deployments / "terraform/modules/kubernetes/eas-kind-runtime-contract"
+    module = tmp_path / "evolve-app-server/helm/charts/eas/kind-runtime-contract"
     module.mkdir(parents=True)
-    applications = terraform.resolve_runtime_applications(target, template, deployments)
+    applications = terraform.resolve_runtime_applications(
+        target, template, {"eas": module}
+    )
     root = terraform.generate_runtime_root(target, applications)
     state = root / "terraform.tfstate"
     state.write_text("preserve")
@@ -87,7 +87,7 @@ def test_runtime_root_targets_provider_and_preserves_state(
     assert "input-password" not in (root / "main.tf.json").read_text()
     template.applications["eas"].databases.clear()
     terraform.generate_runtime_root(
-        target, terraform.resolve_runtime_applications(target, template, None)
+        target, terraform.resolve_runtime_applications(target, template, {})
     )
     assert state.read_text() == "preserve"
     assert "module" not in json.loads((root / "main.tf.json").read_text())
@@ -177,31 +177,6 @@ def test_destroy_failure_preserves_state(
     assert state.read_text() == "preserve"
 
 
-def test_database_repository_requires_native_wrapper(
-    basic_template: dict[str, Any], tmp_path: Path
-) -> None:
-    target = execution_target("integration", environ={"XDG_STATE_HOME": str(tmp_path)})
-    template = database_template(basic_template)
-    with pytest.raises(FileNotFoundError, match="eas-kind-runtime-contract"):
-        terraform.resolve_runtime_applications(target, template, tmp_path)
-    wrapper = tmp_path / "terraform/modules/kubernetes/eas-kind-runtime-contract"
-    wrapper.mkdir(parents=True)
-    [application] = terraform.resolve_runtime_applications(target, template, tmp_path)
-    assert application.module == wrapper
-
-
-def test_runtime_preflight_does_not_create_files_for_missing_wrapper(
-    tmp_path: Path, basic_template: dict[str, Any]
-) -> None:
-    target = execution_target("integration", environ={"XDG_STATE_HOME": str(tmp_path)})
-    template = database_template(basic_template)
-    with pytest.raises(FileNotFoundError, match="runtime wrapper"):
-        terraform.resolve_runtime_applications(
-            target, template, tmp_path / "deployments"
-        )
-    assert not target.directory.exists()
-
-
 def test_standalone_state_symlink_is_rejected_before_terraform(
     tmp_path: Path, fake_execute: FakeExecuteFactory
 ) -> None:
@@ -232,7 +207,7 @@ def test_runtime_applies_empty_module_set_when_state_remains(
         .on("terraform", f"-chdir={target.runtime_root}", "init")
         .on("terraform", f"-chdir={target.runtime_root}", "apply")
     )
-    applications = terraform.resolve_runtime_applications(target, template, None)
+    applications = terraform.resolve_runtime_applications(target, template, {})
     assert terraform.apply_runtime(target, applications) is None
     assert fake.calls == []
     state = terraform.runtime_state(target)

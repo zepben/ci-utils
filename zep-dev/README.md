@@ -1,74 +1,52 @@
 # Zep Dev
 
-Reusable kubernetes cluster for development and CI. Requires kind installed https://kind.sigs.k8s.io/docs/user/quick-start/.
+`zep-dev` creates local Kubernetes development Environments for local development and testing on CI.
 
-## Required Files
+- A **Template** ([example](examples/integration/template.yaml)) defines how the Environment is deployed and configured.
+- A **Distribution** ([example](examples/integration/distribution.yaml)) selects the application charts.
+- **Bindings** ([example](examples/bindings.yaml)) supply the machine-local paths and secret sources the Template needs.
 
-The tool requires two files:
+## Clanker Experiment
 
-* kind-cluster.yaml - configures kind. See [example](examples/kind-cluster.yaml).
-* components.yaml - configures dependencies to be installed via helm when creating the kind cluster.
+The tool uses concepts from [Domain Driven Design](https://en.wikipedia.org/wiki/Domain-driven_design) as an experiment in LLM assisted development. The basic idea is to use a tightly defined language (Ubiquitous Language) consistently throughout the project. The definitions are in the [glossary](docs/language.md), and the goal is to use them consistently throughout the codebase, tests, docs etc. The theory is that this may assist with helping LLMs understand the codebase and not sloppify it, as things have a very specific place and meaning. TBD if this is effective.
 
-### ConfigMaps from files
+In addition to the language, we have [domain context](docs/context.md) which is states the rules and contracts. This is the "Bounded Context" from DDD. It should help the LLM understand the rules of the game.
 
-A component can create ConfigMaps from files before its Helm release is installed:
+We additionally structure the code around this language and this context, and enforce it with unit tests. The idea is to provide quick feedback when the LLM violates a architectural rule.
 
-```yaml
-cluster_components:
-  - name: database
-    chart: example/database
-    version: "1.0.0"
-    namespace: test
-    config_maps_from_file:
-      - name: database-init
-        from_file:
-          init.sql: files/init.sql
+## Examples
+
+[examples/](examples/) holds a Template, a Distribution and Bindings.
+
+Before running the tool, you need to setup the [Bindings](examples/bindings.yaml) on your machine:
+
+```bash
+mkdir -p ~/.config/zep-dev
+cp zep-dev/examples/bindings.yaml ~/.config/zep-dev/bindings.yaml
+```
+Then update the paths within.
+
+Once that is done, you can execute the commands and create/interact/destroy your env:
+
+```sh
+zep-dev environment create --template zep-dev/examples/integration/template.yaml
+zep-dev environment list
+zep-dev environment describe integration
+zep-dev environment destroy integration
 ```
 
-Each ConfigMap uses its component namespace. On a reused Kind cluster, ConfigMaps are
-applied again before Helm is skipped. See [`examples/components.yaml`](examples/components.yaml) for an example.
+The example template exposes an endpoint to access the map. This can be retrieved with:
 
-### Waiting for resources and creating EWB load-database credentials
-
-A component can wait for resources created by its Helm chart, then create the
-Secret consumed by EWB's optional load-database configuration. This is useful for creating
-and waiting for databases to be used by EWB/HCS.
-
-```yaml
-cluster_components:
-  - name: kind-pg
-    chart: cnpg/cluster
-    version: "0.8.1"
-    namespace: ewb-test
-    wait_for:
-      - resource: cluster/kind-pg
-        for: condition=Ready
-        timeout: 180s
-    load_db_credentials:
-      from_secret: kind-pg-superuser
-      database: app
+```bash
+zep-dev environment describe integration
 ```
+
+It should be accessible in the browser on http://127.0.0.1:8080.
 
 ## Development
 
-The Makefile in the root of the project contains some targets for interacting with the the tool. Simply run:
+From the repository root, using Python 3.14:
 
-```shell
+```sh
 make check-zep-dev test-zep-dev
-```
-
-To execute the linters and tests. 
-
-`zep-dev chart lint` and `zep-dev chart test` enforce the chart metadata schema
-and YAML lint policy bundled with `zep-dev`.
-
-To create a local kind cluster, you can run:
-```shell
-make setup-k8s
-```
-
-Be sure to set the env so kubectl and friends operate as expected:
-
-```shell
-export KUBECONFIG=/tmp/kind-k8s-conf.yaml
 ```

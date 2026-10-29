@@ -44,6 +44,10 @@ rejected) and `local_inputs.py` for Bindings.
 - Every call that acts on an Environment's cluster or files (Kind, kubectl, Helm,
   Terraform) targets it explicitly. Inherited Kubernetes and Helm context cannot
   redirect it (`target.kubernetes_environment`).
+- Terraform runs with a fixed set of environment variables, a temporary `HOME` and
+  temporary Terraform configuration (`terraform.terraform_environment`). The only
+  credential passed through is `SSH_AUTH_SOCK`, when it is set, so Terraform can
+  fetch Kind wrappers with a `git::ssh` source.
 - A supporting service uses the Environment namespace unless it names another
   (`ExecutionTarget.namespace_for`).
 - Different names never share a cluster, namespace or files.

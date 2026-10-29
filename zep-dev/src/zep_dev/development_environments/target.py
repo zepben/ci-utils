@@ -36,6 +36,14 @@ def state_home(environ: Mapping[str, str] | None = None) -> Path:
     return base
 
 
+def cache_home() -> Path:
+    configured = os.environ.get("XDG_CACHE_HOME")
+    base = Path(configured) if configured else Path.home() / ".cache"
+    if not base.is_absolute():
+        raise ValueError("XDG_CACHE_HOME must be an absolute path")
+    return base
+
+
 @dataclass(frozen=True)
 class ExecutionTarget:
     name: str

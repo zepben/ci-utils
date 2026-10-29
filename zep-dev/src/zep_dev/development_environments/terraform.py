@@ -17,6 +17,7 @@ from zep_dev.development_environments.services import CnpgService, DatabaseServi
 from zep_dev.development_environments.target import (
     ExecutionTarget,
     kubernetes_namespace,
+    cache_home,
 )
 from zep_dev.development_environments.templates import (
     DatabaseReference,
@@ -170,14 +171,22 @@ def terraform_environment(target: ExecutionTarget) -> Generator[dict[str, str]]:
         home.mkdir()
         data.mkdir()
         cli_config.touch()
-        yield {
+        # TF_DATA_DIR is fresh per apply, so providers come from the plugin cache.
+        plugins = cache_home() / "zep-dev" / "terraform-plugins"
+        plugins.mkdir(parents=True, exist_ok=True)
+        env = {
             "PATH": os.environ.get("PATH", os.defpath),
             "KUBECONFIG": str(target.kubeconfig),
             "KUBE_CONFIG_PATH": str(target.kubeconfig),
             "HOME": str(home),
             "TF_DATA_DIR": str(data),
             "TF_CLI_CONFIG_FILE": str(cli_config),
+            "TF_PLUGIN_CACHE_DIR": str(plugins),
         }
+        # Kind wrappers are fetched from GitHub over SSH, which needs the user's agent.
+        if agent := os.environ.get("SSH_AUTH_SOCK"):
+            env["SSH_AUTH_SOCK"] = agent
+        yield env
 
 
 def terraform_init(root: Path, env: Mapping[str, str]) -> None:

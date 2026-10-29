@@ -101,6 +101,7 @@ def test_standalone_state_and_subprocess_are_environment_scoped(
     monkeypatch.setenv("KUBECONFIG", "/hostile/default")
     monkeypatch.setenv("KUBE_CONFIG_PATH", "/hostile/provider")
     monkeypatch.setenv("TF_VAR_namespace", "production")
+    plugins = Path(os.environ["XDG_CACHE_HOME"]) / "zep-dev/terraform-plugins"
     root = tmp_path / "root"
     root.mkdir()
     first = execution_target("first", environ={"XDG_STATE_HOME": str(tmp_path)})
@@ -115,6 +116,7 @@ def test_standalone_state_and_subprocess_are_environment_scoped(
         assert "TF_VAR_namespace" not in env
         for key in ("HOME", "TF_DATA_DIR", "TF_CLI_CONFIG_FILE"):
             assert Path(env[key]).exists()
+        assert env["TF_PLUGIN_CACHE_DIR"] == str(plugins)
         seen.append(env["KUBECONFIG"])
 
     fake = (
@@ -127,6 +129,7 @@ def test_standalone_state_and_subprocess_are_environment_scoped(
         assert state == target.standalone_state(root, "test")
     assert first.standalone_state(root, "test") != second.standalone_state(root, "test")
     assert seen == [str(first.kubeconfig)] * 2 + [str(second.kubeconfig)] * 2
+    assert plugins.is_dir()
     assert os.environ["KUBECONFIG"] == "/hostile/default"
     assert len(fake.calls_for("terraform", f"-chdir={root}", "apply")) == 2
 
@@ -221,3 +224,16 @@ def test_runtime_applies_empty_module_set_when_state_remains(
         len(fake.calls_for("terraform", f"-chdir={target.runtime_root}", "apply")) == 1
     )
     assert state.read_text() == "preserve"
+
+
+@pytest.mark.parametrize("agent", ["/run/user/1000/ssh-agent.sock", None])
+def test_terraform_receives_the_ssh_agent_only_when_one_is_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent: str | None
+) -> None:
+    if agent is None:
+        monkeypatch.delenv("SSH_AUTH_SOCK", raising=False)
+    else:
+        monkeypatch.setenv("SSH_AUTH_SOCK", agent)
+    target = execution_target("first", environ={"XDG_STATE_HOME": str(tmp_path)})
+    with terraform.terraform_environment(target) as env:
+        assert env.get("SSH_AUTH_SOCK") == agent

@@ -44,6 +44,13 @@ rejected) and `local_inputs.py` for Bindings.
 - Every call that acts on an Environment's cluster or files (Kind, kubectl, Helm,
   Terraform) targets it explicitly. Inherited Kubernetes and Helm context cannot
   redirect it (`target.kubernetes_environment`).
+- Terraform runs with a fixed set of environment variables, a temporary `HOME` and
+  temporary Terraform configuration (`terraform.terraform_environment`). The only
+  credential passed through is `SSH_AUTH_SOCK`, when it is set, so Terraform can
+  fetch Kind wrappers with a `git::ssh` source. Providers are cached under
+  `${XDG_CACHE_HOME:-~/.cache}/zep-dev/terraform-plugins`; the runtime root's lock
+  file lives in the operational directory, so provider versions are fixed per
+  Environment.
 - A supporting service uses the Environment namespace unless it names another
   (`ExecutionTarget.namespace_for`).
 - Different names never share a cluster, namespace or files.
@@ -131,7 +138,8 @@ Limits and their reasons:
   operational directory cannot recover the original Template, resolved charts or
   input values.
 - No lock protects concurrent changes to one Environment. Different names are
-  isolated, but host ports and shared writable inputs can still conflict.
+  isolated, but host ports, shared writable inputs and the shared Terraform plugin
+  cache can still conflict.
 - Reuse is not reconciliation. Editing a Template alone changes nothing. Missing
   Terraform runtime state does not prove its resources are gone: a fresh apply is
   attempted, and lost state cannot be reconstructed.

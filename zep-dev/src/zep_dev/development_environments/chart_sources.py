@@ -37,6 +37,7 @@ from zep_dev.development_environments.local_charts import (
     resolve_local_chart,
 )
 from zep_dev.development_environments.registry_config import RegistryConfig
+from zep_dev.development_environments.target import cache_home
 from zep_dev.github_api import GitHubAPI
 from zep_dev.models import ChartMetadata
 from zep_dev.runtime_contract import RUNTIME_CONTRACT_REF_ANNOTATION
@@ -92,8 +93,7 @@ class GitCache:
     def __init__(
         self, root: Path | None = None, progress: Callable[[str], None] | None = None
     ) -> None:
-        base = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
-        self.root = root if root is not None else base / "zep-dev" / "git"
+        self.root = root if root is not None else cache_home() / "zep-dev" / "git"
         self.progress = progress
 
     @staticmethod

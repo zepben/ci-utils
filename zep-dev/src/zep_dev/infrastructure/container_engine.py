@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from subprocess import CalledProcessError
 
+from zep_dev.errors import ZepDevError
 from zep_dev.shared import execute
 
 
@@ -29,7 +30,7 @@ def choose_engine() -> str:
         except CalledProcessError, OSError:
             continue
         return engine
-    raise RuntimeError("neither podman nor docker is available")
+    raise ZepDevError("neither podman nor docker is available")
 
 
 def pull_missing_images(engine: str, refs: Sequence[str]) -> None:

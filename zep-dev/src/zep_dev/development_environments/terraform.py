@@ -23,6 +23,7 @@ from zep_dev.development_environments.templates import (
     DatabaseReference,
     EnvironmentTemplate,
 )
+from zep_dev.errors import ZepDevError
 from zep_dev.shared import execute
 
 
@@ -200,7 +201,7 @@ def _apply_with_state(
     target: ExecutionTarget, root: Path, namespace: str, state: Path
 ) -> Path:
     if state.is_symlink():
-        raise ValueError(f"Terraform state is a symlink: {state}")
+        raise ZepDevError(f"Terraform state is a symlink: {state}")
     state.parent.mkdir(parents=True, exist_ok=True)
     with terraform_environment(target) as env:
         terraform_init(root, env)
@@ -222,7 +223,7 @@ def apply_terraform(target: ExecutionTarget, root: Path, namespace: str) -> Path
     valid_namespace = kubernetes_namespace(namespace)
     absolute_root = root.resolve()
     if not absolute_root.is_dir():
-        raise FileNotFoundError(f"Terraform root does not exist: {absolute_root}")
+        raise ZepDevError(f"Terraform root does not exist: {absolute_root}")
     state = target.standalone_state(absolute_root, valid_namespace)
     return _apply_with_state(target, absolute_root, valid_namespace, state)
 
@@ -231,12 +232,12 @@ def destroy_terraform(target: ExecutionTarget, root: Path, namespace: str) -> No
     valid_namespace = kubernetes_namespace(namespace)
     absolute_root = root.resolve()
     if not absolute_root.is_dir():
-        raise FileNotFoundError(f"Terraform root does not exist: {absolute_root}")
+        raise ZepDevError(f"Terraform root does not exist: {absolute_root}")
     state = target.standalone_state(absolute_root, valid_namespace)
     if state.is_symlink():
-        raise ValueError(f"Terraform state is a symlink: {state}")
+        raise ZepDevError(f"Terraform state is a symlink: {state}")
     if not state.is_file():
-        raise FileNotFoundError(f"Terraform state does not exist: {state}")
+        raise ZepDevError(f"Terraform state does not exist: {state}")
     with terraform_environment(target) as env:
         terraform_init(absolute_root, env)
         execute(

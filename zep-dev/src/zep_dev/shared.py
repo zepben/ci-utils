@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from zep_dev.errors import ZepDevError
 from zep_dev.static import TOOLS_BY_NAME
 
 LOG = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ def resolve_chart(helm_dir: Path, chart: Path) -> ResolvedChart:
 
 def get_repo_name() -> str:
     if sys.prefix == sys.base_prefix:
-        raise Exception("zep-dev must be run from an application virtualenv")
+        raise ZepDevError("zep-dev must be run from an application virtualenv")
     return Path(sys.prefix).resolve().parent.name
 
 
@@ -83,7 +84,7 @@ def resolve(name: str) -> None:
         raise Exception(f"Failed to locate tool: {name}")
     path = get_bin_dir() / tool.name
     if not path.is_file() or not os.access(path, os.X_OK):
-        raise Exception(f"{name} not installed at {path}; run: zep-dev tools install")
+        raise ZepDevError(f"{name} not installed at {path}; run: zep-dev tools install")
 
 
 def execute(

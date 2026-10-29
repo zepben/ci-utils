@@ -5,6 +5,7 @@ import pytest
 from tests.support.execution import FakeExecuteFactory
 from zep_dev.development_environments import images, kind
 from zep_dev.development_environments.target import ExecutionTarget
+from zep_dev.errors import ZepDevError
 from zep_dev.infrastructure import container_engine
 from zep_dev.shared import CommandResult
 
@@ -99,7 +100,7 @@ def test_load_validates_archive_and_uses_selected_cluster(
         return CommandResult(0, "", "")
 
     monkeypatch.setattr(kind, "kind", load)
-    with pytest.raises(ValueError, match="missing or empty"):
+    with pytest.raises(ZepDevError, match="missing or empty"):
         images.load_images(target, tmp_path / "missing.tar")
     archive = tmp_path / "images.tar"
     archive.write_bytes(b"archive")

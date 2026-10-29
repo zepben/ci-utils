@@ -1,4 +1,3 @@
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -9,6 +8,7 @@ from zep_dev.cli import cli
 from zep_dev.development_environments import cli as commands
 from zep_dev.development_environments import images, kind, secrets, terraform
 from zep_dev.development_environments.target import ExecutionTarget
+from zep_dev.errors import ZepDevError
 
 pytestmark = pytest.mark.usefixtures("cli_environment")
 
@@ -70,8 +70,9 @@ def test_environment_list(
 def test_environment_list_kind_failure(fake_execute: FakeExecuteFactory) -> None:
     fake_execute(kind).on("kind", "get", "clusters", "--quiet", returncode=1)
     result = CliRunner().invoke(cli, ["environment", "list"])
-    assert isinstance(result.exception, subprocess.CalledProcessError)
+    assert result.exit_code == 1
     assert result.stdout == ""
+    assert "kind" in result.stderr
 
 
 def test_kubeconfig_prints_only_path(
@@ -87,18 +88,17 @@ def test_kubeconfig_prints_only_path(
     assert result.stderr == ""
 
 
-def test_kubeconfig_failure_propagates_without_stdout(
+def test_kubeconfig_failure_is_reported_without_stdout(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def missing(_name: str) -> Path:
-        raise FileNotFoundError("Kind cluster 'zep-dev-integration' does not exist")
+        raise ZepDevError("Kind cluster 'zep-dev-integration' does not exist")
 
     monkeypatch.setattr(commands, "environment_kubeconfig", missing)
     result = CliRunner().invoke(cli, ["environment", "kubeconfig", "integration"])
-    assert result.exit_code != 0
+    assert result.exit_code == 1
     assert result.stdout == ""
-    assert isinstance(result.exception, FileNotFoundError)
-    assert "zep-dev-integration" in str(result.exception)
+    assert "Error: Kind cluster 'zep-dev-integration' does not exist" in result.stderr
 
 
 def test_auxiliary_commands_pass_explicit_target(

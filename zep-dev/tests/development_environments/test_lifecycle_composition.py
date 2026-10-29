@@ -28,6 +28,7 @@ from zep_dev.development_environments.target import (
     ExecutionTarget,
     execution_target,
 )
+from zep_dev.errors import ZepDevError
 
 
 def test_supporting_only_create_uses_own_target_without_distribution(
@@ -65,7 +66,7 @@ def test_preflight_error_precedes_kind_and_owned_directory(
     basic_template["inputs"] = {"mounts": ["data"]}
     template = write_template(basic_template)
     calls = prepare_kind()
-    with pytest.raises(FileNotFoundError, match="Bindings not found"):
+    with pytest.raises(ZepDevError, match="Bindings not found"):
         lifecycle.create_environment(template)
     assert calls.calls == []
     assert not execution_target("integration").directory.exists()
@@ -372,7 +373,7 @@ def test_missing_source_chart_is_refused_without_build_or_cluster_mutation(
         "helm", "show", "chart", returncode=1, stderr="manifest unknown"
     )
     cluster = prepare_kind()
-    with pytest.raises(FileNotFoundError, match="run distribution build first"):
+    with pytest.raises(ZepDevError, match="run distribution build first"):
         lifecycle.create_environment(write_template(basic_template))
     ensure.assert_not_called()
     assert len(probe.calls) == 1

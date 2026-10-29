@@ -105,6 +105,15 @@ rejected) and `local_inputs.py` for Bindings.
 Workflows call configuration and integrations. Integrations may use configuration
 and each other. The CLI parses arguments and calls workflows or integrations.
 
+**Failures** (tests: `tests/cli/test_errors.py`)
+
+- A condition the user can act on raises `zep_dev.errors.ZepDevError`: a refused
+  state, a missing prerequisite, a chart or credential that is not there. An invalid
+  document raises `ValueError` (pydantic's `ValidationError` is one). Unexpected tool
+  output raises `RuntimeError`, because a traceback is the right report for a bug.
+- The root CLI group reports `ZepDevError`, `ValueError` and a failed command as one
+  `Error:` line on stderr with exit code 1, and keeps the traceback behind `-v`.
+
 **Typing** (tests: `tests/test_architecture.py`)
 
 - A wildcard `match` case only calls `assert_never`, so mypy reports a kind left

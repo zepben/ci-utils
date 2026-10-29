@@ -154,8 +154,7 @@ def test_discovery_failure_emits_no_partial_json(
 
     assert result.exit_code != 0
     assert result.stdout == ""
-    assert result.exception is failure
-    assert result.exception.__traceback__ is not None
+    assert "returned non-zero exit status 1" in result.stderr
 
 
 def test_duplicate_application_releases_fail_across_namespaces(

@@ -4,6 +4,7 @@ from pathlib import Path
 import click
 
 from zep_dev.charts.utils import execute_ct_lint, validate_dependencies_present
+from zep_dev.errors import ZepDevError
 from zep_dev.models import ChartMetadata, ChartTestingConfig
 from zep_dev.shared import ResolvedChart, execute, resolve_chart
 from zep_dev.static import CT_YAML
@@ -40,7 +41,7 @@ def lint(helm_dir: Path, chart: Path) -> None:
     helm_dir = helm_dir.resolve()
     ct_path = helm_dir / CT_YAML
     if not ct_path.is_file():
-        raise FileNotFoundError(f"{CT_YAML} is required in the root of --helm-dir")
+        raise ZepDevError(f"{CT_YAML} is required in the root of --helm-dir")
 
     resolved_chart = resolve_chart(helm_dir, chart)
     ct_config = ChartTestingConfig.from_chart_dir(helm_dir)

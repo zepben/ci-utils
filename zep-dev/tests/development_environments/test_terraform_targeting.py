@@ -10,6 +10,7 @@ from tests.support.execution import FakeExecuteFactory
 from zep_dev.development_environments import terraform
 from zep_dev.development_environments.target import execution_target
 from zep_dev.development_environments.templates import EnvironmentTemplate
+from zep_dev.errors import ZepDevError
 
 
 def database_template(basic_template: dict[str, Any]) -> EnvironmentTemplate:
@@ -156,7 +157,7 @@ def test_destroy_cleans_only_selected_standalone_state(
     assert not first_state.parent.exists()
     assert second_state.is_file()
     assert runtime.is_file()
-    with pytest.raises(FileNotFoundError, match="state does not exist"):
+    with pytest.raises(ZepDevError, match="state does not exist"):
         terraform.destroy_terraform(first, root, "test")
 
 
@@ -192,9 +193,9 @@ def test_standalone_state_symlink_is_rejected_before_terraform(
     outside.write_text("preserve")
     state.symlink_to(outside)
     fake = fake_execute(terraform)
-    with pytest.raises(ValueError, match="symlink"):
+    with pytest.raises(ZepDevError, match="symlink"):
         terraform.apply_terraform(target, root, "test")
-    with pytest.raises(ValueError, match="symlink"):
+    with pytest.raises(ZepDevError, match="symlink"):
         terraform.destroy_terraform(target, root, "test")
     assert fake.calls == []
     assert outside.read_text() == "preserve"

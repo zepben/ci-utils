@@ -24,6 +24,7 @@ from zep_dev.development_environments.target import (
     execution_target,
 )
 from zep_dev.development_environments.templates import EnvironmentTemplate
+from zep_dev.errors import ZepDevError
 
 
 @pytest.fixture
@@ -107,7 +108,7 @@ def test_existing_environment_is_refused_before_provisioning(
 ) -> None:
     target = creation_plan.target
     kind_runtime.clusters.add(target.cluster_name)
-    with pytest.raises(FileExistsError, match="allow_reuse"):
+    with pytest.raises(ZepDevError, match="allow_reuse"):
         lifecycle.create_environment(Path("template.yaml"))
     assert kind_runtime.events == [("lookup", target)]
     assert provisioning.mock_calls == []
@@ -344,7 +345,7 @@ def test_stale_kubeconfig_does_not_make_absent_cluster_valid(
     target = execution_target("integration")
     target.directory.mkdir(parents=True)
     target.kubeconfig.write_text("stale")
-    with pytest.raises(FileNotFoundError, match="does not exist"):
+    with pytest.raises(ZepDevError, match="does not exist"):
         lifecycle.environment_kubeconfig("integration")
     assert target.kubeconfig.read_text() == "stale"
     assert kind_runtime.events == [("lookup", target)]

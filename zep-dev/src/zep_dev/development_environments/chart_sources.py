@@ -38,6 +38,7 @@ from zep_dev.development_environments.local_charts import (
 )
 from zep_dev.development_environments.registry_config import RegistryConfig
 from zep_dev.development_environments.target import cache_home
+from zep_dev.errors import ZepDevError
 from zep_dev.github_api import GitHubAPI
 from zep_dev.models import ChartMetadata
 from zep_dev.runtime_contract import RUNTIME_CONTRACT_REF_ANNOTATION
@@ -119,7 +120,7 @@ class GitCache:
         remote = self.remote(repo_name)
         self.root.mkdir(parents=True, exist_ok=True)
         if path.is_symlink():
-            raise ValueError(f"Git cache at {path} is a symlink; remove it and retry")
+            raise ZepDevError(f"Git cache at {path} is a symlink; remove it and retry")
         if not path.exists():
             if self.progress is not None:
                 self.progress(f"  cloning {repo_name} into Git cache")
@@ -131,7 +132,7 @@ class GitCache:
                 shutil.rmtree(temporary)
         actual = self.git("remote", "get-url", "origin", cwd=path)
         if actual != remote:
-            raise ValueError(
+            raise ZepDevError(
                 f"Git cache at {path} has unexpected origin; remove it and retry"
             )
         if self.progress is not None:
@@ -149,7 +150,7 @@ class GitCache:
         self.git("fetch", "origin", f"refs/pull/{number}/head", cwd=repo)
         sha = self.commit(repo, "FETCH_HEAD")
         if sha != expected_sha:
-            raise RuntimeError(
+            raise ZepDevError(
                 f"PR #{number} moved from {expected_sha} to {sha}; "
                 "retry distribution build"
             )
@@ -165,7 +166,7 @@ class GitCache:
         try:
             return self.commit(repo, f"refs/remotes/origin/{branch}")
         except subprocess.CalledProcessError as error:
-            raise ValueError(
+            raise ZepDevError(
                 f"Branch {branch!r} not found in source repository"
             ) from error
 
@@ -182,7 +183,7 @@ class GitCache:
             cwd=repo,
         )
         if not refs:
-            raise ValueError(
+            raise ZepDevError(
                 f"Commit {sha} is not reachable from a source repository branch or tag"
             )
         return commit
@@ -215,9 +216,7 @@ def require_ghcr_credentials() -> None:
     configured = os.environ.get("HELM_REGISTRY_CONFIG")
     path = Path(configured) if configured else resolve_registry_config()
     if path is None:
-        raise FileNotFoundError(
-            "GHCR credentials missing; run helm registry login ghcr.io"
-        )
+        raise ZepDevError("GHCR credentials missing; run helm registry login ghcr.io")
     data = RegistryConfig.read(path)
     available = (
         "ghcr.io" in data.auths
@@ -225,9 +224,7 @@ def require_ghcr_credentials() -> None:
         or bool(data.credsStore)
     )
     if not available:
-        raise FileNotFoundError(
-            "GHCR credentials missing; run helm registry login ghcr.io"
-        )
+        raise ZepDevError("GHCR credentials missing; run helm registry login ghcr.io")
 
 
 def wait_for_oci(
@@ -247,7 +244,7 @@ def wait_for_oci(
                 int(elapsed // _PROGRESS_INTERVAL) + 1
             ) * _PROGRESS_INTERVAL
         if elapsed + _POLL_INTERVAL >= _TIMEOUT:
-            raise TimeoutError(
+            raise ZepDevError(
                 f"Timed out waiting for {ref.label()} from {ref.sha}; "
                 f"check https://github.com/zepben/{ref.repo_name}/actions"
             )

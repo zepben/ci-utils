@@ -17,6 +17,7 @@ from zep_dev.development_environments.target import (
     kubernetes_environment,
 )
 from zep_dev.development_environments.templates import KindConfig, KindMount
+from zep_dev.errors import ZepDevError
 from zep_dev.infrastructure.container_engine import choose_engine
 from zep_dev.shared import CommandResult, execute
 
@@ -194,7 +195,7 @@ def validate_existing_worker_mounts(
     ).stdout.splitlines()
     workers = [node for node in nodes if not node.endswith("-control-plane")]
     if not workers:
-        raise RuntimeError("host mounts require at least one worker node")
+        raise ZepDevError("host mounts require at least one worker node")
     expected = {(str(m.host_path.resolve()), m.node_path, m.read_only) for m in mounts}
     destinations = {node_path for _, node_path, _ in expected}
     for worker in workers:
@@ -204,7 +205,7 @@ def validate_existing_worker_mounts(
             if pair[1] in destinations
         }
         if actual != expected:
-            raise RuntimeError(f"worker {worker} mounts differ from requested mounts")
+            raise ZepDevError(f"worker {worker} mounts differ from requested mounts")
 
 
 def load_image_archive(target: ExecutionTarget, archive: Path) -> None:

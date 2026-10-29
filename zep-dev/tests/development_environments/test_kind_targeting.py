@@ -8,6 +8,7 @@ import yaml
 from tests.support.execution import FakeExecuteFactory
 from zep_dev.development_environments import kind
 from zep_dev.development_environments.target import execution_target
+from zep_dev.errors import ZepDevError
 from zep_dev.shared import CommandResult
 
 
@@ -95,7 +96,7 @@ def test_reuse_rejects_wrong_worker_mount_mode(
             (str(mount.host_path.resolve()), mount.node_path, False)
         },
     )
-    with pytest.raises(RuntimeError, match="mounts differ"):
+    with pytest.raises(ZepDevError, match="mounts differ"):
         kind.validate_existing_worker_mounts(target, [mount])
 
 

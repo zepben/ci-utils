@@ -1,5 +1,7 @@
 import logging
 import os
+from subprocess import CalledProcessError
+from typing import override
 
 import click
 
@@ -10,6 +12,7 @@ from zep_dev.development_environments.cli import (
     secrets_group,
     terraform_group,
 )
+from zep_dev.errors import ZepDevError
 from zep_dev.groups.chart import chart
 from zep_dev.groups.runtime_contract import runtime_contract
 from zep_dev.groups.tools import tools
@@ -18,7 +21,30 @@ from zep_dev.shared import get_bin_dir, resolve_registry_config
 LOG = logging.getLogger(__name__)
 
 
-@click.group(help="Manage local development Environments and chart utilities")
+def failure_message(error: Exception) -> str:
+    """str(error) plus the notes and captured stderr it leaves out."""
+    parts = [str(error), *getattr(error, "__notes__", [])]
+    if isinstance(error, CalledProcessError) and isinstance(error.stderr, str):
+        detail = error.stderr.strip()
+        if detail and detail not in "\n".join(parts):
+            parts.append(detail)
+    return "\n".join(parts)
+
+
+class Cli(click.Group):
+    """Report expected failures as one message; keep tracebacks behind -v."""
+
+    @override
+    def invoke(self, ctx: click.Context) -> object:
+        try:
+            return super().invoke(ctx)
+        except (ZepDevError, ValueError, CalledProcessError) as error:
+            if ctx.params.get("verbose"):
+                raise
+            raise click.ClickException(failure_message(error)) from error
+
+
+@click.group(cls=Cli, help="Manage local development Environments and chart utilities")
 @click.option(
     "-v", "--verbose", count=True, help="Increase log verbosity (-v=INFO, -vv=DEBUG)"
 )

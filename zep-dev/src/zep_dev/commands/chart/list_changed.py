@@ -27,7 +27,7 @@ def list_changed(helm_dir: Path, target_branch: str, since: str | None) -> None:
     helm_dir = helm_dir.resolve()
     ct_path = helm_dir / CT_YAML
     if not ct_path.is_file():
-        raise FileNotFoundError(f"{CT_YAML} is required in the root of --helm-dir")
+        raise ZepDevError(f"{CT_YAML} is required in the root of --helm-dir")
 
     repo_root = git_toplevel(helm_dir)
 

@@ -17,6 +17,7 @@ from zep_dev.development_environments.distributions import (
     CommitLocator,
     PullRequestLocator,
 )
+from zep_dev.errors import ZepDevError
 from zep_dev.github_api import GitHubAPI
 from zep_dev.models import ChartMetadata
 
@@ -135,7 +136,7 @@ def test_fork_pr_stops_before_cache_access(
     monkeypatch.setattr(requests, "request", lambda *args, **kwargs: response)
     resolver = ChartResolver(cache=fake_cache, api=GitHubAPI())
 
-    with pytest.raises(ValueError, match="comes from a fork"):
+    with pytest.raises(ZepDevError, match="comes from a fork"):
         resolver.resolve("ewb", PullRequestLocator(pullRequest=42))
 
     assert fake_cache.events == []
@@ -153,7 +154,7 @@ def test_missing_ghcr_entry_fails_before_dispatch(
     monkeypatch.setattr(chart_sources, "probe_oci_chart", lambda *args, **kw: None)
     ref = resolver.resolve("ewb", CommitLocator(commit=SHA))
 
-    with pytest.raises(FileNotFoundError, match="GHCR credentials missing"):
+    with pytest.raises(ZepDevError, match="GHCR credentials missing"):
         resolver.ensure(ref)
 
     assert fake_api.dispatched == []

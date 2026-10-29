@@ -10,6 +10,7 @@ from zep_dev.development_environments.chart_sources import (
     SourceChartRef,
     wait_for_oci,
 )
+from zep_dev.errors import ZepDevError
 
 
 def test_wait_for_oci_times_out_with_actions_context(
@@ -27,7 +28,7 @@ def test_wait_for_oci_times_out_with_actions_context(
         repo=Path("/unused/cache"),
     )
 
-    with pytest.raises(TimeoutError, match="Timed out waiting for ewb:1.2.3") as caught:
+    with pytest.raises(ZepDevError, match="Timed out waiting for ewb:1.2.3") as caught:
         wait_for_oci(ref)
 
     assert ref.sha in str(caught.value)

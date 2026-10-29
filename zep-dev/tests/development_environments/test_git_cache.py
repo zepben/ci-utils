@@ -65,7 +65,7 @@ def test_pr_head_movement_is_rejected(
     new = advance(work, "two")
     git("-C", str(work), "push", "origin", "HEAD:refs/pull/42/head")
     repo = git_cache.GitCache().ensure_repo("ewb")
-    with pytest.raises(RuntimeError, match="moved"):
+    with pytest.raises(ZepDevError, match="moved"):
         git_cache.GitCache().pr_head_commit(repo, 42, old)
     assert git_cache.GitCache().pr_head_commit(repo, 42, new) == new
 
@@ -82,7 +82,7 @@ def test_commit_unreachable_from_default_branch_is_rejected(
     git("-C", str(work), "commit", "-m", "fork")
     untrusted = git("-C", str(work), "rev-parse", "HEAD")
     git("-C", str(work), "push", "origin", "HEAD:refs/pull/99/head")
-    with pytest.raises(ValueError, match="not reachable"):
+    with pytest.raises(ZepDevError, match="not reachable"):
         git_cache.GitCache().trusted_commit(repo, untrusted)
 
 
@@ -105,7 +105,7 @@ def test_branch_tracks_remote_head_and_rejects_deleted_branch(
 
     git("-C", str(work), "push", "origin", "--delete", branch)
     cache.ensure_repo("ewb")
-    with pytest.raises(ValueError, match="not found in source repository"):
+    with pytest.raises(ZepDevError, match="not found in source repository"):
         cache.branch_commit(repo, branch)
 
 

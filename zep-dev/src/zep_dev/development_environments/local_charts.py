@@ -10,6 +10,7 @@ from typing import Literal
 from zep_dev.chart_version import calculate_chart_version
 from zep_dev.development_environments.distributions import ChartName
 from zep_dev.development_environments.target import state_home
+from zep_dev.errors import ZepDevError
 from zep_dev.models import ChartMetadata
 from zep_dev.shared import execute
 
@@ -53,7 +54,7 @@ def resolve_local_chart(name: ChartName) -> LocalChartRef:
 
 def check_local_chart(ref: LocalChartRef) -> None:
     if not ref.package.is_file() or ref.package.stat().st_size == 0:
-        raise FileNotFoundError(
+        raise ZepDevError(
             f"Missing local chart {ref.label()} at {ref.package}; "
             "run distribution build first from this checkout"
         )

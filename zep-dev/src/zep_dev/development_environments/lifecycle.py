@@ -45,6 +45,7 @@ from zep_dev.development_environments.target import (
     execution_target,
 )
 from zep_dev.development_environments.templates import EnvironmentTemplate
+from zep_dev.errors import ZepDevError
 
 
 @dataclass(frozen=True)
@@ -98,7 +99,7 @@ def preflight(template_path: Path, image_archive: Path | None = None) -> Creatio
     if image_archive is not None and (
         not image_archive.is_file() or image_archive.stat().st_size == 0
     ):
-        raise ValueError(f"image archive is missing or empty: {image_archive}")
+        raise ZepDevError(f"image archive is missing or empty: {image_archive}")
 
     charts: tuple[ChartRef, ...] = ()
     kind_wrappers: dict[ChartName, Path | str] = {}
@@ -184,7 +185,7 @@ def provision_helm_service(
             target, name, service, argo.repository_overlay(repositories)
         )
     elif status != "deployed":
-        raise ValueError(
+        raise ZepDevError(
             f"Supporting Helm release {name!r} in namespace {namespace!r} has "
             f"status {status!r} (Environment {target.name!r}). Destroy the "
             f"Environment or uninstall the release before retrying."
@@ -208,20 +209,20 @@ def create_environment(
     exists = kind.cluster_exists(target)
     if exists:
         if not allow_reuse:
-            raise FileExistsError(
+            raise ZepDevError(
                 f"Kind cluster {target.cluster_name!r} already exists; "
                 "destroy it or pass allow_reuse=True"
             )
         if plan.mounts:
             kind.validate_existing_worker_mounts(target, plan.mounts)
         if target.kubeconfig.is_symlink():
-            raise ValueError(
+            raise ZepDevError(
                 f"Environment kubeconfig is a symlink: {target.kubeconfig}"
             )
         kind.export_kubeconfig(target)
     else:
         if target.directory.is_symlink():
-            raise ValueError(f"Environment directory is a symlink: {target.directory}")
+            raise ZepDevError(f"Environment directory is a symlink: {target.directory}")
         if target.directory.exists():
             print(
                 f"Removing stale Environment files at {target.directory}",
@@ -279,9 +280,9 @@ def destroy_environment(name: str) -> None:
 def require_environment(name: str) -> ExecutionTarget:
     target = execution_target(name)
     if not kind.cluster_exists(target):
-        raise FileNotFoundError(f"Kind cluster {target.cluster_name!r} does not exist")
+        raise ZepDevError(f"Kind cluster {target.cluster_name!r} does not exist")
     if target.kubeconfig.is_symlink():
-        raise ValueError(f"Environment kubeconfig is a symlink: {target.kubeconfig}")
+        raise ZepDevError(f"Environment kubeconfig is a symlink: {target.kubeconfig}")
     if not target.kubeconfig.is_file():
         kind.export_kubeconfig(target)
     return target

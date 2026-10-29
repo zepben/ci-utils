@@ -20,6 +20,7 @@ from zep_dev.development_environments.target import (
     ExecutionTarget,
     kubernetes_namespace,
 )
+from zep_dev.errors import ZepDevError
 from zep_dev.models import CiSecrets
 
 IMAGE_SECRET_NAME = "github-registry"
@@ -88,7 +89,7 @@ def registry_credential(registry: str) -> tuple[Path, RegistryCredential]:
             entry = RegistryConfig.read(path).auths.get(registry)
             if entry is not None:
                 return path, entry
-    raise LookupError(
+    raise ZepDevError(
         f"credential for {registry} was not found in local container auth"
     )
 

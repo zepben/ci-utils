@@ -25,6 +25,7 @@ from zep_dev.development_environments.chart_sources import ChartResolver
 from zep_dev.development_environments.distributions import Distribution, LocalLocator
 from zep_dev.development_environments.local_charts import LocalChartRef
 from zep_dev.development_environments.target import execution_target
+from zep_dev.errors import ZepDevError
 
 
 @pytest.fixture
@@ -204,7 +205,7 @@ def test_new_commit_requires_new_package(checkout: Path) -> None:
     )
     current = resolver.resolve("ewb", LocalLocator(local=True))
     assert current.version != original.version
-    with pytest.raises(FileNotFoundError, match="run distribution build first"):
+    with pytest.raises(ZepDevError, match="run distribution build first"):
         resolver.check(current)
 
 
@@ -230,7 +231,7 @@ def test_missing_local_package_stops_creation_before_cluster_access(
     path = write_distribution(ewb={"local": True})
     basic_template["distribution"] = str(path)
     cluster = prepare_kind()
-    with pytest.raises(FileNotFoundError, match="Missing local chart"):
+    with pytest.raises(ZepDevError, match="Missing local chart"):
         lifecycle.create_environment(write_template(basic_template))
     assert cluster.calls == []
 
@@ -331,5 +332,5 @@ def test_empty_saved_package_is_rejected(checkout: Path) -> None:
     assert isinstance(ref, LocalChartRef)
     ref.package.parent.mkdir(parents=True)
     ref.package.touch()
-    with pytest.raises(FileNotFoundError, match="Missing local chart"):
+    with pytest.raises(ZepDevError, match="Missing local chart"):
         resolver.check(ref)

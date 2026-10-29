@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 import click
 
 from zep_dev.charts.utils import validate_dependencies_present
+from zep_dev.errors import ZepDevError
 from zep_dev.models import ChartMetadata, ChartTestingConfig
 from zep_dev.shared import execute
 from zep_dev.static import CT_YAML
@@ -79,7 +80,7 @@ def push(
 
     text = f"{result.stderr}\n{result.stdout}".lower()
     if "not found" not in text and "manifest unknown" not in text:
-        raise RuntimeError(
+        raise ZepDevError(
             f"exist check failed (rc={result.returncode}): {result.stderr.strip()}"
         )
 

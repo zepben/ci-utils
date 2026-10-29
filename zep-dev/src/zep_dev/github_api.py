@@ -4,6 +4,8 @@ import re
 import requests
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from zep_dev.errors import ZepDevError
+
 _SHA = re.compile(r"[0-9a-f]{40}\Z")
 _WORKFLOW = "build-commit-container.yaml"
 
@@ -32,7 +34,7 @@ class GitHubAPI:
     def token() -> str:
         token = os.environ.get("GH_TOKEN", "").strip()
         if not token:
-            raise RuntimeError("GH_TOKEN is required for PR lookup and build dispatch")
+            raise ZepDevError("GH_TOKEN is required for PR lookup and build dispatch")
         return token
 
     def request(
@@ -50,7 +52,7 @@ class GitHubAPI:
         )
         if not response.ok:
             kind = "authentication" if response.status_code in (401, 403) else "request"
-            raise RuntimeError(
+            raise ZepDevError(
                 f"GitHub API {kind} error: HTTP {response.status_code} for {path}"
             )
         return response
@@ -64,7 +66,7 @@ class GitHubAPI:
         sha = head.sha
         source = head.repo.full_name
         if source.lower() != f"zepben/{repo_name}".lower():
-            raise ValueError(
+            raise ZepDevError(
                 f"PR #{number} comes from a fork; refusing privileged build"
             )
         if not _SHA.fullmatch(sha):

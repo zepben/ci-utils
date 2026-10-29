@@ -178,12 +178,9 @@ def test_push_preserves_command_failure_and_adds_diagnostics(
         ],
     )
 
-    assert result.exception is error
-    assert error.__cause__ is None
-    assert error.cmd == ["helm", *command]
-    assert error.returncode == 2
-    assert error.stdout == "command stdout"
-    assert error.stderr == "command stderr"
+    assert result.exit_code == 1
     assert error.__notes__ == [
         f"{phase} failed with rc=2\ncommand stdout\ncommand stderr"
     ]
+    assert f"{phase} failed with rc=2" in result.stderr
+    assert "command stderr" in result.stderr

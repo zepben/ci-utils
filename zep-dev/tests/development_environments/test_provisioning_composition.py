@@ -22,6 +22,7 @@ from zep_dev.development_environments import (
     supporting,
 )
 from zep_dev.development_environments.target import execution_target
+from zep_dev.errors import ZepDevError
 
 
 def test_missing_manifest_fails_before_kind(
@@ -224,7 +225,7 @@ def test_non_deployed_helm_release_fails_without_install(
         lambda _target: {("integration", "operator"): "failed"},
     )
 
-    with pytest.raises(ValueError, match="status 'failed'"):
+    with pytest.raises(ZepDevError, match="status 'failed'"):
         lifecycle.create_environment(template)
 
     assert events == ["raw"]
@@ -280,10 +281,10 @@ def test_argo_oci_preflight_checks_credentials_before_kind(
     calls = prepare_kind()
 
     def fail_credential(_registry: str) -> tuple[str, str]:
-        raise LookupError("missing registry credential")
+        raise ZepDevError("missing registry credential")
 
     monkeypatch.setattr(secrets, "resolve_registry_credential", fail_credential)
-    with pytest.raises(LookupError, match="missing registry credential"):
+    with pytest.raises(ZepDevError, match="missing registry credential"):
         lifecycle.create_environment(write_template(basic_template))
     assert calls.calls == []
 

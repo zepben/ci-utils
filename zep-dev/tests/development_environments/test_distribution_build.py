@@ -62,8 +62,7 @@ def test_missing_version_stops_distribution_build(
     )
 
     assert "Distribution charts ready" not in result.output
-    assert result.exit_code != 0
-    assert result.exception is not None
-    assert "OCI not-found" in str(result.exception)
-    assert "cannot build a version: locator" in str(result.exception)
+    assert result.exit_code == 1
+    assert "OCI not-found" in result.stderr
+    assert "cannot build a version: locator" in result.stderr
     assert len(fake.calls) == 1

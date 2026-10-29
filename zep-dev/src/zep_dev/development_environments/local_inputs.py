@@ -9,6 +9,7 @@ from zep_dev.development_environments.bindings import Bindings, SecretSource
 from zep_dev.development_environments.documents import read_mapping
 from zep_dev.development_environments.services import HelmService
 from zep_dev.development_environments.templates import EnvironmentTemplate
+from zep_dev.errors import ZepDevError
 
 
 @dataclass(frozen=True)
@@ -50,7 +51,7 @@ def load_bindings(cwd: Path | None = None, *, required: bool = True) -> Bindings
     if not required:
         return Bindings()
     searched = ", ".join(map(str, candidates))
-    raise FileNotFoundError(f"Bindings not found; searched: {searched}")
+    raise ZepDevError(f"Bindings not found; searched: {searched}")
 
 
 def resolve_inputs(template: EnvironmentTemplate, bindings: Bindings) -> ResolvedInputs:

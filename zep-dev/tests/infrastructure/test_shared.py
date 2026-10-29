@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 import zep_dev.shared as shared
+from zep_dev.errors import ZepDevError
 from zep_dev.shared import (
     ResolvedChart,
     resolve,
@@ -22,13 +23,13 @@ def bin_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_resolve_missing(bin_dir: Path) -> None:
-    with pytest.raises(Exception, match="not installed"):
+    with pytest.raises(ZepDevError, match="not installed"):
         resolve("kind")
 
 
 def test_resolve_not_executable(bin_dir: Path) -> None:
     (bin_dir / "kind").write_text("data")
-    with pytest.raises(Exception, match="not installed"):
+    with pytest.raises(ZepDevError, match="not installed"):
         resolve("kind")
 
 

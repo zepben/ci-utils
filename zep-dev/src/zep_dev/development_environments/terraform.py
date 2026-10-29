@@ -160,7 +160,7 @@ def terraform_environment(target: ExecutionTarget) -> Generator[dict[str, str]]:
         home.mkdir()
         data.mkdir()
         cli_config.touch()
-        yield {
+        env = {
             "PATH": os.environ.get("PATH", os.defpath),
             "KUBECONFIG": str(target.kubeconfig),
             "KUBE_CONFIG_PATH": str(target.kubeconfig),
@@ -168,6 +168,10 @@ def terraform_environment(target: ExecutionTarget) -> Generator[dict[str, str]]:
             "TF_DATA_DIR": str(data),
             "TF_CLI_CONFIG_FILE": str(cli_config),
         }
+        # Kind wrappers are fetched from GitHub over SSH, which needs the user's agent.
+        if agent := os.environ.get("SSH_AUTH_SOCK"):
+            env["SSH_AUTH_SOCK"] = agent
+        yield env
 
 
 def terraform_init(root: Path, env: Mapping[str, str]) -> None:

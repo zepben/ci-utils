@@ -221,3 +221,16 @@ def test_runtime_applies_empty_module_set_when_state_remains(
         len(fake.calls_for("terraform", f"-chdir={target.runtime_root}", "apply")) == 1
     )
     assert state.read_text() == "preserve"
+
+
+@pytest.mark.parametrize("agent", ["/run/user/1000/ssh-agent.sock", None])
+def test_terraform_receives_the_ssh_agent_only_when_one_is_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent: str | None
+) -> None:
+    if agent is None:
+        monkeypatch.delenv("SSH_AUTH_SOCK", raising=False)
+    else:
+        monkeypatch.setenv("SSH_AUTH_SOCK", agent)
+    target = execution_target("first", environ={"XDG_STATE_HOME": str(tmp_path)})
+    with terraform.terraform_environment(target) as env:
+        assert env.get("SSH_AUTH_SOCK") == agent

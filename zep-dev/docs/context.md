@@ -91,7 +91,9 @@ rejected) and `local_inputs.py` for Bindings.
 
 - Bindings never hold application secret values. A secret source names exactly one of
   `env` or `file`, and is read when the Secret is created.
-- Only inputs a Template requires are resolved.
+- Every declared input has a consumer: a mount is used by `cluster.mounts`, a
+  repository by a supporting service's Argo integration. Only inputs a Template
+  requires are resolved (tests: `test_templates.py`, `test_local_inputs.py`).
 
 **Layering** (tests: `tests/test_architecture.py`)
 

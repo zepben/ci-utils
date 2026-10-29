@@ -163,6 +163,7 @@ class EnvironmentTemplate(BaseModel):
             )
 
     def validate_service_references(self) -> None:
+        consumed: set[str] = set()
         for name, service in self.services.items():
             if not isinstance(service, HelmService):
                 continue
@@ -176,6 +177,10 @@ class EnvironmentTemplate(BaseModel):
                 raise ValueError(
                     f"services.{name}.integration.repositories undeclared: {sorted(unknown)}"
                 )
+            consumed.update(service.integration.repositories)
+        unused = set(self.inputs.repositories) - consumed
+        if unused:
+            raise ValueError(f"inputs.repositories has no consumer: {sorted(unused)}")
 
     def validate_database_references(self) -> None:
         for app, config in self.applications.items():

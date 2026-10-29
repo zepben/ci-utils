@@ -50,7 +50,6 @@ def test_distribution_is_template_relative_and_cross_namespace_cnpg_is_valid(
                     "values": {"deploymentProfile": "kindTest"},
                 }
             },
-            "inputs": {"repositories": ["deployments"]},
         }
     )
     path = write_template(basic_template)

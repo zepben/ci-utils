@@ -119,7 +119,7 @@ def test_argo_mounts_and_overlay_come_from_consumed_binding(
 ) -> None:
     checkout = deployments_checkout
     write_bindings(repositories={"deployments": str(checkout)})
-    basic_template["inputs"] = {"repositories": ["deployments", "unused"]}
+    basic_template["inputs"] = {"repositories": ["deployments"]}
     basic_template["services"] = {
         "argo": {
             "type": "helm",

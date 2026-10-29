@@ -70,7 +70,6 @@ def test_database_reference_requires_an_explicit_declared_database(
         reference["database"] = database
     basic_template.update(
         distribution="dist.yaml",
-        inputs={"repositories": ["deployments"]},
         services={
             "postgres": {
                 "type": "cnpg",
@@ -182,11 +181,12 @@ def test_declared_inputs_have_unique_identity(
         EnvironmentTemplate.model_validate(basic_template)
 
 
-def test_declared_mount_requires_a_consumer(basic_template: dict[str, Any]) -> None:
-    basic_template["inputs"] = {"mounts": ["unused"]}
-    with pytest.raises(ValidationError, match="no consumer"):
-        EnvironmentTemplate.model_validate(basic_template)
+@pytest.mark.parametrize("field", ["mounts", "repositories"])
+def test_declared_input_requires_a_consumer(
+    basic_template: dict[str, Any], field: str
 ) -> None:
+    basic_template["inputs"] = {field: ["unused"]}
+    with pytest.raises(ValidationError, match=f"inputs.{field} has no consumer"):
         EnvironmentTemplate.model_validate(basic_template)
 
 

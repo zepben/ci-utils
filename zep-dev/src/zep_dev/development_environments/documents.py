@@ -11,6 +11,7 @@ from zep_dev.development_environments.templates import (
     EnvironmentTemplate,
     validate_distribution,
 )
+from zep_dev.errors import ZepDevError
 
 _MAPPING: TypeAdapter[dict[str, object]] = TypeAdapter(dict[str, object])
 
@@ -76,6 +77,8 @@ def load_template(path: Path) -> tuple[EnvironmentTemplate, Distribution | None]
     distribution = None
     if template.distribution is not None:
         distribution_path = resolve_relative(path, template.distribution)
+        if not distribution_path.is_file():
+            raise ZepDevError(f"{path}: Distribution not found: {distribution_path}")
         distribution = load_distribution(distribution_path)
     validate_distribution(template, distribution)
     return template, distribution

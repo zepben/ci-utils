@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 from zep_dev.charts.utils import discover_charts
+from zep_dev.errors import ZepDevError
 from zep_dev.infrastructure.container_engine import (
     choose_engine,
     pull_missing_images,
@@ -39,7 +40,7 @@ def extract_image_refs(yaml_text: str) -> set[str]:
 
 def pack_images(helm_dir: Path, output: Path) -> None:
     if not (helm_dir / CT_YAML).is_file():
-        raise ValueError(f"{CT_YAML} is required in the root of --helm-dir")
+        raise ZepDevError(f"{CT_YAML} is required in the root of --helm-dir")
 
     refs: set[str] = set()
     for chart_path in discover_charts(helm_dir):

@@ -3,7 +3,7 @@
 import json
 import os
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from ipaddress import IPv4Address, ip_address
 from pathlib import Path
@@ -65,15 +65,8 @@ def list_clusters() -> list[str]:
     return result.stdout.splitlines()
 
 
-def render_kind_config(
-    config: KindConfig | Mapping[str, object], mounts: Sequence[HostMount] = ()
-) -> str:
-    validated = (
-        config
-        if isinstance(config, KindConfig)
-        else KindConfig.model_validate(dict(config))
-    )
-    rendered = validated.model_copy(deep=True)
+def render_kind_config(config: KindConfig, mounts: Sequence[HostMount] = ()) -> str:
+    rendered = config.model_copy(deep=True)
     workers = [node for node in rendered.nodes if node.role == "worker"]
     if mounts and not workers:
         raise ValueError("host mounts require at least one worker node")
@@ -209,8 +202,6 @@ def validate_existing_worker_mounts(
 
 
 def load_image_archive(target: ExecutionTarget, archive: Path) -> None:
-    if not archive.is_file() or archive.stat().st_size == 0:
-        raise ValueError(f"image archive is missing or empty: {archive}")
     kind(target, "load", "image-archive", str(archive), "--name", target.cluster_name)
 
 

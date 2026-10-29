@@ -237,7 +237,6 @@ def observe_applications(target: ExecutionTarget) -> list[ApplicationRelease]:
         "--deployed",
         "--failed",
         "--pending",
-        "--max=0",
         "--output=json",
         capture_stdout=True,
         timeout=15,

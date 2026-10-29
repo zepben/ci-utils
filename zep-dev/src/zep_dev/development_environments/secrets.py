@@ -1,6 +1,7 @@
 """Environment-targeted Kubernetes Secret creation."""
 
 import base64
+import os
 from pathlib import Path
 
 import yaml
@@ -18,7 +19,7 @@ from zep_dev.development_environments.registry_config import (
 from zep_dev.development_environments.services import OciRepository
 from zep_dev.development_environments.target import (
     ExecutionTarget,
-    kubernetes_namespace,
+    kubernetes_name,
 )
 from zep_dev.errors import ZepDevError
 from zep_dev.models import CiSecrets
@@ -36,8 +37,8 @@ def create_env_file_secret(
     name: str,
     content: str,
 ) -> None:
-    namespace = kubernetes_namespace(namespace)
-    name = kubernetes_namespace(name)
+    namespace = kubernetes_name(namespace)
+    name = kubernetes_name(name)
     if not resource_exists(target, "secret", name, namespace=namespace):
         kubectl(
             target,
@@ -56,7 +57,7 @@ def create_additional_secrets(
     target: ExecutionTarget, namespace: str, ci_secrets_file: Path
 ) -> None:
     """Load the standalone CI Secret-file format."""
-    namespace = kubernetes_namespace(namespace)
+    namespace = kubernetes_name(namespace)
     config = CiSecrets.model_validate(
         yaml.safe_load(ci_secrets_file.read_text(encoding="utf-8"))
     )
@@ -69,9 +70,7 @@ def create_bound_secret(
     target: ExecutionTarget, name: str, source: SecretSource
 ) -> None:
     """Resolve a validated source at use time; do not store its value in a model."""
-    import os
-
-    name = kubernetes_namespace(name)
+    name = kubernetes_name(name)
     if source.env is not None:
         content = os.environ.get(source.env)
         if not content:
@@ -106,7 +105,7 @@ def resolve_registry_credential(registry: str) -> tuple[str, str]:
 
 
 def create_image_pull_secret(target: ExecutionTarget, namespace: str) -> None:
-    namespace = kubernetes_namespace(namespace)
+    namespace = kubernetes_name(namespace)
     auth, _ = registry_credential(GHCR_REGISTRY)
     if not resource_exists(target, "secret", IMAGE_SECRET_NAME, namespace=namespace):
         kubectl(
@@ -126,7 +125,7 @@ def apply_argo_oci_repository_secret(
     namespace: str,
     repository: OciRepository,
 ) -> None:
-    namespace = kubernetes_namespace(namespace)
+    namespace = kubernetes_name(namespace)
     username, password = resolve_registry_credential(repository.registry)
     manifest = {
         "apiVersion": "v1",

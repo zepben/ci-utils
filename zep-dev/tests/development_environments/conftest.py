@@ -1,6 +1,5 @@
 import base64
 import json
-import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Unpack
@@ -17,6 +16,7 @@ from tests.support.fixtures import (
     WriteBindings,
     WriteDistribution,
 )
+from tests.support.git import init_repository
 from tests.support.resolvers import RecordingChartResolver
 from zep_dev.development_environments import (
     chart_sources,
@@ -25,11 +25,6 @@ from zep_dev.development_environments import (
     lifecycle,
     secrets,
 )
-
-
-@pytest.fixture(autouse=True)
-def container_provider(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("KIND_EXPERIMENTAL_PROVIDER", "podman")
 
 
 @pytest.fixture

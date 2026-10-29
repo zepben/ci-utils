@@ -7,6 +7,7 @@ from zep_dev.development_environments.documents import resolve_relative
 from zep_dev.development_environments.kubernetes import kubectl
 from zep_dev.development_environments.target import ExecutionTarget
 from zep_dev.development_environments.templates import EnvironmentTemplate
+from zep_dev.errors import ZepDevError
 
 
 def resolve_application_manifests(
@@ -18,8 +19,8 @@ def resolve_application_manifests(
         for reference in application.manifests
     )
     for path in paths:
-        with path.open("rb") as source:
-            source.read(1)
+        if not path.is_file():
+            raise ZepDevError(f"application manifest not found: {path}")
     return paths
 
 

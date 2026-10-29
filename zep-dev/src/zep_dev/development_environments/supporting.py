@@ -18,6 +18,7 @@ from zep_dev.development_environments.services import (
     RawService,
 )
 from zep_dev.development_environments.target import ExecutionTarget
+from zep_dev.errors import ZepDevError
 
 
 class _Secret(BaseModel):
@@ -61,14 +62,18 @@ def resolve_config_maps(
         ResolvedConfigMap(
             name=config.name,
             data={
-                key: resolve_relative(template_path, reference).read_text(
-                    encoding="utf-8"
-                )
+                key: input_file_text(resolve_relative(template_path, reference))
                 for key, reference in config.from_file.items()
             },
         )
         for config in configs
     )
+
+
+def input_file_text(path: Path) -> str:
+    if not path.is_file():
+        raise ZepDevError(f"config_maps_from_file source not found: {path}")
+    return path.read_text(encoding="utf-8")
 
 
 def apply_config_maps(

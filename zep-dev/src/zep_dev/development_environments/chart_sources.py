@@ -197,11 +197,7 @@ class GitCache:
 
 
 def probe_oci_chart(
-    name: ChartName,
-    version: str,
-    *,
-    report: bool = True,
-    progress: Callable[[str], None] | None = None,
+    name: ChartName, version: str, progress: Callable[[str], None] | None = None
 ) -> ChartMetadata | None:
     """Return the published chart's metadata, or None if it is not in OCI."""
     if progress is not None:

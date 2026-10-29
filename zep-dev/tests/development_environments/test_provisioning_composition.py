@@ -12,7 +12,6 @@ import yaml
 from tests.support.execution import FakeExecute, FakeExecuteFactory
 from tests.support.fixtures import PrepareKind, WriteBindings, WriteDistribution
 from zep_dev.development_environments import (
-    argo,
     cnpg,
     helm,
     kind,
@@ -42,18 +41,22 @@ def test_missing_manifest_fails_before_kind(
         }
     )
     calls = prepare_kind()
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(ZepDevError, match="manifest not found"):
         lifecycle.create_environment(write_template(basic_template))
     assert calls.calls == []
     assert not execution_target("integration").directory.exists()
 
 
 @pytest.mark.parametrize(
-    "installed_namespace",
-    ["elsewhere", "operators"],
-    ids=["different-namespace", "already-installed"],
+    ("installed_namespace", "status", "installs"),
+    [
+        ("elsewhere", "deployed", True),
+        ("operators", "deployed", False),
+        ("operators", "uninstalled", True),
+    ],
+    ids=["different-namespace", "already-installed", "uninstalled"],
 )
-def test_release_identity_controls_install_but_always_waits(
+def test_release_identity_and_status_control_install_but_always_waits(
     state_home: Path,
     prepare_kind: PrepareKind,
     prepare_kubectl: Callable[[], FakeExecute],
@@ -61,6 +64,8 @@ def test_release_identity_controls_install_but_always_waits(
     write_template: Callable[[dict[str, Any]], Path],
     fake_execute: FakeExecuteFactory,
     installed_namespace: str,
+    status: str,
+    installs: bool,
 ) -> None:
     basic_template["services"] = {
         "operator": {
@@ -90,7 +95,7 @@ def test_release_identity_controls_install_but_always_waits(
                     {
                         "name": "operator",
                         "namespace": installed_namespace,
-                        "status": "deployed",
+                        "status": status,
                     }
                 ]
             ),
@@ -101,9 +106,7 @@ def test_release_identity_controls_install_but_always_waits(
 
     lifecycle.create_environment(template, allow_reuse=True)
 
-    assert bool(helm_calls.calls_for("helm", "install")) is (
-        installed_namespace != "operators"
-    )
+    assert bool(helm_calls.calls_for("helm", "install")) is installs
     [wait] = [command for command in kubectl_calls.calls if "wait" in command.args]
     assert "deployment/operator" in wait.args
 
@@ -112,6 +115,7 @@ def test_argo_mounts_and_overlay_come_from_consumed_binding(
     deployments_checkout: Path,
     write_bindings: WriteBindings,
     state_home: Path,
+    prepare_kubectl: Callable[[], FakeExecute],
     monkeypatch: pytest.MonkeyPatch,
     basic_template: dict[str, Any],
     write_template: Callable[[dict[str, Any]], Path],
@@ -134,32 +138,35 @@ def test_argo_mounts_and_overlay_come_from_consumed_binding(
     assert plan.mounts == (
         kind.HostMount(checkout, "/mnt/local-repos/deployments", True),
     )
-    overlay = argo.repository_overlay([checkout])
-    assert (
-        overlay["configs"]["repositories"]["local-deployments"]["url"]
-        == "file:///mnt/local-repos/deployments"
-    )
-    [repository_mount] = overlay["repoServer"]["volumeMounts"]
-    assert repository_mount["mountPath"] == "/mnt/local-repos"
     calls = fake_execute(kind).on(
         "kind", "get", "clusters", "--quiet", stdout="zep-dev-integration\n"
     )
     validate_mounts = create_autospec(kind.validate_existing_worker_mounts)
     monkeypatch.setattr(kind, "validate_existing_worker_mounts", validate_mounts)
     monkeypatch.setattr(kind, "export_kubeconfig", lambda _target: None)
-    monkeypatch.setattr(kubernetes, "ensure_namespace", lambda *_args: None)
-    monkeypatch.setattr(
-        kubernetes, "apply_builtin_storage_classes", lambda *_args: None
+    prepare_kubectl()
+    installed: list[dict[str, Any]] = []
+
+    def read_values(args: tuple[str, ...], _kwargs: dict[str, object]) -> None:
+        installed.extend(
+            yaml.safe_load(Path(args[index + 1]).read_text())
+            for index, argument in enumerate(args)
+            if argument == "-f"
+        )
+
+    fake_execute(helm).on("helm", "list", stdout="[]").on(
+        "helm", "install", hook=read_values
     )
-    monkeypatch.setattr(
-        helm,
-        "release_statuses",
-        lambda _target: {("integration", "argo"): "deployed"},
-    )
-    monkeypatch.setattr(helm, "install_service", lambda *_args: None)
     lifecycle.create_environment(write_template(basic_template), allow_reuse=True)
     assert len(calls.calls_for("kind", "get")) == 1
     validate_mounts.assert_called_once_with(plan.target, plan.mounts)
+    [overlay] = installed
+    assert (
+        overlay["configs"]["repositories"]["local-deployments"]["url"]
+        == "file:///mnt/local-repos/deployments"
+    )
+    [repository_mount] = overlay["repoServer"]["volumeMounts"]
+    assert repository_mount["mountPath"] == "/mnt/local-repos"
 
 
 @pytest.fixture

@@ -23,7 +23,7 @@ from zep_dev.development_environments.target import (
     ExecutionTarget,
     execution_target,
 )
-from zep_dev.development_environments.templates import EnvironmentTemplate
+from zep_dev.development_environments.templates import EnvironmentTemplate, KindConfig
 from zep_dev.errors import ZepDevError
 
 
@@ -50,7 +50,9 @@ def creation_plan(
         target=execution_target("integration"),
         inputs=local_inputs.ResolvedInputs(mounts={}, secrets={}, argo_repositories={}),
         mounts=(),
-        kind_config=kind.render_kind_config(basic_template["cluster"]["kind"]),
+        kind_config=kind.render_kind_config(
+            KindConfig.model_validate(basic_template["cluster"]["kind"])
+        ),
         charts=(),
         config_maps={},
         application_manifests=(),
@@ -259,6 +261,54 @@ def test_runtime_precedes_manifests_and_application_install(
             target, application_plan.charts, {"eas": {"replicas": 1}}
         ),
     ]
+
+
+def test_create_refuses_symlinked_directory_before_cluster_creation(
+    creation_plan: lifecycle.CreationPlan,
+    kind_runtime: FakeKind,
+    provisioning: Mock,
+    tmp_path: Path,
+) -> None:
+    target = creation_plan.target
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    target.directory.parent.mkdir(parents=True)
+    target.directory.symlink_to(outside)
+    with pytest.raises(ZepDevError, match="symlink"):
+        lifecycle.create_environment(Path("template.yaml"))
+    assert kind_runtime.events == [("lookup", target)]
+    assert outside.is_dir()
+    assert provisioning.mock_calls == []
+
+
+def test_destroy_refuses_symlinked_directory_before_touching_cluster(
+    state_home: Path, kind_runtime: FakeKind, tmp_path: Path
+) -> None:
+    target = execution_target("integration")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    target.directory.parent.mkdir(parents=True)
+    target.directory.symlink_to(outside)
+    kind_runtime.clusters.add(target.cluster_name)
+    with pytest.raises(ZepDevError, match="symlink"):
+        lifecycle.destroy_environment("integration")
+    assert kind_runtime.events == []
+    assert outside.is_dir()
+
+
+def test_symlinked_kubeconfig_is_refused_before_export(
+    state_home: Path, kind_runtime: FakeKind, tmp_path: Path
+) -> None:
+    target = execution_target("integration")
+    outside = tmp_path / "outside-kubeconfig"
+    outside.write_text("preserve")
+    target.directory.mkdir(parents=True)
+    target.kubeconfig.symlink_to(outside)
+    kind_runtime.clusters.add(target.cluster_name)
+    with pytest.raises(ZepDevError, match="symlink"):
+        lifecycle.environment_kubeconfig("integration")
+    assert kind_runtime.events == [("lookup", target)]
+    assert outside.read_text() == "preserve"
 
 
 def test_destroy_failure_preserves_owned_files(

@@ -8,6 +8,7 @@ import yaml
 from tests.support.execution import FakeExecuteFactory
 from zep_dev.development_environments import kind
 from zep_dev.development_environments.target import execution_target
+from zep_dev.development_environments.templates import KindConfig
 from zep_dev.errors import ZepDevError
 from zep_dev.shared import CommandResult
 
@@ -45,7 +46,7 @@ def test_kind_uses_unique_config_and_scoped_kubeconfig(
         "apiVersion": "kind.x-k8s.io/v1alpha4",
         "nodes": [{"role": "control-plane"}, {"role": "worker"}],
     }
-    rendered = kind.render_kind_config(config)
+    rendered = kind.render_kind_config(KindConfig.model_validate(config))
     if fail:
         with pytest.raises(subprocess.CalledProcessError):
             kind.create_cluster(target, rendered)
@@ -66,7 +67,7 @@ def test_kind_mounts_are_worker_only_and_read_only(tmp_path: Path) -> None:
         "nodes": [{"role": "control-plane"}, {"role": "worker"}],
     }
     rendered = kind.render_kind_config(
-        config,
+        KindConfig.model_validate(config),
         [kind.HostMount(tmp_path, "/mnt/repo", read_only=True)],
     )
     nodes = {node["role"]: node for node in yaml.safe_load(rendered)["nodes"]}
@@ -128,8 +129,6 @@ def test_kubeconfig_export_sends_kind_stdout_to_stderr(
 def test_kind_round_trip_preserves_unmodeled_options_and_native_mounts(
     tmp_path: Path,
 ) -> None:
-    from zep_dev.development_environments.templates import KindConfig
-
     config = {
         "kind": "Cluster",
         "apiVersion": "kind.x-k8s.io/v1alpha4",

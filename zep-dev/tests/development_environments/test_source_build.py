@@ -1,7 +1,6 @@
 """Source selection resolution, build dispatch, and trust boundaries."""
 
 import json
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import override
@@ -181,6 +180,8 @@ def test_missing_source_chart_dispatches_and_waits_for_oci(
     ref = resolver.resolve("ewb", CommitLocator(commit=SHA))
     resolver.ensure(ref)
 
-    assert reports == [True, False, False]
+    assert probes == [("ewb", "1.2.3")] * 3
     assert fake_api.dispatched == [("energy-workbench-server", "main", SHA)]
-    assert capsys.readouterr().out.splitlines()[-1] == "  ready ewb:1.2.3"
+    output = capsys.readouterr().out.splitlines()
+    assert output.count("  checking OCI ewb:1.2.3") == 1
+    assert output[-1] == "  ready ewb:1.2.3"

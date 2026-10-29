@@ -3,6 +3,7 @@ from typing import Any
 
 import pytest
 
+from tests.support.git import init_repository
 from zep_dev.development_environments.bindings import Bindings, SecretSource
 from zep_dev.development_environments.local_inputs import (
     load_bindings,
@@ -108,10 +109,8 @@ def test_required_mount_must_exist(basic_template: dict[str, Any]) -> None:
 
 
 def test_argo_repository_requires_git_top_level(
-    basic_template: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    basic_template: dict[str, Any], tmp_path: Path
 ) -> None:
-    import subprocess
-
     basic_template["inputs"] = {"repositories": ["deployments"]}
     basic_template["services"] = {
         "argo": {
@@ -123,14 +122,8 @@ def test_argo_repository_requires_git_top_level(
         }
     }
     template = EnvironmentTemplate.model_validate(basic_template)
-    bindings = Bindings(repositories={"deployments": tmp_path})
-    calls: list[list[str]] = []
-
-    def fake_run(args: list[str], **_: Any) -> subprocess.CompletedProcess[str]:
-        calls.append(args)
-        return subprocess.CompletedProcess(args, 0, str(tmp_path / "parent"))
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    inside = init_repository(tmp_path / "deployments") / "terraform"
+    inside.mkdir()
+    bindings = Bindings(repositories={"deployments": inside})
     with pytest.raises(ValueError, match="Git checkout top level"):
         resolve_inputs(template, bindings)
-    assert calls == [["git", "-C", str(tmp_path), "rev-parse", "--show-toplevel"]]

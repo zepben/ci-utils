@@ -8,6 +8,14 @@ from tests.support.execution import FakeExecute, FakeExecuteFactory
 from zep_dev import shared
 
 
+@pytest.fixture(autouse=True)
+def ambient_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test probes a container engine, dumps a cluster, or writes ~/.cache."""
+    monkeypatch.setenv("KIND_EXPERIMENTAL_PROVIDER", "podman")
+    monkeypatch.delenv("CI_DUMP_DEBUG", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+
+
 @pytest.fixture
 def cli_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Isolate CLI startup and restore variables it changes directly."""

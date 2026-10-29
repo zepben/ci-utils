@@ -15,7 +15,7 @@ from zep_dev.development_environments.names import (
 )
 
 _NAME: TypeAdapter[str] = TypeAdapter(EnvironmentName)
-_NAMESPACE: TypeAdapter[str] = TypeAdapter(KubernetesName)
+_KUBERNETES_NAME: TypeAdapter[str] = TypeAdapter(KubernetesName)
 
 
 def environment_name(value: str) -> str:
@@ -23,8 +23,8 @@ def environment_name(value: str) -> str:
     return _NAME.validate_python(value)
 
 
-def kubernetes_namespace(value: str) -> str:
-    return _NAMESPACE.validate_python(value)
+def kubernetes_name(value: str) -> str:
+    return _KUBERNETES_NAME.validate_python(value)
 
 
 def state_home(environ: Mapping[str, str] | None = None) -> Path:
@@ -90,7 +90,7 @@ class ExecutionTarget:
         return self.directory / "terraform" / "standalone"
 
     def standalone_state(self, root: Path, namespace: str) -> Path:
-        valid_namespace = kubernetes_namespace(namespace)
+        valid_namespace = kubernetes_name(namespace)
         resolved = root.resolve()
         key = hashlib.sha256(f"{resolved}\0{valid_namespace}".encode()).hexdigest()
         return self.standalone_root / key / "terraform.tfstate"
@@ -99,8 +99,7 @@ class ExecutionTarget:
 def execution_target(
     name: str, *, environ: Mapping[str, str] | None = None
 ) -> ExecutionTarget:
-    valid_name = environment_name(name)
-    return ExecutionTarget(name=valid_name, state_root=state_home(environ))
+    return ExecutionTarget(name=name, state_root=state_home(environ))
 
 
 def kubernetes_environment(target: ExecutionTarget) -> dict[str, str]:

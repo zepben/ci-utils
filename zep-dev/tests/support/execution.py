@@ -66,7 +66,6 @@ class FakeExecute:
         self.calls.append(call(*args, **kwargs))
         for rule in self._rules:
             if rule.matches(args, kwargs):
-                result, raises, hook = rule.result, rule.raises, rule.hook
                 break
         else:
             prefixes = [rule.prefix for rule in self._rules]
@@ -74,10 +73,16 @@ class FakeExecute:
                 f"No rule matched execute{args!r} with {kwargs!r}; "
                 f"configured prefixes: {prefixes!r}"
             )
-        if hook is not None:
-            hook(args, kwargs)
-        if raises is not None:
-            raise raises
+        if rule.hook is not None:
+            rule.hook(args, kwargs)
+        if rule.raises is not None:
+            raise rule.raises
+        # Like shared.execute, output reaches the caller only when captured.
+        result = CommandResult(
+            rule.result.returncode,
+            rule.result.stdout if kwargs.get("capture_stdout") else "",
+            rule.result.stderr if kwargs.get("capture_stderr") else "",
+        )
         if kwargs.get("check", True) and result.returncode != 0:
             raise subprocess.CalledProcessError(
                 result.returncode,

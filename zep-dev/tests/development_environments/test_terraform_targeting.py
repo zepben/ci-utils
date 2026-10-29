@@ -94,6 +94,23 @@ def test_runtime_root_targets_provider_and_preserves_state(
     assert "module" not in json.loads((root / "main.tf.json").read_text())
 
 
+def test_published_chart_kind_wrapper_is_a_git_source_passed_unchanged(
+    tmp_path: Path, basic_template: dict[str, Any]
+) -> None:
+    target = execution_target("integration", environ={"XDG_STATE_HOME": str(tmp_path)})
+    template = database_template(basic_template)
+    source = (
+        "git::ssh://git@github.com/zepben/evolve-app-server.git"
+        "//helm/charts/eas/kind-runtime-contract?ref=" + "a" * 40
+    )
+    applications = terraform.resolve_runtime_applications(
+        target, template, {"eas": source}
+    )
+    root = terraform.generate_runtime_root(target, applications)
+    config = json.loads((root / "main.tf.json").read_text())
+    assert config["module"]["eas_runtime_contract"]["source"] == source
+
+
 def test_standalone_state_and_subprocess_are_environment_scoped(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

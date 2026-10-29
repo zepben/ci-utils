@@ -1,3 +1,4 @@
+import json
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
@@ -11,7 +12,6 @@ from tests.support.resolvers import RecordingChartResolver
 from zep_dev.charts import published
 from zep_dev.development_environments import (
     chart_sources,
-    cnpg,
     helm,
     kind,
     lifecycle,
@@ -218,7 +218,7 @@ def test_reuse_without_runtime_state_still_attempts_database_apply(
         )
     ]
 
-    monkeypatch.setattr(cnpg, "apply_cnpg_service", lambda *_args: None)
+    # Application installs use Popen, outside the execute boundary.
     monkeypatch.setattr(helm, "install_applications", lambda *_args: None)
     runtime_root = execution_target("integration").runtime_root
     terraform_calls = (

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from zep_dev.development_environments.kind import kind, load_image_archive
 from zep_dev.development_environments.target import ExecutionTarget
+from zep_dev.errors import ZepDevError
 from zep_dev.infrastructure.container_engine import (
     choose_engine,
     pull_missing_images,
@@ -105,4 +106,6 @@ def dump_images(
 
 
 def load_images(target: ExecutionTarget, archive: Path) -> None:
+    if not archive.is_file() or archive.stat().st_size == 0:
+        raise ZepDevError(f"image archive is missing or empty: {archive}")
     load_image_archive(target, archive)

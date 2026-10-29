@@ -45,26 +45,9 @@ def checkout(tmp_path: Path, state_home: Path, monkeypatch: pytest.MonkeyPatch) 
     (sibling / "Chart.yaml").write_text(
         "apiVersion: v2\nname: sibling\nversion: 0.1.0\n"
     )
-    subprocess.run(["git", "init", "-q", str(repo)], check=True)
-    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repo),
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.org",
-            "-c",
-            "commit.gpgsign=false",
-            "commit",
-            "-qm",
-            "Initial chart",
-        ],
-        check=True,
-    )
-    subprocess.run(["git", "-C", str(repo), "tag", "v1.2.3"], check=True)
+    init_repository(repo)
+    commit_all(repo, "Initial chart")
+    git("tag", "v1.2.3", cwd=repo)
     monkeypatch.chdir(chart)
     return repo
 
@@ -185,24 +168,7 @@ def test_new_commit_requires_new_package(checkout: Path) -> None:
     assert isinstance(original, LocalChartRef)
     original.package.parent.mkdir(parents=True)
     original.package.write_bytes(b"old chart")
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(checkout),
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.org",
-            "-c",
-            "commit.gpgsign=false",
-            "commit",
-            "--allow-empty",
-            "-qm",
-            "Next commit",
-        ],
-        check=True,
-    )
+    commit_all(checkout, "Next commit")
     current = resolver.resolve("ewb", LocalLocator(local=True))
     assert current.version != original.version
     with pytest.raises(ZepDevError, match="run distribution build first"):

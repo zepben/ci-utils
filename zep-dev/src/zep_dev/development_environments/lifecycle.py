@@ -269,10 +269,10 @@ def create_environment(
 def destroy_environment(name: str) -> None:
     """Ensure the named cluster is absent before removing only its owned files."""
     target = execution_target(name)
+    if target.directory.is_symlink():
+        raise ZepDevError(f"Environment directory is a symlink: {target.directory}")
     if kind.cluster_exists(target):
         kind.delete_cluster(target)
-    if target.directory.is_symlink():
-        raise ValueError(f"Environment directory is a symlink: {target.directory}")
     if target.directory.exists():
         shutil.rmtree(target.directory)
 

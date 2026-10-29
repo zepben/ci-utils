@@ -152,9 +152,33 @@ def test_discovery_failure_emits_no_partial_json(
 
     result = CliRunner().invoke(cli, ["environment", "describe", target.name])
 
-    assert result.exit_code != 0
+    assert result.exit_code == 1
     assert result.stdout == ""
     assert "returned non-zero exit status 1" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("change", "diagnostic"),
+    [
+        (
+            {"externalTrafficPolicy": "Local"},
+            "Ignoring unsupported HTTP Service applications/hcs: "
+            "externalTrafficPolicy=Local\n",
+        ),
+        ({"ports": [kubernetes.ServicePort(name="grpc", nodePort=NODE_PORT)]}, ""),
+    ],
+    ids=["local-traffic-policy", "no-http-port"],
+)
+def test_unsupported_exposure_is_omitted(
+    application: helm.ApplicationRelease,
+    change: dict[str, object],
+    diagnostic: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    exposed = service(application, NODE_PORT)
+    exposed.spec = exposed.spec.model_copy(update=change)
+    assert discovery.http_services([application], [exposed]) == []
+    assert capsys.readouterr().err == diagnostic
 
 
 def test_duplicate_application_releases_fail_across_namespaces(

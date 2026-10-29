@@ -16,8 +16,8 @@ from zep_dev.development_environments.kubernetes import ServiceAddress
 from zep_dev.development_environments.services import CnpgService, DatabaseService
 from zep_dev.development_environments.target import (
     ExecutionTarget,
-    kubernetes_namespace,
     cache_home,
+    kubernetes_name,
 )
 from zep_dev.development_environments.templates import (
     DatabaseReference,
@@ -220,7 +220,7 @@ def _apply_with_state(
 
 def apply_terraform(target: ExecutionTarget, root: Path, namespace: str) -> Path:
     """Apply a standalone root using its Environment-scoped state key."""
-    valid_namespace = kubernetes_namespace(namespace)
+    valid_namespace = kubernetes_name(namespace)
     absolute_root = root.resolve()
     if not absolute_root.is_dir():
         raise ZepDevError(f"Terraform root does not exist: {absolute_root}")
@@ -229,7 +229,7 @@ def apply_terraform(target: ExecutionTarget, root: Path, namespace: str) -> Path
 
 
 def destroy_terraform(target: ExecutionTarget, root: Path, namespace: str) -> None:
-    valid_namespace = kubernetes_namespace(namespace)
+    valid_namespace = kubernetes_name(namespace)
     absolute_root = root.resolve()
     if not absolute_root.is_dir():
         raise ZepDevError(f"Terraform root does not exist: {absolute_root}")

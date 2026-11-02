@@ -11,6 +11,7 @@ site_dir=$(pwd)
 release_notes="${docs}/site-config/release-notes.md"
 docusaurus_config="${docs}/site-config/docusaurus.config.js"
 static="${docs}/site-config/static"
+static_spec="${static}/spec"
 archive="${docs}/archive"
 
 # Lazily parse args
@@ -103,15 +104,15 @@ function configure_site() {
 
     # we're in site-config, so handle the spec files
     echo "checking for spec files..."
-    if [ -d "${docs}/docs/spec" ]; then
-        if [ ! -d "${static}/spec" ]; then
-            mkdir -p "${static}/spec"
+    if [ -d "${docs}/spec" ]; then
+        if [ ! -d "${static_spec}" ]; then
+            mkdir -p "${static_spec}"
         fi
 
         echo "copying next spec..."
-        cp -r "${docs}/docs/spec/." static/spec/next
+        cp -r "${docs}/spec/." ${static_spec}/next
         echo "copying archive specs..."
-        cp -r "${archive}/versioned_spec/." static/spec/
+        cp -r "${archive}/versioned_spec/." ${static_spec}
     fi
 
     echo "preparing for build..."

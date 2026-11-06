@@ -13,7 +13,7 @@ from pydantic import (
 
 from zep_dev.development_environments.names import NonEmptyStr
 
-type ChartName = Literal["ewb", "eas", "hcs", "eas-web-client"]
+type ChartName = Literal["ewb", "eas", "hcs", "eas-web-client", "metric-collector"]
 
 GHCR_REGISTRY = "ghcr.io"
 APP_HELM_TIMEOUT = "10m"
@@ -71,14 +71,11 @@ type ChartLocator = (
 
 type Charts = Annotated[dict[ChartName, ChartLocator], Field(min_length=1)]
 
-# Preserve the build and install order independently of YAML mapping order.
-CHART_ORDER: tuple[ChartName, ...] = ("ewb", "eas", "hcs", "eas-web-client")
-
 
 def ordered_charts(
     charts: Charts,
 ) -> Iterator[tuple[ChartName, ChartLocator]]:
-    for name in CHART_ORDER:
+    for name in sorted(charts):
         if name in charts:
             yield name, charts[name]
 

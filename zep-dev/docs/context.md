@@ -200,7 +200,7 @@ predictable. **Supporting**: translates the model into tool commands, or serves 
 | --- | --- | --- |
 | `names.py` | core | Environment, Kubernetes and Helm release name rules |
 | `templates.py`, `services.py` | core | Template and supporting-service schemas, cross-reference rules |
-| `distributions.py` | core | Distribution schema, Locators, chart order |
+| `distributions.py` | core | Distribution schema, Locators |
 | `bindings.py` | core | Bindings schema |
 | `chart_sources.py` | core | Locator resolution, OCI checks, Kind wrapper location, Distribution build (and a generic Git cache) |
 | `lifecycle.py` | core | Preflight, creation plan, create, reuse, destroy, list, kubeconfig |

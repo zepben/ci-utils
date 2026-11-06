@@ -54,6 +54,7 @@ REPOSITORIES: dict[ChartName, str] = {
     "eas": "evolve-app-server",
     "hcs": "hosting-capacity-service",
     "eas-web-client": "evolve-web-app",
+    "metric-collector": "metric-collector",
 }
 
 KIND_WRAPPER = "kind-runtime-contract"

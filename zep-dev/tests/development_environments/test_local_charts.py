@@ -224,8 +224,10 @@ def test_mixed_distribution_build_and_preflight(
     assert len(build_tools.calls_for("helm", "package")) == 1
     basic_template["distribution"] = str(distribution)
     plan = lifecycle.preflight(write_template(basic_template))
-    assert isinstance(plan.charts[0], LocalChartRef)
-    assert plan.charts[1].chart.endswith("/eas")
+    local = [ref for ref in plan.charts if isinstance(ref, LocalChartRef)]
+    remote_refs = [ref for ref in plan.charts if not isinstance(ref, LocalChartRef)]
+    assert len(local) == 1
+    assert [ref.chart.endswith("/eas") for ref in remote_refs] == [True]
     assert len(build_tools.calls_for("helm", "package")) == 1
     assert all(call.args[3].endswith("/eas") for call in remote.calls)
 

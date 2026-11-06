@@ -6,8 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from click import ClickException
-
+from zep_dev.errors import ZepDevError
 from zep_dev.static import TOOLS_BY_NAME
 
 LOG = logging.getLogger(__name__)
@@ -46,9 +45,8 @@ def resolve_chart(helm_dir: Path, chart: Path) -> ResolvedChart:
     try:
         path_relative_to_helm_dir = absolute_path.relative_to(helm_dir)
     except ValueError as e:
-        raise ClickException(
-            f"--chart {chart} is not inside --helm-dir {helm_dir}"
-        ) from e
+        e.add_note(f"--chart {chart} is not inside --helm-dir {helm_dir}")
+        raise
     return ResolvedChart(
         absolute_path=absolute_path,
         path_relative_to_helm_dir=path_relative_to_helm_dir,
@@ -57,7 +55,7 @@ def resolve_chart(helm_dir: Path, chart: Path) -> ResolvedChart:
 
 def get_repo_name() -> str:
     if sys.prefix == sys.base_prefix:
-        raise Exception("zep-dev must be run from an application virtualenv")
+        raise ZepDevError("zep-dev must be run from an application virtualenv")
     return Path(sys.prefix).resolve().parent.name
 
 
@@ -86,7 +84,7 @@ def resolve(name: str) -> None:
         raise Exception(f"Failed to locate tool: {name}")
     path = get_bin_dir() / tool.name
     if not path.is_file() or not os.access(path, os.X_OK):
-        raise Exception(f"{name} not installed at {path}; run: zep-dev tools install")
+        raise ZepDevError(f"{name} not installed at {path}; run: zep-dev tools install")
 
 
 def execute(
@@ -97,6 +95,7 @@ def execute(
     check: bool = True,
     input: str | None = None,
     env: Mapping[str, str] | None = None,
+    timeout: float | None = None,
 ) -> CommandResult:
     if not skip_resolve:
         resolve(args[0])
@@ -109,6 +108,7 @@ def execute(
         stderr=subprocess.PIPE if capture_stderr else None,
         check=False,
         env=env,
+        timeout=timeout,
     )
     result = CommandResult(
         returncode=completed.returncode,

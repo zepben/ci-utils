@@ -1,0 +1,4 @@
+# Copy to .zep-dev/bindings.yaml or set ZEP_DEV_BINDINGS to its path.
+mounts:
+  # Change this path to point to your local network
+  ewb-data: /home/alice/data/network

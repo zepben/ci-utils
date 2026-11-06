@@ -1,11 +1,11 @@
 import json
 from contextlib import chdir
 from pathlib import Path
-from subprocess import CalledProcessError
 
 import click
-from click import ClickException
 
+from zep_dev.chart_version import git_toplevel
+from zep_dev.errors import ZepDevError
 from zep_dev.shared import execute
 from zep_dev.static import CT_YAML
 
@@ -27,20 +27,9 @@ def list_changed(helm_dir: Path, target_branch: str, since: str | None) -> None:
     helm_dir = helm_dir.resolve()
     ct_path = helm_dir / CT_YAML
     if not ct_path.is_file():
-        raise ClickException(f"{CT_YAML} is required in the root of --helm-dir")
+        raise ZepDevError(f"{CT_YAML} is required in the root of --helm-dir")
 
-    # Get the root of our git repo.
-    repo_root = Path(
-        execute(
-            "git",
-            "-C",
-            str(helm_dir),
-            "rev-parse",
-            "--show-toplevel",
-            skip_resolve=True,
-            capture_stdout=True,
-        ).stdout.strip()
-    ).resolve()
+    repo_root = git_toplevel(helm_dir)
 
     # ct list-changed operates a bit differently to the other CT commands.
     # It must be executed from the root of the repo, and the paths to
@@ -59,9 +48,6 @@ def list_changed(helm_dir: Path, target_branch: str, since: str | None) -> None:
         ]
         if since is not None:
             args.extend(["--since", since])
-        try:
-            out = execute(*args, capture_stdout=True)
-        except CalledProcessError as e:
-            raise ClickException(f"list-changed failed with rc={e.returncode}") from e
+        out = execute(*args, capture_stdout=True)
         charts = [line.strip() for line in out.stdout.splitlines() if line.strip()]
         click.echo(json.dumps(charts))

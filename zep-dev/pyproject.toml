@@ -15,14 +15,16 @@ dependencies = [
 ]
 
 [tool.setuptools.package-data]
-zep_dev = ["resources/*"]
+zep_dev = [
+    "resources/*",
+]
 
 [project.optional-dependencies]
 dev = [
     "ruff",
-    "mypy",
-    "types-PyYAML",
-    "types-requests",
+    "mypy==2.4.0",
+    "types-PyYAML==6.0.12.20260906",
+    "types-requests==2.33.0.20261006",
     "pytest",
     "pytest-randomly",
 ]
@@ -39,18 +41,42 @@ line-length = 88
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "TID"]
 ignore = ["E501"]
+typing-extensions = false
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"__future__.annotations" = { msg = "Unnecessary on Python 3.14 and greater, use default PEP 649 deferred annotations" }
 
 [tool.ruff.format]
 quote-style = "double"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = ["--import-mode=importlib", "--strict-config", "--strict-markers"]
+xfail_strict = true
 
 [tool.mypy]
 python_version = "3.14"
 strict = true
 warn_unused_configs = true
-mypy_path = "src"
+mypy_path = "$MYPY_CONFIG_FILE_DIR/src"
 explicit_package_bases = true
+
+plugins = ["pydantic.mypy"]
+warn_unreachable = true
+disallow_any_unimported = true
+enable_error_code = [
+    "ignore-without-code",
+    "exhaustive-match",
+    "redundant-expr",
+    "truthy-bool",
+    "truthy-iterable",
+    "explicit-override",
+    "unused-awaitable",
+]
+
+[tool.pydantic-mypy]
+init_typed = true
+init_forbid_extra = true
+warn_required_dynamic_aliases = true

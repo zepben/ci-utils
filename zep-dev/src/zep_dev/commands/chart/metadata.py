@@ -3,8 +3,16 @@ from pathlib import Path
 
 import click
 
-from zep_dev.commands.chart.version import calculate_chart_version
+from zep_dev.chart_version import (
+    SOURCE_COMMIT_ANNOTATION,
+    calculate_chart_version,
+    source_commit,
+)
 from zep_dev.models import ChartMetadata, ChartValues
+from zep_dev.runtime_contract import (
+    RUNTIME_CONTRACT_REF_ANNOTATION,
+    runtime_contract_ref,
+)
 
 # When this annotation is present and set to true, it indicates that we
 # should process the metadata update and update the version/tag.
@@ -79,9 +87,19 @@ def update(chart: Path, image_tag: str) -> None:
     elif image_tag:
         raise click.ClickException(f"--image-tag requires the {PUBLISH_ANNOTATION}")
 
-    release_version = calculate_chart_version()
+    try:
+        contract_ref = runtime_contract_ref(chart)
+    except ValueError as error:
+        raise click.ClickException(str(error)) from error
+
+    release_version = calculate_chart_version(chart)
     chart_metadata.version = release_version
     chart_metadata.appVersion = release_version
+    annotations = {SOURCE_COMMIT_ANNOTATION: source_commit(chart)}
+    if contract_ref is not None:
+        annotations[RUNTIME_CONTRACT_REF_ANNOTATION] = contract_ref
+    # Assign, not mutate: write() keeps only fields that were set.
+    chart_metadata.annotations = {**chart_metadata.annotations, **annotations}
     if values is not None:
         values.image.tag = image_tag
 

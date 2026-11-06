@@ -1,0 +1,37 @@
+"""OCI wait timeout messaging."""
+
+from pathlib import Path
+
+import pytest
+
+from tests.support.clock import FakeClock
+from zep_dev.development_environments import chart_sources
+from zep_dev.development_environments.chart_sources import (
+    SourceChartRef,
+    wait_for_oci,
+)
+from zep_dev.errors import ZepDevError
+
+
+def test_wait_for_oci_times_out_with_actions_context(
+    monkeypatch: pytest.MonkeyPatch,
+    fake_clock: FakeClock,
+) -> None:
+    monkeypatch.setattr(chart_sources, "_TIMEOUT", 100)
+    monkeypatch.setattr(chart_sources, "published_chart_metadata", lambda *_args: None)
+    ref = SourceChartRef(
+        name="ewb",
+        version="1.2.3",
+        source="commit",
+        sha="a" * 40,
+        repo_name="energy-workbench-server",
+        repo=Path("/unused/cache"),
+    )
+
+    with pytest.raises(ZepDevError, match="Timed out waiting for ewb:1.2.3") as caught:
+        wait_for_oci(ref)
+
+    assert ref.sha in str(caught.value)
+    assert "https://github.com/zepben/energy-workbench-server/actions" in str(
+        caught.value
+    )

@@ -92,4 +92,3 @@ TOOLS_BY_NAME = {tool.name: tool for tool in TOOLS}
 
 # The files should live relative to helm dir in Application repo
 CT_YAML = Path("ct.yaml")
-CI_SECRETS_YAML = Path("ci-secrets.yaml")

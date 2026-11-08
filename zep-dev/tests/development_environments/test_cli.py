@@ -42,7 +42,7 @@ def test_create_passes_template_archive_and_reuse(
     )
     assert result.exit_code == 0, result.exception
     assert seen == [(template, True, archive)]
-    assert result.stdout == ""
+    assert result.stdout == f"Using image archive: {archive}\n"
     assert "integration ready" in result.stderr
 
 

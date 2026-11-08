@@ -37,8 +37,14 @@ def environment() -> None:
     is_flag=True,
     help="Reuse an existing Environment on a best-effort basis",
 )
-@click.option("--image-archive", type=click.Path(dir_okay=False, path_type=Path))
+@click.option(
+    "--image-archive",
+    envvar="ZEPDEV_IMAGE_ARCHIVE",
+    type=click.Path(dir_okay=False, path_type=Path),
+)
 def create(template: Path, allow_reuse: bool, image_archive: Path | None) -> None:
+    if image_archive is not None:
+        click.echo(f"Using image archive: {image_archive}")
     target = create_environment(
         template, allow_reuse=allow_reuse, image_archive=image_archive
     )

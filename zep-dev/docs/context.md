@@ -24,7 +24,7 @@ together.
 
 | Neighbour | Direction | Relationship |
 | --- | --- | --- |
-| Kind, kubectl, Helm, Terraform, Podman/Docker, GHCR/OCI, GitHub API and Actions, and the Kind wrappers in Application repositories | Upstream | We conform to their commands and formats. `kind.py`, `kubernetes.py`, `helm.py`, `terraform.py` and `github_api.py` translate our model into their terms and keep tool details out of the core. |
+| Kind, kubectl, Helm, Terraform, Podman/Docker, GHCR/OCI, GitHub API and Actions, and the Kind wrappers in Application repositories | Upstream | We conform to their commands and formats. `kind.py`, `kubernetes.py`, `helm.py`, `terraform.py` and `github_api.py` translate our model into their terms and keep tool details out of the core. Local image builds follow the release convention: build secrets `npm`, `maven` and `nuget` from `~/.npmrc`, `~/.m2/settings.xml` and `~/.nuget/NuGet/NuGet.Config`, each passed only when the file exists. |
 | Application teams' integration tests, CI | Downstream | They consume `environment describe` JSON and the kubeconfig path (see Contracts and limits). |
 | Chart CI (`zep-dev chart ...`), tool installation | Separate | A future CI context will own them. They must not import this package (enforced). In that code "chart" means a directory under a Helm directory. |
 
@@ -57,14 +57,14 @@ rejected) and `local_inputs.py` for Bindings.
 
 **Creation, reuse and failure** (tests: `test_lifecycle_policy.py`,
 `test_lifecycle_composition.py`, `test_provisioning_composition.py`,
-`test_git_cache.py`)
+`test_git_cache.py`, `test_local_charts.py`)
 
 - Preflight resolves and validates everything before the cluster or operational
   directory changes.
 - Creation refuses an existing cluster unless reuse is requested. A stale operational
   directory is removed first, and a cleanup failure stops creation.
-- Creation never starts a chart build. A missing source chart is refused before any
-  change.
+- Creation never starts a chart or image build. A missing source chart or Local image
+  is refused before any change.
 - Supporting services run in Template order, with no dependency graph. Runtime
   resources are applied before application manifests and charts.
 - Every selected chart whose revision has a Kind wrapper gets it applied, with the
@@ -159,7 +159,9 @@ Limits and their reasons:
   that is not yet available. A missing version-selected chart is an error, because a
   version cannot trigger a build.
 - For `local: true`, build and create from the chart's checkout. Uncommitted changes
-  share a version, so rebuild after editing.
+  share a chart version, so rebuild after editing. A Local image's tag follows its
+  content: a rebuild that changes the image rolls the Application out, and one that
+  does not leaves it running.
 - Argo repository integration needs a Kind worker node, because repo-server is
   scheduled away from control-plane nodes. It mounts the checkout read-only and
   registers the repository. It creates no Argo Applications.
@@ -177,7 +179,7 @@ Limits and their reasons:
 
 1. `cli.py` parses arguments and calls `lifecycle.create_environment()`.
 2. Preflight loads and validates the documents, resolves inputs and generated
-   resources, and checks that the selected charts are available. It changes nothing.
+   resources, and checks that the selected charts and Local images are available. It changes nothing.
 3. Preflight returns a creation plan: resolved inputs, execution target, chart
    references and provisioning data.
 4. Creation checks whether the cluster exists and applies the create or
@@ -206,7 +208,7 @@ predictable. **Supporting**: translates the model into tool commands, or serves 
 | `lifecycle.py` | core | Preflight, creation plan, create, reuse, destroy, list, kubeconfig |
 | `target.py` | core | Execution target, operational directory paths, child process environment |
 | `local_inputs.py` | supporting | Bindings discovery, resolving host inputs |
-| `local_charts.py` | supporting | Packaging working-tree charts for `local: true` |
+| `local_charts.py` | supporting | Packaging working-tree charts and building their Local images for `local: true` |
 | `kind.py`, `kubernetes.py`, `helm.py`, `terraform.py` | supporting | Tool commands and generated resources |
 | `cnpg.py`, `argo.py`, `supporting.py`, `manifests.py` | supporting | Supporting-service integrations and application manifests |
 | `secrets.py`, `images.py` | supporting | Environment-targeted Secret and image operations |

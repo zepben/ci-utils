@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from zep_dev.development_environments.distributions import (
     ChartName,
     Distribution,
+    LocalLocator,
 )
 from zep_dev.development_environments.names import (
     EnvironmentName,
@@ -229,3 +230,22 @@ def validate_distribution(
         raise ValueError(
             f"service names collide with application releases: {sorted(collisions)}"
         )
+    # A local chart names the image built from its checkout; a Template tag would
+    # override it and test another image.
+    pinned = sorted(
+        name
+        for name, locator in distribution.charts.items()
+        if isinstance(locator, LocalLocator)
+        and name in template.applications
+        and pins_image_tag(template.applications[name].values)
+    )
+    if pinned:
+        raise ValueError(
+            f"applications {pinned} set image.tag, but are local: true; "
+            "their image is built from the checkout"
+        )
+
+
+def pins_image_tag(values: dict[str, object]) -> bool:
+    image = values.get("image")
+    return isinstance(image, dict) and "tag" in image

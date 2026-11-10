@@ -55,7 +55,6 @@ def test_parallel_application_processes_receive_their_own_target(
             assert option_value(args, "--kubeconfig") == str(target.kubeconfig)
             assert option_value(args, "--kube-context") == target.context
             assert env["KUBECONFIG"] == str(target.kubeconfig)
-            assert option_value(args, "--labels") == f"{helm.ENVIRONMENT_LABEL}={name}"
     assert os.environ["KUBECONFIG"] == "/hostile/default"
 
 

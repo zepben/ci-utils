@@ -101,13 +101,12 @@ class ServiceMetadata(BaseModel):
 
     name: NonEmptyStr
     namespace: NonEmptyStr
-    labels: dict[str, str] = Field(default_factory=dict)
-    annotations: dict[str, str] = Field(default_factory=dict)
 
 
 class ServicePort(BaseModel):
     model_config = ConfigDict(strict=True)
 
+    port: int
     name: str = ""
     protocol: str = "TCP"
     nodePort: int | None = None
@@ -116,7 +115,6 @@ class ServicePort(BaseModel):
 class ServiceSpec(BaseModel):
     model_config = ConfigDict(strict=True)
 
-    type: str = "ClusterIP"
     externalTrafficPolicy: str = "Cluster"
     ports: list[ServicePort] = Field(default_factory=list)
 

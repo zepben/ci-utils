@@ -1,114 +1,86 @@
-"""Describe application connections observed in an existing Environment."""
+"""Describe the addresses an existing Environment publishes on the host."""
 
-import sys
+import logging
 from collections.abc import Sequence
 from typing import TypedDict
 
-from zep_dev.development_environments import helm, kind, kubernetes
+from zep_dev.development_environments import kind, kubernetes
 from zep_dev.development_environments.target import ExecutionTarget
+
+LOG = logging.getLogger(__name__)
 
 
 class KubernetesConnection(TypedDict):
     kubeconfig: str
     context: str
-
-
-class ApplicationDescription(TypedDict):
     namespace: str
-    endpoints: dict[str, str]
+
+
+# Namespace -> Service -> Service port name (or number when unnamed) -> host:port.
+type Addresses = dict[str, dict[str, dict[str, str]]]
 
 
 class EnvironmentDescription(TypedDict):
     name: str
     kubernetes: KubernetesConnection
-    applications: dict[str, ApplicationDescription]
+    addresses: Addresses
 
 
-type HttpService = tuple[str, kubernetes.Service, int]
+def _port_key(port: kubernetes.ServicePort) -> str:
+    return port.name or str(port.port)
 
 
-def http_services(
-    applications: Sequence[helm.ApplicationRelease],
-    services: Sequence[kubernetes.Service],
-) -> list[HttpService]:
-    releases: dict[str, helm.ApplicationRelease] = {}
-    for application in applications:
-        previous = releases.get(application.chart)
-        if previous is not None:
-            raise ValueError(
-                f"Multiple releases of application {application.chart!r}: "
-                f"{previous.namespace}/{previous.name}, "
-                f"{application.namespace}/{application.name}"
-            )
-        releases[application.chart] = application
-    exposed: list[HttpService] = []
-    for service in services:
+def published_addresses(
+    services: Sequence[kubernetes.Service], published: Sequence[kind.PublishedPort]
+) -> Addresses:
+    """Address each published node port through the Service port that owns it."""
+    candidates: dict[int, dict[str, set[str]]] = {}  # node port -> address -> nodes
+    for binding in published:
+        nodes_by_address = candidates.setdefault(binding.node_port, {})
+        nodes_by_address.setdefault(binding.address, set()).add(binding.node)
+    addresses: Addresses = {}
+    for service in sorted(
+        services, key=lambda item: (item.metadata.namespace, item.metadata.name)
+    ):
         metadata, spec = service.metadata, service.spec
-        release = releases.get(metadata.labels.get("app.kubernetes.io/name", ""))
-        if release is None:
-            continue
-        if (
-            metadata.namespace != release.namespace
-            or metadata.annotations.get("meta.helm.sh/release-name") != release.name
-            or metadata.annotations.get("meta.helm.sh/release-namespace")
-            != release.namespace
-        ):
-            continue
-        if spec.type != "NodePort":
-            continue
-        for port in spec.ports:
-            if port.name != "http" or port.protocol != "TCP" or port.nodePort is None:
+        for port in sorted(spec.ports, key=_port_key):
+            if port.protocol != "TCP" or port.nodePort not in candidates:
                 continue
+            bindings = candidates.pop(port.nodePort)
+            key = _port_key(port)
+            connection = f"{metadata.namespace}/{metadata.name}:{key}"
             if spec.externalTrafficPolicy != "Cluster":
-                print(
-                    f"Ignoring unsupported HTTP Service {metadata.namespace}/{metadata.name}: "
-                    f"externalTrafficPolicy={spec.externalTrafficPolicy}",
-                    file=sys.stderr,
+                LOG.warning(
+                    "Ignoring %s: externalTrafficPolicy=%s",
+                    connection,
+                    spec.externalTrafficPolicy,
                 )
                 continue
-            exposed.append((release.chart, service, port.nodePort))
-    return exposed
-
-
-def assemble_description(
-    target: ExecutionTarget,
-    applications: Sequence[helm.ApplicationRelease],
-    services: Sequence[HttpService],
-    mappings: Sequence[kind.PublishedPort],
-) -> EnvironmentDescription:
-    descriptions: dict[str, ApplicationDescription] = {
-        application.chart: {"namespace": application.namespace, "endpoints": {}}
-        for application in sorted(applications, key=lambda item: item.chart)
-    }
-    candidates: dict[str, dict[str, set[str]]] = {}
-    for application, service, node_port in services:
-        for mapping in mappings:
-            if mapping.node_port != node_port:
-                continue
-            url = f"http://{mapping.host_ip}:{mapping.host_port}"
-            source = f"{service.metadata.namespace}/{service.metadata.name} via {mapping.node}:{node_port}"
-            candidates.setdefault(application, {}).setdefault(url, set()).add(source)
-    for application, urls in sorted(candidates.items()):
-        if len(urls) > 1:
-            conflicts = "; ".join(
-                f"{url} ({', '.join(sorted(sources))})"
-                for url, sources in sorted(urls.items())
+            if len(bindings) > 1:
+                conflicts = "; ".join(
+                    f"{address} via {', '.join(sorted(nodes))}"
+                    for address, nodes in sorted(bindings.items())
+                )
+                raise ValueError(f"Ambiguous address for {connection}: {conflicts}")
+            (address,) = bindings
+            ports = addresses.setdefault(metadata.namespace, {}).setdefault(
+                metadata.name, {}
             )
-            raise ValueError(
-                f"Ambiguous HTTP endpoint for application {application!r}: {conflicts}"
-            )
-        descriptions[application]["endpoints"]["http"] = next(iter(urls))
-    return {
-        "name": target.name,
-        "kubernetes": {"kubeconfig": str(target.kubeconfig), "context": target.context},
-        "applications": descriptions,
-    }
+            ports[key] = address
+    for node_port in sorted(candidates):
+        LOG.warning("Ignoring published node port %s: no Service owns it", node_port)
+    return addresses
 
 
 def describe_environment(target: ExecutionTarget) -> EnvironmentDescription:
-    applications = helm.observe_applications(target)
-    exposed = http_services(
-        applications, kubernetes.observe_services(target) if applications else []
-    )
-    mappings = kind.observe_published_ports(target) if exposed else []
-    return assemble_description(target, applications, exposed, mappings)
+    return {
+        "name": target.name,
+        "kubernetes": {
+            "kubeconfig": str(target.kubeconfig),
+            "context": target.context,
+            "namespace": target.namespace,
+        },
+        "addresses": published_addresses(
+            kubernetes.observe_services(target), kind.observe_published_ports(target)
+        ),
+    }

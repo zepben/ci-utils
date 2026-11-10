@@ -130,14 +130,14 @@ User-visible promises that a change must not break:
 - `environment kubeconfig <name>` prints only the absolute kubeconfig path to stdout,
   regenerating a missing file at the conventional location. Diagnostics go to stderr.
 - `environment describe <name>` prints one JSON document: `name`,
-  `kubernetes: {kubeconfig, context}`, and `applications` keyed by root chart name,
-  each with `namespace` and `endpoints` (`http` is the supported endpoint). It does
-  not check readiness. It lists application releases that carry the Helm label
-  `zepben.com/environment=<name>`; unmarked and supporting releases are excluded.
-  HTTP discovery supports a TCP NodePort named `http` with
-  `externalTrafficPolicy: Cluster`, bound on IPv4 loopback. Unsupported exposure is
-  omitted with a diagnostic, and distinct URLs for one connection are an error. A
-  failure prints no partial JSON (tests: `test_discovery.py`).
+  `kubernetes: {kubeconfig, context, namespace}`, and `addresses` keyed by
+  namespace, Service and Service port name (the port number when unnamed). It does
+  not check readiness. Every Kind-published TCP port whose nodePort a Service port
+  in any namespace owns is listed, when the Service has
+  `externalTrafficPolicy: Cluster` and the port is bound on IPv4 loopback or
+  wildcard (reported as `127.0.0.1`). Other published ports are omitted with a logged
+  warning, and distinct addresses for one Service port are an error. A failure
+  prints no partial JSON (tests: `test_discovery.py`).
 - `environment list` prints the sorted names of live zep-dev Kind clusters. It does
   not inspect operational directories, and a listed cluster may be partial.
 - Creation succeeding means required provisioning and readiness checks completed. It

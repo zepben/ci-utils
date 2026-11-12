@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 
 import click
 
+from zep_dev.charts.published import is_missing_chart
 from zep_dev.charts.utils import validate_dependencies_present
 from zep_dev.errors import ZepDevError
 from zep_dev.models import ChartMetadata, ChartTestingConfig
@@ -78,8 +79,7 @@ def push(
         )
         return
 
-    text = f"{result.stderr}\n{result.stdout}".lower()
-    if "not found" not in text and "manifest unknown" not in text:
+    if not is_missing_chart(f"{result.stderr}\n{result.stdout}"):
         raise ZepDevError(
             f"exist check failed (rc={result.returncode}): {result.stderr.strip()}"
         )

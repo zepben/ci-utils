@@ -1,6 +1,7 @@
 """Read charts published to the zepben OCI chart repository."""
 
-import yaml
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from zep_dev.errors import ZepDevError
 from zep_dev.models import ChartMetadata
@@ -11,28 +12,41 @@ CHART_OCI_PREFIX = f"oci://{CHART_REPOSITORY}"
 _TIMEOUT = 60
 
 
+def is_missing_chart(output: str) -> bool:
+    """Whether Helm's output says the chart or version is absent.
+
+    Auth and network failures are not missing charts.
+    """
+    text = output.lower()
+    return "not found" in text or "manifest unknown" in text
+
+
 def published_chart_metadata(name: str, version: str) -> ChartMetadata | None:
     """Return the published chart's metadata, or None if it is not in OCI.
 
-    Only Helm's not-found phrasings mean missing. Auth and network errors are
-    not the same as a missing chart.
+    The chart is pulled and its Chart.yaml read from disk. Stdout is never parsed.
     """
     oci_ref = f"{CHART_OCI_PREFIX}/{name}"
-    result = execute(
-        "helm",
-        "show",
-        "chart",
-        oci_ref,
-        "--version",
-        version,
-        capture_stdout=True,
-        capture_stderr=True,
-        check=False,
-        timeout=_TIMEOUT,
-    )
-    if result.returncode == 0:
-        return ChartMetadata.model_validate(yaml.safe_load(result.stdout))
-    detail = (result.stderr or result.stdout).strip() or f"exit {result.returncode}"
-    if any(phrase in detail.lower() for phrase in ("not found", "manifest unknown")):
+    with TemporaryDirectory(prefix="zep-dev-published-") as directory:
+        result = execute(
+            "helm",
+            "pull",
+            oci_ref,
+            "--version",
+            version,
+            "--untar",
+            "--destination",
+            directory,
+            # Helm's pull notices go to stdout; capture them so they do not
+            # reach the caller's stdout, which some commands keep machine-readable.
+            capture_stdout=True,
+            capture_stderr=True,
+            check=False,
+            timeout=_TIMEOUT,
+        )
+        if result.returncode == 0:
+            return ChartMetadata.from_chart_dir(Path(directory) / name)
+    detail = result.stderr.strip() or f"exit {result.returncode}"
+    if is_missing_chart(detail):
         return None
     raise ZepDevError(f"OCI error for {oci_ref}:{version}: {detail}")

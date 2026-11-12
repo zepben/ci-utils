@@ -116,6 +116,25 @@ def test_application_must_be_selected(
         validate_distribution(template, distribution)
 
 
+def test_template_cannot_pin_the_image_tag_of_a_local_application(
+    basic_template: dict[str, Any],
+) -> None:
+    basic_template.update(
+        distribution="dist.yaml",
+        applications={"eas": {"values": {"image": {"tag": "pinned"}}}},
+    )
+    template = EnvironmentTemplate.model_validate(basic_template)
+    published = Distribution.model_validate(
+        {"metadata": {"name": "test"}, "charts": {"eas": {"version": "1.0.0"}}}
+    )
+    validate_distribution(template, published)
+    local = Distribution.model_validate(
+        {"metadata": {"name": "test"}, "charts": {"eas": {"local": True}}}
+    )
+    with pytest.raises(ValueError, match="local: true"):
+        validate_distribution(template, local)
+
+
 def test_helm_release_length_limit(basic_template: dict[str, Any]) -> None:
     service = {
         "type": "helm",

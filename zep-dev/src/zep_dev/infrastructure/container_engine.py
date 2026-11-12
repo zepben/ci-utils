@@ -1,7 +1,7 @@
 """Choose an available host container engine."""
 
 import os
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from subprocess import CalledProcessError
 
@@ -47,6 +47,30 @@ def pull_missing_images(engine: str, refs: Sequence[str]) -> None:
         )
         if result.returncode != 0:
             execute(engine, "pull", ref, skip_resolve=True)
+
+
+def build_image(
+    engine: str, context: Path, secrets: Mapping[str, Path], iidfile: Path
+) -> str:
+    """Build the Dockerfile in context and return the image ID."""
+    secret_options = [f"--secret=id={name},src={src}" for name, src in secrets.items()]
+    execute(
+        engine,
+        "build",
+        *secret_options,
+        "--iidfile",
+        str(iidfile),
+        str(context),
+        skip_resolve=True,
+    )
+    image_id = iidfile.read_text().strip()
+    if not image_id:
+        raise RuntimeError(f"{engine} build wrote no image ID to {iidfile}")
+    return image_id
+
+
+def tag_image(engine: str, image_id: str, ref: str) -> None:
+    execute(engine, "tag", image_id, ref, skip_resolve=True)
 
 
 def save_image_archive(engine: str, output: Path, refs: Sequence[str]) -> None:

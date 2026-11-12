@@ -10,7 +10,7 @@ import yaml
 from click.testing import CliRunner
 from pydantic import ValidationError
 
-from tests.support.charts import published_chart
+from tests.support.charts import pulled_charts, pulls_published_chart
 from tests.support.execution import FakeExecute, FakeExecuteFactory, option_value
 from tests.support.fixtures import PrepareKind, WriteDistribution
 from tests.support.git import commit_all, git, init_repository
@@ -26,6 +26,7 @@ from zep_dev.development_environments.distributions import Distribution, LocalLo
 from zep_dev.development_environments.local_charts import LocalChartRef
 from zep_dev.development_environments.target import execution_target
 from zep_dev.errors import ZepDevError
+from zep_dev.infrastructure import container_engine
 
 
 @pytest.fixture
@@ -76,6 +77,35 @@ def build_tools(checkout: Path, fake_execute: FakeExecuteFactory) -> FakeExecute
         .on("git", "rev-parse", stdout=str(checkout))
         .on("helm", "dependency", "build", hook=dependency_build)
         .on("helm", "package", hook=package)
+    )
+
+
+@pytest.fixture
+def image_tools(
+    checkout: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_execute: FakeExecuteFactory,
+) -> FakeExecute:
+    """The checkout's chart is published with its application image; the engine is stubbed."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    metadata = checkout / "helm/charts/ewb/Chart.yaml"
+    metadata.write_text(
+        metadata.read_text()
+        + 'annotations:\n  zepben.com/publish-with-application-image: "true"\n'
+    )
+
+    def build(args: tuple[str, ...], _kwargs: dict[str, object]) -> None:
+        Path(option_value(args, "--iidfile")).write_text("sha256:" + "ab" * 32)
+
+    def save(args: tuple[str, ...], _kwargs: dict[str, object]) -> None:
+        Path(option_value(args, "-o")).write_bytes(b"image archive")
+
+    return (
+        fake_execute(container_engine)
+        .on("podman", "build", hook=build)
+        .on("podman", "tag")
+        .on("podman", "save", hook=save)
     )
 
 
@@ -213,9 +243,7 @@ def test_mixed_distribution_build_and_preflight(
 ) -> None:
     distribution = write_distribution(ewb={"local": True}, eas={"version": "2.0.0"})
     original = distribution.read_bytes()
-    remote = fake_execute(published).on(
-        "helm", "show", "chart", stdout=published_chart("eas", "2.0.0")
-    )
+    remote = fake_execute(published).on("helm", "pull", hook=pulls_published_chart())
     result = CliRunner().invoke(
         cli, ["distribution", "build", "--distribution", str(distribution)]
     )
@@ -229,7 +257,7 @@ def test_mixed_distribution_build_and_preflight(
     assert len(local) == 1
     assert [ref.chart.endswith("/eas") for ref in remote_refs] == [True]
     assert len(build_tools.calls_for("helm", "package")) == 1
-    assert all(call.args[3].endswith("/eas") for call in remote.calls)
+    assert pulled_charts(remote) == {f"{published.CHART_OCI_PREFIX}/eas": "2.0.0"}
 
 
 @pytest.mark.parametrize("output", [None, b""])
@@ -302,3 +330,22 @@ def test_empty_saved_package_is_rejected(checkout: Path) -> None:
     ref.package.touch()
     with pytest.raises(ZepDevError, match="Missing local chart"):
         resolver.check(ref)
+
+
+def test_local_chart_package_names_the_image_built_from_its_checkout(
+    checkout: Path,
+    build_tools: FakeExecute,
+    image_tools: FakeExecute,
+) -> None:
+    resolver = ChartResolver()
+    ref = resolver.resolve("ewb", LocalLocator(local=True))
+    assert isinstance(ref, LocalChartRef)
+    resolver.ensure(ref)
+    image = "ghcr.io/zepben/energy-workbench-server:local-abababababab"
+    [tag] = image_tools.calls_for("podman", "tag")
+    assert tag.args[-1] == image
+    assert "tag: local-abababababab" in ref.package.read_text()
+    assert ref.image_archive.read_bytes() == b"image archive"
+    values = checkout / "helm/charts/ewb/values.yaml"
+    assert values.read_text() == "image:\n  tag: original\n"
+    resolver.check(ref)

@@ -8,15 +8,11 @@ from zep_dev.chart_version import (
     calculate_chart_version,
     source_commit,
 )
-from zep_dev.models import ChartMetadata, ChartValues
+from zep_dev.models import PUBLISH_ANNOTATION, ChartMetadata, ChartValues
 from zep_dev.runtime_contract import (
     RUNTIME_CONTRACT_REF_ANNOTATION,
     runtime_contract_ref,
 )
-
-# When this annotation is present and set to true, it indicates that we
-# should process the metadata update and update the version/tag.
-PUBLISH_ANNOTATION = "zepben.com/publish-with-application-image"
 
 
 @click.group("metadata")
@@ -62,11 +58,10 @@ def show(chart: Path) -> None:
 def update(chart: Path, image_tag: str) -> None:
     """Set finalized release metadata in a chart directory."""
     chart_metadata = ChartMetadata.from_chart_dir(chart)
-    publish_with_image = chart_metadata.annotations.get(PUBLISH_ANNOTATION) == "true"
     image_tag = image_tag.strip()
 
     values: ChartValues | None = None
-    if publish_with_image:
+    if chart_metadata.publishes_application_image:
         if not image_tag:
             raise click.ClickException(
                 "--image-tag is required for charts published with the application image"

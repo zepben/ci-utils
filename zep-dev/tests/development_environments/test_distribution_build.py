@@ -3,8 +3,8 @@
 import pytest
 from click.testing import CliRunner
 
-from tests.support.charts import published_chart
-from tests.support.execution import FakeExecuteFactory, option_value
+from tests.support.charts import pulled_charts, pulls_published_chart
+from tests.support.execution import FakeExecuteFactory
 from tests.support.fixtures import WriteDistribution
 from zep_dev.charts import published
 from zep_dev.cli import cli
@@ -22,30 +22,17 @@ def test_build_checks_selected_versions_and_preserves_document(
         eas={"version": selected["eas"]},
     )
     original = path.read_text(encoding="utf-8")
-    fake = fake_execute(published)
-    for name, version in selected.items():
-        fake.on(
-            "helm",
-            "show",
-            "chart",
-            f"oci://ghcr.io/zepben/charts/{name}",
-            "--version",
-            version,
-            stdout=published_chart(name, version),
-        )
+    fake = fake_execute(published).on("helm", "pull", hook=pulls_published_chart())
 
     result = CliRunner().invoke(
         cli, ["distribution", "build", "--distribution", str(path)]
     )
 
     assert result.exit_code == 0, result.exception or result.output
-    assert sorted(
-        (entry.args[3], option_value(entry.args, "--version"))
-        for entry in fake.calls_for("helm", "show", "chart")
-    ) == sorted(
-        (f"oci://ghcr.io/zepben/charts/{name}", version)
+    assert pulled_charts(fake) == {
+        f"{published.CHART_OCI_PREFIX}/{name}": version
         for name, version in selected.items()
-    )
+    }
     assert path.read_text(encoding="utf-8") == original
 
 
@@ -54,7 +41,7 @@ def test_missing_version_stops_distribution_build(
 ) -> None:
     path = write_distribution(ewb={"version": "9.9.9"}, eas={"version": "1.0.0"})
     fake = fake_execute(published).on(
-        "helm", "show", "chart", returncode=1, stderr="manifest unknown"
+        "helm", "pull", returncode=1, stderr="manifest unknown"
     )
 
     result = CliRunner().invoke(

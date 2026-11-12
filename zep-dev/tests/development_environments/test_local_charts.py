@@ -10,7 +10,7 @@ import yaml
 from click.testing import CliRunner
 from pydantic import ValidationError
 
-from tests.support.charts import published_chart
+from tests.support.charts import pulled_charts, pulls_published_chart
 from tests.support.execution import FakeExecute, FakeExecuteFactory, option_value
 from tests.support.fixtures import PrepareKind, WriteDistribution
 from tests.support.git import commit_all, git, init_repository
@@ -243,9 +243,7 @@ def test_mixed_distribution_build_and_preflight(
 ) -> None:
     distribution = write_distribution(ewb={"local": True}, eas={"version": "2.0.0"})
     original = distribution.read_bytes()
-    remote = fake_execute(published).on(
-        "helm", "show", "chart", stdout=published_chart("eas", "2.0.0")
-    )
+    remote = fake_execute(published).on("helm", "pull", hook=pulls_published_chart())
     result = CliRunner().invoke(
         cli, ["distribution", "build", "--distribution", str(distribution)]
     )
@@ -259,7 +257,7 @@ def test_mixed_distribution_build_and_preflight(
     assert len(local) == 1
     assert [ref.chart.endswith("/eas") for ref in remote_refs] == [True]
     assert len(build_tools.calls_for("helm", "package")) == 1
-    assert all(call.args[3].endswith("/eas") for call in remote.calls)
+    assert pulled_charts(remote) == {f"{published.CHART_OCI_PREFIX}/eas": "2.0.0"}
 
 
 @pytest.mark.parametrize("output", [None, b""])

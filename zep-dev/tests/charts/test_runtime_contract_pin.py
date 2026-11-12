@@ -6,7 +6,7 @@ import pytest
 import yaml
 from click.testing import CliRunner, Result
 
-from tests.support.charts import published_chart
+from tests.support.charts import pulls_published_chart
 from tests.support.execution import FakeExecute, FakeExecuteFactory
 from zep_dev.charts import published
 from zep_dev.cli import cli
@@ -76,7 +76,7 @@ def publish(
     fake_execute: FakeExecuteFactory, annotations: dict[str, str]
 ) -> FakeExecute:
     return fake_execute(published).on(
-        "helm", "show", "chart", stdout=published_chart("eas", "2.0.0+abc", annotations)
+        "helm", "pull", hook=pulls_published_chart(annotations)
     )
 
 
@@ -156,9 +156,7 @@ def test_chart_with_a_runtime_contract_requires_a_terraform_root(
 def test_unpublished_chart_version_fails(
     staging: Path, fake_execute: FakeExecuteFactory
 ) -> None:
-    fake_execute(published).on(
-        "helm", "show", "chart", returncode=1, stderr="manifest unknown"
-    )
+    fake_execute(published).on("helm", "pull", returncode=1, stderr="manifest unknown")
 
     result = run_pin("--check", staging)
 

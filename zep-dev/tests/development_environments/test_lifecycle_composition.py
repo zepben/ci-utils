@@ -370,7 +370,7 @@ def test_missing_source_chart_is_refused_without_build_or_cluster_mutation(
     ensure = Mock(side_effect=AssertionError("creation requested a build"))
     monkeypatch.setattr(chart_sources.ChartResolver, "ensure", ensure)
     probe = fake_execute(published).on(
-        "helm", "show", "chart", returncode=1, stderr="manifest unknown"
+        "helm", "pull", returncode=1, stderr="manifest unknown"
     )
     cluster = prepare_kind()
     with pytest.raises(ZepDevError, match="run distribution build first"):

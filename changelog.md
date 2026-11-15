@@ -4,7 +4,7 @@
 * None.
 
 ### New Features
-* None.
+* Added `--dart` to the version scripts (`update-version.sh`, `finalize-version.sh`) for `pubspec.yaml`, using `X.Y.Z-beta.N` pre-release versions.
 
 ### Enhancements
 * None.

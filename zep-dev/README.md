@@ -35,7 +35,7 @@ zep-dev environment describe integration
 zep-dev environment destroy integration
 ```
 
-The example template exposes an endpoint to access the map. This can be retrieved with:
+The example template publishes an address for the map. It is listed under `addresses` by:
 
 ```bash
 zep-dev environment describe integration

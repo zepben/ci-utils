@@ -33,6 +33,7 @@ from zep_dev.development_environments.distributions import (
     GHCR_REGISTRY,
     ChartName,
 )
+from zep_dev.development_environments.local_charts import LocalChartRef
 from zep_dev.development_environments.names import CLUSTER_PREFIX
 from zep_dev.development_environments.services import (
     CnpgService,
@@ -56,6 +57,7 @@ class CreationPlan:
     mounts: tuple[kind.HostMount, ...]
     kind_config: str
     charts: tuple[ChartRef, ...]
+    image_archives: tuple[Path, ...]
     config_maps: dict[str, tuple[supporting.ResolvedConfigMap, ...]]
     application_manifests: tuple[Path, ...]
     runtime_applications: tuple[terraform.RuntimeApplication, ...]
@@ -120,6 +122,12 @@ def preflight(template_path: Path, image_archive: Path | None = None) -> Creatio
                     f"wrapper was found for {ref.label()}: its revision has none, or "
                     "it was published without its source commit"
                 )
+    # The CLI's archive first, so an image built from the checkout wins any shared tag.
+    image_archives = (() if image_archive is None else (image_archive,)) + tuple(
+        ref.image_archive
+        for ref in charts
+        if isinstance(ref, LocalChartRef) and ref.image is not None
+    )
     runtime_applications = terraform.resolve_runtime_applications(
         target, template, kind_wrappers
     )
@@ -134,6 +142,7 @@ def preflight(template_path: Path, image_archive: Path | None = None) -> Creatio
         mounts=mounts,
         kind_config=kind_config,
         charts=charts,
+        image_archives=image_archives,
         config_maps=config_maps,
         application_manifests=application_manifests,
         runtime_applications=runtime_applications,
@@ -232,8 +241,8 @@ def create_environment(
         kind.create_cluster(target, plan.kind_config)
 
     try:
-        if image_archive is not None:
-            kind.load_image_archive(target, image_archive)
+        for archive in plan.image_archives:
+            kind.load_image_archive(target, archive)
         kubernetes.ensure_namespace(target, target.namespace)
         kubernetes.apply_builtin_storage_classes(target)
         provision_services(plan)

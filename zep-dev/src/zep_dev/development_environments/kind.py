@@ -1,6 +1,7 @@
 """Kind cluster operations with Environment-specific execution files."""
 
 import json
+import logging
 import os
 import sys
 from collections.abc import Sequence
@@ -20,6 +21,8 @@ from zep_dev.development_environments.templates import KindConfig, KindMount
 from zep_dev.errors import ZepDevError
 from zep_dev.infrastructure.container_engine import choose_engine
 from zep_dev.shared import CommandResult, execute
+
+LOG = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -209,8 +212,14 @@ def load_image_archive(target: ExecutionTarget, archive: Path) -> None:
 class PublishedPort:
     node: str
     node_port: int
-    host_ip: str
-    host_port: int
+    address: str
+
+
+# Kind publishes the API server on every control plane; the kubeconfig addresses it.
+_API_SERVER_PORT = 6443
+# A wildcard binding also listens on loopback.
+_IPV4_WILDCARD = IPv4Address("0.0.0.0")
+_IPV4_LOOPBACK = IPv4Address("127.0.0.1")
 
 
 class _PortBinding(BaseModel):
@@ -253,24 +262,26 @@ def observe_published_ports(target: ExecutionTarget) -> list[PublishedPort]:
             bindings = _PORT_BINDINGS.validate_json(result.stdout)
             for key, addresses in bindings.items():
                 port, protocol = key.split("/")
-                if protocol != "tcp":
-                    continue
                 node_port = int(port)
+                if protocol != "tcp" or node_port == _API_SERVER_PORT:
+                    continue
                 for address in addresses or []:
                     host_ip = ip_address(address.HostIp)
+                    if host_ip == _IPV4_WILDCARD:
+                        host_ip = _IPV4_LOOPBACK
                     if isinstance(host_ip, IPv4Address) and host_ip.is_loopback:
                         ports.append(
                             PublishedPort(
-                                node,
-                                node_port,
-                                str(host_ip),
-                                int(address.HostPort),
+                                node, node_port, f"{host_ip}:{int(address.HostPort)}"
                             )
                         )
                     else:
-                        print(
-                            f"Ignoring unsupported binding on {node}: {key} -> {address.HostIp}:{address.HostPort}",
-                            file=sys.stderr,
+                        LOG.warning(
+                            "Ignoring unsupported binding on %s: %s -> %s:%s",
+                            node,
+                            key,
+                            address.HostIp,
+                            address.HostPort,
                         )
         except ValueError as error:
             raise ValueError(

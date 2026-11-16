@@ -19,6 +19,7 @@ from typing import Literal, assert_never
 from zep_dev.chart_version import SOURCE_COMMIT_ANNOTATION, calculate_chart_version
 from zep_dev.charts.published import CHART_OCI_PREFIX, published_chart_metadata
 from zep_dev.development_environments.distributions import (
+    GHCR_REGISTRY,
     BranchLocator,
     ChartLocator,
     ChartName,
@@ -273,7 +274,9 @@ class ChartResolver:
     def resolve(self, name: ChartName, locator: ChartLocator) -> ChartRef:
         match locator:
             case LocalLocator():
-                ref = resolve_local_chart(name)
+                ref = resolve_local_chart(
+                    name, f"{GHCR_REGISTRY}/zepben/{REPOSITORIES[name]}"
+                )
                 self.report(f"  resolved local {ref.label()} from {ref.repo}")
                 return ref
             case VersionLocator():

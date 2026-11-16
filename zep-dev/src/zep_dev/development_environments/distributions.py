@@ -69,7 +69,7 @@ type ChartLocator = (
     VersionLocator | PullRequestLocator | BranchLocator | CommitLocator | LocalLocator
 )
 
-type Charts = Annotated[dict[ChartName, ChartLocator], Field(min_length=1)]
+type Charts = dict[ChartName, ChartLocator]
 
 
 def ordered_charts(

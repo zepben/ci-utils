@@ -54,6 +54,7 @@ def creation_plan(
             KindConfig.model_validate(basic_template["cluster"]["kind"])
         ),
         charts=(),
+        image_archives=(),
         config_maps={},
         application_manifests=(),
         runtime_applications=(),

@@ -91,6 +91,11 @@ class ChartDependency(BaseModel):
     repository: str = Field(min_length=1)
 
 
+# When this annotation is "true", the chart is published with the application image
+# built from the same revision, and its values.yaml image.tag names that image.
+PUBLISH_ANNOTATION = "zepben.com/publish-with-application-image"
+
+
 class ChartMetadata(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -100,6 +105,10 @@ class ChartMetadata(BaseModel):
     appVersion: str | None = None
     annotations: dict[str, str] = Field(default_factory=dict)
     dependencies: list[ChartDependency] = Field(default_factory=list)
+
+    @property
+    def publishes_application_image(self) -> bool:
+        return self.annotations.get(PUBLISH_ANNOTATION) == "true"
 
     @classmethod
     def from_chart_dir(cls, chart_dir: Path) -> Self:

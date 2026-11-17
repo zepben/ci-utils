@@ -82,6 +82,18 @@ def create_bound_secret(
     create_env_file_secret(target, target.namespace, name, content)
 
 
+def registry_config_path() -> Path:
+    """Return the first registry configuration found, validated for its format."""
+    for path in IMAGE_SECRET_PATHS:
+        if path.is_file():
+            RegistryConfig.read(path)
+            return path
+    searched = ", ".join(map(str, IMAGE_SECRET_PATHS))
+    raise ZepDevError(
+        f"container registry configuration not found; searched: {searched}"
+    )
+
+
 def registry_credential(registry: str) -> tuple[Path, RegistryCredential]:
     for path in IMAGE_SECRET_PATHS:
         if path.is_file():

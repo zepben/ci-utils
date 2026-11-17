@@ -35,7 +35,7 @@ class FakeKind:
         self.record("delete", target)
         self.clusters.remove(target.cluster_name)
 
-    def validate_existing_worker_mounts(
+    def validate_existing_node_mounts(
         self, target: ExecutionTarget, mounts: Sequence[HostMount]
     ) -> None:
         self.record("mounts", target)

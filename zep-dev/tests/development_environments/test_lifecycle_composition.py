@@ -176,6 +176,7 @@ def test_two_environment_names_use_distinct_clusters_and_files(
     assert len(calls.calls_for("kind", "create")) == 2
 
 
+@pytest.mark.usefixtures("unchecked_reuse_mounts")
 def test_reuse_without_runtime_state_still_attempts_database_apply(
     tmp_path: Path,
     fake_execute: FakeExecuteFactory,

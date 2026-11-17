@@ -137,6 +137,21 @@ def test_invalid_registry_credentials_are_rejected_without_exposing_values(
     assert "private-value" not in str(failure.value.__cause__)
 
 
+def test_registry_configuration_is_the_first_valid_file_found(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = tmp_path / "containers-auth.json"
+    second = tmp_path / "docker-config.json"
+    second.write_text('{"auths": {}}', encoding="utf-8")
+    monkeypatch.setattr(secrets, "IMAGE_SECRET_PATHS", (first, second))
+    assert secrets.registry_config_path() == second
+    first.write_text('{"auths": {}}', encoding="utf-8")
+    assert secrets.registry_config_path() == first
+    first.write_text('{"auths": []}', encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid container registry configuration"):
+        secrets.registry_config_path()
+
+
 def test_image_pull_secret_uses_the_registry_selected_by_preflight(
     tmp_path: Path,
     registry_auth: Path,

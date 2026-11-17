@@ -56,6 +56,7 @@ def test_missing_manifest_fails_before_kind(
     ],
     ids=["different-namespace", "already-installed", "uninstalled"],
 )
+@pytest.mark.usefixtures("unchecked_reuse_mounts")
 def test_release_identity_and_status_control_install_but_always_waits(
     state_home: Path,
     prepare_kind: PrepareKind,
@@ -137,12 +138,13 @@ def test_argo_mounts_and_overlay_come_from_consumed_binding(
     assert plan.inputs.argo_repositories == {"deployments": checkout}
     assert plan.mounts == (
         kind.HostMount(checkout, "/mnt/local-repos/deployments", True),
+        kind.registry_config_mount(secrets.registry_config_path()),
     )
     calls = fake_execute(kind).on(
         "kind", "get", "clusters", "--quiet", stdout="zep-dev-integration\n"
     )
-    validate_mounts = create_autospec(kind.validate_existing_worker_mounts)
-    monkeypatch.setattr(kind, "validate_existing_worker_mounts", validate_mounts)
+    validate_mounts = create_autospec(kind.validate_existing_node_mounts)
+    monkeypatch.setattr(kind, "validate_existing_node_mounts", validate_mounts)
     monkeypatch.setattr(kind, "export_kubeconfig", lambda _target: None)
     prepare_kubectl()
     installed: list[dict[str, Any]] = []
@@ -238,6 +240,7 @@ def test_non_deployed_helm_release_fails_without_install(
     assert events == ["raw"]
 
 
+@pytest.mark.usefixtures("unchecked_reuse_mounts")
 def test_service_failure_stops_provisioning_and_preserves_environment(
     service_provisioning: tuple[Path, list[str], FakeExecute],
     monkeypatch: pytest.MonkeyPatch,
@@ -292,6 +295,36 @@ def test_argo_oci_preflight_checks_credentials_before_kind(
 
     monkeypatch.setattr(secrets, "resolve_registry_credential", fail_credential)
     with pytest.raises(ZepDevError, match="missing registry credential"):
+        lifecycle.create_environment(write_template(basic_template))
+    assert calls.calls == []
+
+
+def test_every_node_pulls_images_with_the_callers_registry_configuration(
+    state_home: Path,
+    basic_template: dict[str, Any],
+    write_template: Callable[[dict[str, Any]], Path],
+) -> None:
+    registry_config = secrets.registry_config_path()
+    plan = lifecycle.preflight(write_template(basic_template))
+    for node in yaml.safe_load(plan.kind_config)["nodes"]:
+        assert {
+            "hostPath": str(registry_config.resolve()),
+            "containerPath": kind.KUBELET_REGISTRY_CONFIG,
+            "readOnly": True,
+        } in node["extraMounts"]
+
+
+def test_missing_registry_configuration_fails_before_kind(
+    state_home: Path,
+    prepare_kind: PrepareKind,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    basic_template: dict[str, Any],
+    write_template: Callable[[dict[str, Any]], Path],
+) -> None:
+    monkeypatch.setattr(secrets, "IMAGE_SECRET_PATHS", (tmp_path / "absent.json",))
+    calls = prepare_kind()
+    with pytest.raises(ZepDevError, match="registry configuration not found"):
         lifecycle.create_environment(write_template(basic_template))
     assert calls.calls == []
 

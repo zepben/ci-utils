@@ -60,24 +60,6 @@ def test_kind_uses_unique_config_and_scoped_kubeconfig(
     assert all("extraMounts" not in node for node in config["nodes"])
 
 
-def test_kind_mounts_are_worker_only_and_read_only(tmp_path: Path) -> None:
-    config = {
-        "kind": "Cluster",
-        "apiVersion": "kind.x-k8s.io/v1alpha4",
-        "nodes": [{"role": "control-plane"}, {"role": "worker"}],
-    }
-    rendered = kind.render_kind_config(
-        KindConfig.model_validate(config),
-        [kind.HostMount(tmp_path, "/mnt/repo", read_only=True)],
-    )
-    nodes = {node["role"]: node for node in yaml.safe_load(rendered)["nodes"]}
-    assert "extraMounts" not in nodes["control-plane"]
-    assert nodes["worker"]["extraMounts"] == [
-        {"hostPath": str(tmp_path), "containerPath": "/mnt/repo", "readOnly": True}
-    ]
-    assert all("extraMounts" not in node for node in config["nodes"])
-
-
 def test_reuse_rejects_wrong_worker_mount_mode(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -98,7 +80,110 @@ def test_reuse_rejects_wrong_worker_mount_mode(
         },
     )
     with pytest.raises(ZepDevError, match="mounts differ"):
-        kind.validate_existing_worker_mounts(target, [mount])
+        kind.validate_existing_node_mounts(target, [mount])
+
+
+def test_host_mounts_reach_workers_and_every_node_mounts_reach_all_nodes(
+    tmp_path: Path,
+) -> None:
+    config = {
+        "kind": "Cluster",
+        "apiVersion": "kind.x-k8s.io/v1alpha4",
+        "nodes": [{"role": "control-plane"}, {"role": "worker"}],
+    }
+    registry = kind.registry_config_mount(tmp_path / "auth.json")
+    repository = kind.HostMount(tmp_path, "/mnt/repo", read_only=True)
+    rendered = kind.render_kind_config(
+        KindConfig.model_validate(config), [repository, registry]
+    )
+    nodes = {node["role"]: node for node in yaml.safe_load(rendered)["nodes"]}
+    registry_mount = {
+        "hostPath": str((tmp_path / "auth.json").resolve()),
+        "containerPath": "/var/lib/kubelet/config.json",
+        "readOnly": True,
+    }
+    assert nodes["control-plane"]["extraMounts"] == [registry_mount]
+    assert nodes["worker"]["extraMounts"] == [
+        {"hostPath": str(tmp_path), "containerPath": "/mnt/repo", "readOnly": True},
+        registry_mount,
+    ]
+    assert all("extraMounts" not in node for node in config["nodes"])
+
+
+def test_registry_configuration_mount_binds_the_symlink_target(tmp_path: Path) -> None:
+    link = tmp_path / "auth.json"
+    link.symlink_to(tmp_path / "grant.json")
+    assert (
+        kind.registry_config_mount(link).host_path
+        == (tmp_path / "grant.json").resolve()
+    )
+
+
+def test_every_node_mounts_need_no_worker_and_reach_kinds_default_node(
+    tmp_path: Path,
+) -> None:
+    config = KindConfig.model_validate(
+        {"kind": "Cluster", "apiVersion": "kind.x-k8s.io/v1alpha4"}
+    )
+    rendered = yaml.safe_load(
+        kind.render_kind_config(
+            config, [kind.registry_config_mount(tmp_path / "auth.json")]
+        )
+    )
+    [node] = rendered["nodes"]
+    assert node["role"] == "control-plane"
+    assert node["extraMounts"][0]["containerPath"] == "/var/lib/kubelet/config.json"
+
+
+def test_worker_mounts_require_a_worker(tmp_path: Path) -> None:
+    config = KindConfig.model_validate(
+        {
+            "kind": "Cluster",
+            "apiVersion": "kind.x-k8s.io/v1alpha4",
+            "nodes": [{"role": "control-plane"}],
+        }
+    )
+    with pytest.raises(ValueError, match="require at least one worker"):
+        kind.render_kind_config(config, [kind.HostMount(tmp_path, "/mnt/repo")])
+
+
+@pytest.mark.parametrize(
+    "control_plane_mounted", [True, False], ids=["mounted", "missing-on-control-plane"]
+)
+def test_reuse_checks_every_node_mount_on_each_node_but_not_the_load_balancer(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    control_plane_mounted: bool,
+) -> None:
+    target = execution_target("integration", environ={"XDG_STATE_HOME": str(tmp_path)})
+    registry = kind.registry_config_mount(tmp_path / "auth.json")
+    mounted = {(str(registry.host_path), registry.node_path, True)}
+    nodes = {
+        f"{target.cluster_name}-control-plane": mounted
+        if control_plane_mounted
+        else set(),
+        f"{target.cluster_name}-control-plane2": mounted,
+        f"{target.cluster_name}-worker": mounted,
+        f"{target.cluster_name}-external-load-balancer": set(),
+    }
+    monkeypatch.setattr(
+        kind,
+        "kind",
+        lambda *_args, **_kwargs: CommandResult(0, "\n".join(nodes) + "\n", ""),
+    )
+    inspected: list[str] = []
+
+    def inspect(node: str, **_kwargs: object) -> set[tuple[str, str, bool]]:
+        inspected.append(node)
+        return nodes[node]
+
+    monkeypatch.setattr(kind, "inspect_bind_mounts", inspect)
+    if control_plane_mounted:
+        kind.validate_existing_node_mounts(target, [registry])
+        assert f"{target.cluster_name}-external-load-balancer" not in inspected
+    else:
+        with pytest.raises(ZepDevError, match="control-plane mounts differ"):
+            kind.validate_existing_node_mounts(target, [registry])
 
 
 def test_kubeconfig_export_sends_kind_stdout_to_stderr(

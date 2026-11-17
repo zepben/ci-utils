@@ -234,7 +234,7 @@ get_params() {
   IFS=' ' read -r -a args <<< "$@"
 }
 
-build_lang_options=( "--python" "--csharp" "--java" "--js" )
+build_lang_options=( "--python" "--csharp" "--java" "--js" "--dart" )
 
 build_lang() {
     buildLang=${@:? 'Build lang option is required.'}
@@ -246,6 +246,8 @@ build_lang() {
         source "$(dirname "$0")/java-common.sh"
     elif [[ " ${buildLang[@]} " =~ " --js " ]]; then
       source "$(dirname "$0")/js-common.sh"
+    elif [[ " ${buildLang[@]} " =~ " --dart " ]]; then
+        source "$(dirname "$0")/dart-common.sh"
     else
         fail "Available build langs are ${build_lang_options[@]}."
     fi

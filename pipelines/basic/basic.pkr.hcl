@@ -76,6 +76,11 @@ build {
   }
 
   provisioner "file" {
+    destination = "/scripts"
+    source      = "../Dart/scripts/"
+  }
+
+  provisioner "file" {
     destination = "/root/.aws/"
     source      = "./aws/"
   }

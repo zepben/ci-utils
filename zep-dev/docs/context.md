@@ -57,12 +57,18 @@ rejected) and `local_inputs.py` for Bindings.
 
 **Creation, reuse and failure** (tests: `test_lifecycle_policy.py`,
 `test_lifecycle_composition.py`, `test_provisioning_composition.py`,
-`test_git_cache.py`, `test_local_charts.py`)
+`test_kind_targeting.py`, `test_secrets.py`, `test_git_cache.py`,
+`test_local_charts.py`)
 
 - Preflight resolves and validates everything before the cluster or operational
   directory changes.
 - Creation refuses an existing cluster unless reuse is requested. A stale operational
   directory is removed first, and a cleanup failure stops creation.
+- Every Kind node, control plane included, mounts the registry configuration
+  read-only as kubelet's `/var/lib/kubelet/config.json`, so pods pull images with
+  the caller's credentials instead of anonymously. Preflight refuses creation when
+  no registry configuration exists. Reuse refuses a cluster whose nodes lack the
+  mounts the Template and registry configuration require.
 - Creation never starts a chart or image build. A missing source chart or Local image
   is refused before any change.
 - Supporting services run in Template order, with no dependency graph. Runtime

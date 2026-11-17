@@ -93,10 +93,14 @@ def preflight(template_path: Path, image_archive: Path | None = None) -> Creatio
     )
 
     inputs = local_inputs.load_required_inputs(template)
-    mounts = tuple(
-        kind.HostMount(inputs.mounts[mount.slot], mount.node_path)
-        for mount in template.cluster.mounts
-    ) + argo.repository_mounts(inputs.argo_repositories)
+    mounts = (
+        *(
+            kind.HostMount(inputs.mounts[mount.slot], mount.node_path)
+            for mount in template.cluster.mounts
+        ),
+        *argo.repository_mounts(inputs.argo_repositories),
+        kind.registry_config_mount(secrets.registry_config_path()),
+    )
     kind_config = kind.render_kind_config(template.cluster.kind, mounts)
     if image_archive is not None and (
         not image_archive.is_file() or image_archive.stat().st_size == 0
@@ -222,8 +226,7 @@ def create_environment(
                 f"Kind cluster {target.cluster_name!r} already exists; "
                 "destroy it or pass allow_reuse=True"
             )
-        if plan.mounts:
-            kind.validate_existing_worker_mounts(target, plan.mounts)
+        kind.validate_existing_node_mounts(target, plan.mounts)
         if target.kubeconfig.is_symlink():
             raise ZepDevError(
                 f"Environment kubeconfig is a symlink: {target.kubeconfig}"

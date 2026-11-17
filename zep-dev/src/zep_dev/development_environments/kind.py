@@ -17,19 +17,37 @@ from zep_dev.development_environments.target import (
     ExecutionTarget,
     kubernetes_environment,
 )
-from zep_dev.development_environments.templates import KindConfig, KindMount
+from zep_dev.development_environments.templates import KindConfig, KindMount, KindNode
 from zep_dev.errors import ZepDevError
 from zep_dev.infrastructure.container_engine import choose_engine
 from zep_dev.shared import CommandResult, execute
 
 LOG = logging.getLogger(__name__)
 
+# Kubelet authenticates image pulls with the registry credentials in this file.
+KUBELET_REGISTRY_CONFIG = "/var/lib/kubelet/config.json"
+
 
 @dataclass(frozen=True)
 class HostMount:
+    """A host path bind-mounted into every worker, or into every node."""
+
     host_path: Path
     node_path: str
     read_only: bool = False
+    every_node: bool = False
+
+
+def registry_config_mount(registry_config: Path) -> HostMount:
+    """Make every node's kubelet pull images with the caller's registry credentials."""
+    # A remote container engine resolves host paths itself, where a symlink such as
+    # ~/.config/containers/auth.json may not exist; its target must.
+    return HostMount(
+        registry_config.resolve(),
+        KUBELET_REGISTRY_CONFIG,
+        read_only=True,
+        every_node=True,
+    )
 
 
 def kind(
@@ -68,32 +86,43 @@ def list_clusters() -> list[str]:
     return result.stdout.splitlines()
 
 
+def mounts_for_node(mounts: Sequence[HostMount], role: str) -> list[HostMount]:
+    return [mount for mount in mounts if mount.every_node or role == "worker"]
+
+
 def render_kind_config(config: KindConfig, mounts: Sequence[HostMount] = ()) -> str:
     rendered = config.model_copy(deep=True)
-    workers = [node for node in rendered.nodes if node.role == "worker"]
-    if mounts and not workers:
+    if not rendered.nodes and any(mount.every_node for mount in mounts):
+        # Name Kind's default single node so it can carry mounts.
+        rendered.nodes = [KindNode(role="control-plane")]
+    if not any(node.role == "worker" for node in rendered.nodes) and any(
+        not mount.every_node for mount in mounts
+    ):
         raise ValueError("host mounts require at least one worker node")
-    destinations = {mount.node_path for mount in mounts}
-    if len(destinations) != len(mounts):
-        raise ValueError("worker mount destinations must be unique")
-    for worker in workers:
-        for native in worker.extraMounts:
+    if len({mount.node_path for mount in mounts}) != len(mounts):
+        raise ValueError("host mount destinations must be unique")
+    for node in rendered.nodes:
+        node_mounts = mounts_for_node(mounts, node.role)
+        if not node_mounts:
+            continue
+        destinations = {mount.node_path for mount in node_mounts}
+        for native in node.extraMounts:
             if native.containerPath in destinations:
                 raise ValueError(
-                    f"worker mount collides with native Kind extraMount: {native.containerPath}"
+                    f"{node.role} mount collides with native Kind extraMount: "
+                    f"{native.containerPath}"
                 )
-        if mounts:
-            worker.extraMounts = [
-                *worker.extraMounts,
-                *(
-                    KindMount(
-                        hostPath=str(mount.host_path),
-                        containerPath=mount.node_path,
-                        readOnly=mount.read_only,
-                    )
-                    for mount in mounts
-                ),
-            ]
+        node.extraMounts = [
+            *node.extraMounts,
+            *(
+                KindMount(
+                    hostPath=str(mount.host_path),
+                    containerPath=mount.node_path,
+                    readOnly=mount.read_only,
+                )
+                for mount in node_mounts
+            ),
+        ]
     return yaml.safe_dump(
         rendered.model_dump(exclude_unset=True), default_flow_style=False
     )
@@ -176,7 +205,13 @@ def inspect_bind_mounts(
     return bind_mounts
 
 
-def validate_existing_worker_mounts(
+def node_role(target: ExecutionTarget, node: str) -> str | None:
+    """The role in a Kind node name, such as zep-dev-x-worker2; None for a load balancer."""
+    role = node.removeprefix(f"{target.cluster_name}-").rstrip("0123456789")
+    return role if role in ("control-plane", "worker") else None
+
+
+def validate_existing_node_mounts(
     target: ExecutionTarget, mounts: Sequence[HostMount]
 ) -> None:
     engine = choose_engine()
@@ -189,19 +224,24 @@ def validate_existing_worker_mounts(
         engine=engine,
         capture_stdout=True,
     ).stdout.splitlines()
-    workers = [node for node in nodes if not node.endswith("-control-plane")]
-    if not workers:
+    roles = {node: node_role(target, node) for node in nodes}
+    if "worker" not in roles.values() and any(not m.every_node for m in mounts):
         raise ZepDevError("host mounts require at least one worker node")
-    expected = {(str(m.host_path.resolve()), m.node_path, m.read_only) for m in mounts}
-    destinations = {node_path for _, node_path, _ in expected}
-    for worker in workers:
+    for node, role in roles.items():
+        if role is None:
+            continue
+        expected = {
+            (str(m.host_path.resolve()), m.node_path, m.read_only)
+            for m in mounts_for_node(mounts, role)
+        }
+        destinations = {node_path for _, node_path, _ in expected}
         actual = {
             pair
-            for pair in inspect_bind_mounts(worker, engine=engine)
+            for pair in inspect_bind_mounts(node, engine=engine)
             if pair[1] in destinations
         }
         if actual != expected:
-            raise ZepDevError(f"worker {worker} mounts differ from requested mounts")
+            raise ZepDevError(f"node {node} mounts differ from requested mounts")
 
 
 def load_image_archive(target: ExecutionTarget, archive: Path) -> None:

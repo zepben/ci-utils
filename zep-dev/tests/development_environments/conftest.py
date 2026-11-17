@@ -127,6 +127,22 @@ def write_distribution(tmp_path: Path) -> WriteDistribution:
     return write
 
 
+@pytest.fixture(autouse=True)
+def ambient_registry_config(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No test reads the caller's registry configuration."""
+    path = tmp_path_factory.mktemp("registry") / "auth.json"
+    path.write_text('{"auths": {}}', encoding="utf-8")
+    monkeypatch.setattr(secrets, "IMAGE_SECRET_PATHS", (path,))
+
+
+@pytest.fixture
+def unchecked_reuse_mounts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """For reuse tests about other rules; test_kind_targeting.py covers mount checks."""
+    monkeypatch.setattr(kind, "validate_existing_node_mounts", lambda *_args: None)
+
+
 @pytest.fixture
 def chart_resolver(monkeypatch: pytest.MonkeyPatch) -> RecordingChartResolver:
     resolver = RecordingChartResolver()

@@ -35,7 +35,7 @@ def kind_runtime(monkeypatch: pytest.MonkeyPatch, state_home: Path) -> FakeKind:
         "create_cluster",
         "export_kubeconfig",
         "delete_cluster",
-        "validate_existing_worker_mounts",
+        "validate_existing_node_mounts",
     ):
         monkeypatch.setattr(kind, name, getattr(runtime, name))
     return runtime
@@ -126,7 +126,11 @@ def test_reuse_exports_kubeconfig_without_creating_cluster(
     assert (
         lifecycle.create_environment(Path("template.yaml"), allow_reuse=True) == target
     )
-    assert kind_runtime.events == [("lookup", target), ("export", target)]
+    assert kind_runtime.events == [
+        ("lookup", target),
+        ("mounts", target),
+        ("export", target),
+    ]
     assert target.kubeconfig.is_file()
 
 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "zep-dev"
 version = "0.1.0"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "click>=8.4.2",
     "pydantic>=2.13.4",
@@ -36,7 +36,7 @@ zep-dev = "zep_dev.cli:cli"
 where = ["src"]
 
 [tool.ruff]
-target-version = "py314"
+target-version = "py312"
 line-length = 88
 src = ["src", "tests"]
 
@@ -46,7 +46,7 @@ ignore = ["E501"]
 typing-extensions = false
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
-"__future__.annotations" = { msg = "Unnecessary on Python 3.14 and greater, use default PEP 649 deferred annotations" }
+"__future__.annotations" = { msg = "Use Self or quoted forward references for Python 3.12-compatible annotations" }
 
 [tool.ruff.format]
 quote-style = "double"
@@ -57,7 +57,7 @@ addopts = ["--import-mode=importlib", "--strict-config", "--strict-markers"]
 xfail_strict = true
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.12"
 strict = true
 warn_unused_configs = true
 mypy_path = "$MYPY_CONFIG_FILE_DIR/src"

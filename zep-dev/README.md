@@ -45,7 +45,7 @@ It should be accessible in the browser on http://127.0.0.1:8080.
 
 ## Development
 
-From the repository root, using Python 3.14:
+From the repository root, using Python 3.12 or later:
 
 ```sh
 make check-zep-dev test-zep-dev

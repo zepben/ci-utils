@@ -2,6 +2,7 @@ import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from types import ModuleType
+from typing import Self
 
 from zep_dev.shared import CommandResult
 
@@ -47,7 +48,7 @@ class FakeExecute:
         match_kwargs: dict[str, object] | None = None,
         raises: BaseException | None = None,
         hook: ExecuteHook | None = None,
-    ) -> FakeExecute:
+    ) -> Self:
         self._rules.append(
             _Rule(
                 prefix=prefix,

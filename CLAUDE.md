@@ -36,7 +36,7 @@ into code and tests, and an explicit bounded context.
 
 ## Commands
 
-From the repository root, with Python 3.14:
+From the repository root, with Python 3.12 or later:
 
 ```sh
 make check-zep-dev test-zep-dev

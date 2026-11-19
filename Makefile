@@ -48,7 +48,7 @@ destroy-environment: $(VENV)
 clean:
 	rm -rf $(VENV)
 
-$(VENV): $(ZEP_DEV)/pyproject.toml .python-version
+$(VENV): $(ZEP_DEV)/pyproject.toml
 	$(PYTHON) -m venv $(VENV)
 	$(ACTIVATE) pip install yamllint
 	$(ACTIVATE) pip install -e "./$(ZEP_DEV)[dev]"

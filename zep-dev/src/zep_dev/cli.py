@@ -5,6 +5,7 @@ from typing import override
 
 import click
 
+from zep_dev.ci.cli import ci
 from zep_dev.development_environments.cli import (
     distribution,
     environment,
@@ -45,7 +46,9 @@ class Cli(click.Group):
             raise click.ClickException(failure_message(error)) from error
 
 
-@click.group(cls=Cli, help="Manage local development Environments and chart utilities")
+@click.group(
+    cls=Cli, help="Manage development Environments, charts, and repository CI utilities"
+)
 @click.option(
     "-v", "--verbose", count=True, help="Increase log verbosity (-v=INFO, -vv=DEBUG)"
 )
@@ -92,6 +95,7 @@ cli.add_command(distribution)
 cli.add_command(images_group)
 cli.add_command(tools)
 cli.add_command(chart)
+cli.add_command(ci)
 cli.add_command(runtime_contract)
 cli.add_command(secrets_group)
 cli.add_command(terraform_group)

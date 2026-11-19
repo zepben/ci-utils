@@ -2,7 +2,7 @@ import os
 import re
 
 import requests
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
 from zep_dev.errors import ZepDevError
 
@@ -26,6 +26,20 @@ class _PullRequest(BaseModel):
     head: _PullRequestHead
 
 
+class PullRequest(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    number: int
+    title: str
+    body: str | None = None
+    html_url: str
+    merged_at: str | None = None
+    merge_commit_sha: str | None = None
+
+
+_COMMIT_PULL_REQUESTS = TypeAdapter(list[PullRequest])
+
+
 class GitHubAPI:
     def __init__(self, base_url: str = "https://api.github.com") -> None:
         self.base_url = base_url
@@ -34,7 +48,7 @@ class GitHubAPI:
     def token() -> str:
         token = os.environ.get("GH_TOKEN", "").strip()
         if not token:
-            raise ZepDevError("GH_TOKEN is required for PR lookup and build dispatch")
+            raise ZepDevError("GH_TOKEN is required for GitHub API access")
         return token
 
     def request(
@@ -72,6 +86,20 @@ class GitHubAPI:
         if not _SHA.fullmatch(sha):
             raise RuntimeError(f"Invalid head SHA for PR #{number}")
         return sha
+
+    def merged_pull_request(self, repository: str, sha: str) -> PullRequest | None:
+        """The pull request merged as this commit; None for a direct push."""
+        response = self.request("GET", f"/repos/{repository}/commits/{sha}/pulls")
+        try:
+            pulls = _COMMIT_PULL_REQUESTS.validate_json(response.text)
+        except ValidationError as error:
+            raise RuntimeError(
+                f"Invalid pull request response for commit {sha}"
+            ) from error
+        return next(
+            (pull for pull in pulls if pull.merged_at and pull.merge_commit_sha == sha),
+            None,
+        )
 
     def dispatch_build(self, repo_name: str, default_branch: str, sha: str) -> None:
         self.request(

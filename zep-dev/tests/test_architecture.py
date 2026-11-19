@@ -4,9 +4,12 @@ import ast
 from importlib.util import resolve_name
 from pathlib import Path
 
+import pytest
+
 SRC = Path(__file__).resolve().parents[1] / "src/zep_dev"
 CONFIGURATION = {"templates", "bindings", "names", "services", "distributions"}
-FEATURE = "zep_dev.development_environments"
+ENVIRONMENTS = "zep_dev.development_environments"
+CONTEXTS = (ENVIRONMENTS, "zep_dev.ci")
 
 
 def module_name(path: Path) -> str:
@@ -43,14 +46,14 @@ def imports(path: Path) -> set[str]:
 def cli_module(name: str) -> bool:
     return (
         name == "zep_dev.cli"
-        or name == "zep_dev.development_environments.cli"
+        or any(name == f"{context}.cli" for context in CONTEXTS)
         or name in {"zep_dev.commands", "zep_dev.groups"}
         or name.startswith(("zep_dev.commands.", "zep_dev.groups."))
     )
 
 
-def in_feature(name: str) -> bool:
-    return name == FEATURE or name.startswith(f"{FEATURE}.")
+def in_context(name: str, context: str) -> bool:
+    return name == context or name.startswith(f"{context}.")
 
 
 def asserts_never(body: list[ast.stmt]) -> bool:
@@ -85,7 +88,8 @@ def test_configuration_does_not_import_effects_or_workflows() -> None:
         or (
             name.startswith("zep_dev.")
             and not any(
-                name == f"{FEATURE}.{module}" or name.startswith(f"{FEATURE}.{module}.")
+                name == f"{ENVIRONMENTS}.{module}"
+                or name.startswith(f"{ENVIRONMENTS}.{module}.")
                 for module in CONFIGURATION
             )
         )
@@ -99,21 +103,22 @@ def test_integrations_do_not_import_lifecycle_or_cli() -> None:
         for path in (SRC / "development_environments").glob("*.py")
         if path.stem not in CONFIGURATION | {"__init__", "lifecycle", "cli"}
         for name in imports(path)
-        if name == f"{FEATURE}.lifecycle"
-        or name.startswith(f"{FEATURE}.lifecycle.")
+        if name == f"{ENVIRONMENTS}.lifecycle"
+        or name.startswith(f"{ENVIRONMENTS}.lifecycle.")
         or cli_module(name)
     ]
     assert violations == []
 
 
-def test_code_outside_the_feature_does_not_import_it() -> None:
-    # zep_dev.cli registers the feature's commands, so it is the one allowed importer.
+@pytest.mark.parametrize("context", CONTEXTS)
+def test_context_is_private_except_for_root_cli_registration(context: str) -> None:
     violations = [
         f"{module_name(path)} -> {name}"
         for path in SRC.rglob("*.py")
-        if not in_feature(module_name(path)) and module_name(path) != "zep_dev.cli"
+        if not in_context(module_name(path), context)
         for name in imports(path)
-        if in_feature(name)
+        if in_context(name, context)
+        and not (module_name(path) == "zep_dev.cli" and name == f"{context}.cli")
     ]
     assert violations == []
 

@@ -1,6 +1,6 @@
 # Zep Dev
 
-`zep-dev` creates local Kubernetes development Environments for local development and testing on CI.
+`zep-dev` creates local Kubernetes development Environments and provides chart utilities and repository operations for local and CI use.
 
 - A **Template** ([example](examples/integration/template.yaml)) defines how the Environment is deployed and configured.
 - A **Distribution** ([example](examples/integration/distribution.yaml)) selects the application charts.
@@ -8,11 +8,14 @@
 
 ## Clanker Experiment
 
-The tool uses concepts from [Domain Driven Design](https://en.wikipedia.org/wiki/Domain-driven_design) as an experiment in LLM assisted development. The basic idea is to use a tightly defined language (Ubiquitous Language) consistently throughout the project. The definitions are in the [glossary](docs/language.md), and the goal is to use them consistently throughout the codebase, tests, docs etc. The theory is that this may assist with helping LLMs understand the codebase and not sloppify it, as things have a very specific place and meaning. TBD if this is effective.
+The tool uses a small subset of [Domain-Driven Design](https://en.wikipedia.org/wiki/Domain-driven_design) as an experiment in LLM-assisted development. Each bounded context defines its own language, rules and code ownership. The aim is to make changes easier to place and architectural mistakes easier to detect; whether this improves LLM-assisted development remains an experiment.
 
-In addition to the language, we have [domain context](docs/context.md) which is states the rules and contracts. This is the "Bounded Context" from DDD. It should help the LLM understand the rules of the game.
+| Context | Responsibility | Documentation |
+| --- | --- | --- |
+| Development Environments | Create, reuse, inspect and destroy named local Kubernetes Environments. | [Context](docs/development_environments/context.md), [language](docs/development_environments/language.md) |
+| CI | Reusable repository checks and maintenance operations, callable locally or by CI. | [Context](docs/ci/context.md), [language](docs/ci/language.md) |
 
-We additionally structure the code around this language and this context, and enforce it with unit tests. The idea is to provide quick feedback when the LLM violates a architectural rule.
+Use the relevant context's terms in code, tests, errors and documentation. Tests enforce the dependency boundaries. Existing chart and tool utilities remain outside these contexts, with shared contracts available to their consumers.
 
 ## Examples
 

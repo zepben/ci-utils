@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "zep-dev"
 version = "0.1.0"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "click>=8.4.2",
     "pydantic>=2.13.4",
@@ -34,7 +34,7 @@ zep-dev = "zep_dev.cli:cli"
 where = ["src"]
 
 [tool.ruff]
-target-version = "py314"
+target-version = "py312"
 line-length = 88
 src = ["src", "tests"]
 
@@ -49,7 +49,7 @@ quote-style = "double"
 testpaths = ["tests"]
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.12"
 strict = true
 warn_unused_configs = true
 mypy_path = "src"

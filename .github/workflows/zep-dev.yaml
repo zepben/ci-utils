@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "zep-dev/**"
+      - "Makefile"
+      - ".github/workflows/zep-dev.yaml"
 
 jobs:
   lint-and-test:
@@ -12,7 +14,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
-          python-version-file: .python-version
+          python-version: '3.12'
       # zep-dev mounts the resulting ~/.docker/config.json into the kind nodes,
       # so redis is pulled authenticated instead of from the shared runner IP.
       - name: Login to Docker Hub

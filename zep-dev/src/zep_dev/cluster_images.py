@@ -39,7 +39,7 @@ def choose_engine() -> str:
                 capture_stderr=True,
                 skip_resolve=True,
             )
-        except CalledProcessError, OSError:
+        except (CalledProcessError, OSError):
             continue
         return engine
     raise ClickException("neither podman nor docker is available")

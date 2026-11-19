@@ -47,7 +47,8 @@ implicitly make an operation read-only.
 | Location | Owns |
 | --- | --- |
 | `ci/cli.py` | Command registration, arguments and output |
-| `github_api.py`, `shared.py`, `infrastructure/` (outside the context) | Shared API and tool integrations |
+| `ci/news.py` | NEWS generation and its repository operations |
+| `infrastructure/` (outside the context) | Shared GitHub client, command execution, managed-tool support and registry discovery |
 
 Add capability-named modules as behaviour is added. Keep related rules and
 orchestration together. Extract helpers or adapters when there is a clear

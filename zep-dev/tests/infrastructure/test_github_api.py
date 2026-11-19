@@ -1,7 +1,7 @@
 import pytest
 import requests
 
-from zep_dev.github_api import GitHubAPI
+from zep_dev.infrastructure.github_api import GitHubAPI
 
 SHA = "a" * 40
 

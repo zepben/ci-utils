@@ -16,7 +16,8 @@ from zep_dev.errors import ZepDevError
 from zep_dev.groups.chart import chart
 from zep_dev.groups.runtime_contract import runtime_contract
 from zep_dev.groups.tools import tools
-from zep_dev.shared import get_bin_dir, resolve_registry_config
+from zep_dev.infrastructure.registry import resolve_registry_config
+from zep_dev.infrastructure.tools import get_bin_dir
 
 LOG = logging.getLogger(__name__)
 

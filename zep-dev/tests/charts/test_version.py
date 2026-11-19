@@ -2,8 +2,8 @@ import pytest
 from click.testing import CliRunner
 
 from tests.support.execution import FakeExecuteFactory
-from zep_dev import chart_version as chart_version_module
-from zep_dev.chart_version import (
+from zep_dev.charts import version as chart_version_module
+from zep_dev.charts.version import (
     GitDescribe,
     calculate_chart_version,
     parse_git_describe,

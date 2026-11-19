@@ -3,7 +3,7 @@ from typing import assert_never
 
 import click
 
-from zep_dev.runtime_contract import (
+from zep_dev.charts.runtime_contract import (
     PinOutcome,
     pin_runtime_contract,
     read_applications,

@@ -3,9 +3,9 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from zep_dev.charts.metadata import ChartMetadata
 from zep_dev.errors import ZepDevError
-from zep_dev.models import ChartMetadata
-from zep_dev.shared import execute
+from zep_dev.infrastructure.execution import execute
 
 CHART_REPOSITORY = "ghcr.io/zepben/charts"
 CHART_OCI_PREFIX = f"oci://{CHART_REPOSITORY}"

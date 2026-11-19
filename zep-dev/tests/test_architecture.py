@@ -77,6 +77,13 @@ def test_non_cli_modules_do_not_import_cli() -> None:
     assert violations == []
 
 
+def test_managed_tool_support_does_not_import_command_execution() -> None:
+    # Execution validates tools; the reverse dependency would create a cycle.
+    assert "zep_dev.infrastructure.execution" not in imports(
+        SRC / "infrastructure/tools.py"
+    )
+
+
 def test_configuration_does_not_import_effects_or_workflows() -> None:
     effects = {"click", "os", "requests", "socket", "subprocess", "sys"}
     violations = [

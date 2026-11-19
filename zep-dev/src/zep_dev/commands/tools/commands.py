@@ -25,9 +25,15 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
-from zep_dev.models import ArchiveFormat, RequiredTool
-from zep_dev.shared import execute, get_bin_dir, get_hash_dir, get_tools_dir
-from zep_dev.static import TOOLS
+from zep_dev.infrastructure.execution import execute
+from zep_dev.infrastructure.tools import (
+    TOOLS,
+    ArchiveFormat,
+    RequiredTool,
+    get_bin_dir,
+    get_hash_dir,
+    get_tools_dir,
+)
 
 LOG = logging.getLogger(__name__)
 

@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 import yaml
+from pydantic import BaseModel, ConfigDict, Field
 
 from zep_dev.development_environments.bindings import SecretSource
 from zep_dev.development_environments.distributions import GHCR_REGISTRY
@@ -22,7 +23,25 @@ from zep_dev.development_environments.target import (
     kubernetes_name,
 )
 from zep_dev.errors import ZepDevError
-from zep_dev.models import CiSecrets
+
+
+class CiSecret(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    env_var: str = Field(min_length=1)
+
+    def resolve_value(self) -> str:
+        value = os.environ.get(self.env_var)
+        if value is None or value == "":
+            raise ValueError(f"{self.env_var} is not set")
+        return value
+
+
+class CiSecrets(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    secrets: list[CiSecret]
+
 
 IMAGE_SECRET_NAME = "github-registry"
 IMAGE_SECRET_PATHS = (

@@ -5,7 +5,7 @@ from types import ModuleType
 import pytest
 
 from tests.support.execution import FakeExecute, FakeExecuteFactory
-from zep_dev import shared
+from zep_dev.infrastructure import registry, tools
 
 
 @pytest.fixture(autouse=True)
@@ -22,11 +22,11 @@ def cli_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     bin_dir = tmp_path / "cli-bin"
     bin_dir.mkdir()
     monkeypatch.setattr("zep_dev.cli.get_bin_dir", lambda: bin_dir)
-    monkeypatch.setattr(shared, "get_bin_dir", lambda: bin_dir)
+    monkeypatch.setattr(tools, "get_bin_dir", lambda: bin_dir)
     # Register restoration before Click callbacks mutate os.environ.
     monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
     monkeypatch.delenv("HELM_REGISTRY_CONFIG", raising=False)
-    monkeypatch.setattr(shared, "REGISTRY_CONFIG_PATHS", ())
+    monkeypatch.setattr(registry, "REGISTRY_CONFIG_PATHS", ())
 
 
 @pytest.fixture

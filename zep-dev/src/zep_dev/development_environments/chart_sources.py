@@ -16,8 +16,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, assert_never
 
-from zep_dev.chart_version import SOURCE_COMMIT_ANNOTATION, calculate_chart_version
+from zep_dev.charts.metadata import ChartMetadata
 from zep_dev.charts.published import CHART_OCI_PREFIX, published_chart_metadata
+from zep_dev.charts.runtime_contract import RUNTIME_CONTRACT_REF_ANNOTATION
+from zep_dev.charts.version import SOURCE_COMMIT_ANNOTATION, calculate_chart_version
 from zep_dev.development_environments.distributions import (
     GHCR_REGISTRY,
     BranchLocator,
@@ -40,10 +42,8 @@ from zep_dev.development_environments.local_charts import (
 from zep_dev.development_environments.registry_config import RegistryConfig
 from zep_dev.development_environments.target import cache_home
 from zep_dev.errors import ZepDevError
-from zep_dev.github_api import GitHubAPI
-from zep_dev.models import ChartMetadata
-from zep_dev.runtime_contract import RUNTIME_CONTRACT_REF_ANNOTATION
-from zep_dev.shared import resolve_registry_config
+from zep_dev.infrastructure.github_api import GitHubAPI
+from zep_dev.infrastructure.registry import resolve_registry_config
 
 _POLL_INTERVAL = 30
 _PROGRESS_INTERVAL = 5 * 60

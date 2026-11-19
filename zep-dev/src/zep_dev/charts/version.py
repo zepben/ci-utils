@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from zep_dev.shared import execute
+from zep_dev.infrastructure.execution import execute
 
 SOURCE_COMMIT_ANNOTATION = "zepben.com/source-commit"
 GIT_DESCRIBE_PATTERN = re.compile(

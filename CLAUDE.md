@@ -28,6 +28,19 @@ Read the relevant context and language before changing behaviour or naming thing
 - Keep external terms as they are: Distribution, and the application names EWB, EAS,
   HCS and web client.
 
+Shared support is not another bounded context:
+
+| Location under `src/zep_dev/` | Owns |
+| --- | --- |
+| `charts/metadata.py`, `charts/version.py`, `charts/runtime_contract.py` | Shared chart schemas, version rules and runtime-contract support |
+| `charts/utils.py` | Chart discovery, chart-testing configuration and chart-path handling |
+| `infrastructure/execution.py`, `infrastructure/tools.py` | Command execution and managed-tool definitions, catalog, paths and resolution |
+| `infrastructure/registry.py`, `infrastructure/github_api.py`, `infrastructure/container_engine.py` | Registry discovery and external integrations |
+
+Execution validates managed tools. Tool support must not import execution or CLI
+code; dependency tests enforce this direction. `cli.py` remains the application
+entrypoint and `errors.py` the package-wide expected-failure contract.
+
 ## Rules for changes
 
 - Test names state the rule they protect, in the ubiquitous language.

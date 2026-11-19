@@ -3,11 +3,11 @@ from pathlib import Path
 import pytest
 
 from tests.support.git import git
-from zep_dev.chart_version import calculate_chart_version
+from zep_dev.charts.metadata import ChartMetadata
+from zep_dev.charts.version import calculate_chart_version
 from zep_dev.development_environments import chart_sources as git_cache
 from zep_dev.development_environments.chart_sources import VersionChartRef
 from zep_dev.errors import ZepDevError
-from zep_dev.models import ChartMetadata
 
 
 @pytest.fixture

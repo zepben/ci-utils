@@ -1,13 +1,13 @@
 from dataclasses import dataclass, field
 from typing import override
 
+from zep_dev.charts.metadata import ChartMetadata
 from zep_dev.development_environments.chart_sources import ChartRef, ChartResolver
 from zep_dev.development_environments.distributions import (
     ChartLocator,
     ChartName,
     Charts,
 )
-from zep_dev.models import ChartMetadata
 
 
 @dataclass

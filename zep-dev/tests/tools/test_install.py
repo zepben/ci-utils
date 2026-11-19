@@ -14,7 +14,7 @@ from tenacity import wait_none
 
 from zep_dev.commands.tools import commands as install_module
 from zep_dev.commands.tools.commands import download, install_binary_tool
-from zep_dev.models import ArchiveFormat, RequiredTool
+from zep_dev.infrastructure.tools import ArchiveFormat, RequiredTool
 
 
 @pytest.fixture

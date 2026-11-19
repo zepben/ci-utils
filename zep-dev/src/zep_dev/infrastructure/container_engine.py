@@ -6,7 +6,7 @@ from pathlib import Path
 from subprocess import CalledProcessError
 
 from zep_dev.errors import ZepDevError
-from zep_dev.shared import execute
+from zep_dev.infrastructure.execution import execute
 
 
 def choose_engine() -> str:

@@ -12,7 +12,7 @@ from zep_dev.infrastructure.container_engine import (
     pull_missing_images,
     save_image_archive,
 )
-from zep_dev.shared import execute
+from zep_dev.infrastructure.execution import execute
 
 DEFAULT_EXCLUDES = (
     "registry.k8s.io/*",

@@ -7,7 +7,7 @@ from click.testing import CliRunner
 
 from tests.support.charts import write_chart
 from tests.support.execution import FakeExecuteFactory
-from zep_dev import runtime_contract as runtime_contract_module
+from zep_dev.charts import runtime_contract as runtime_contract_module
 from zep_dev.cli import cli
 from zep_dev.commands.chart import metadata as metadata_module
 

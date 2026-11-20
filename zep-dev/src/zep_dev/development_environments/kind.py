@@ -20,7 +20,7 @@ from zep_dev.development_environments.target import (
 from zep_dev.development_environments.templates import KindConfig, KindMount, KindNode
 from zep_dev.errors import ZepDevError
 from zep_dev.infrastructure.container_engine import choose_engine
-from zep_dev.shared import CommandResult, execute
+from zep_dev.infrastructure.execution import CommandResult, execute
 
 LOG = logging.getLogger(__name__)
 

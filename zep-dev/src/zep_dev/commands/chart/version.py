@@ -2,7 +2,7 @@
 
 import click
 
-from zep_dev.chart_version import calculate_chart_version
+from zep_dev.charts.version import calculate_chart_version
 
 
 @click.command("version")

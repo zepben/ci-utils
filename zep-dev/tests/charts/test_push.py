@@ -7,9 +7,9 @@ from click.testing import CliRunner
 
 from tests.support.charts import write_chart
 from tests.support.execution import FakeExecuteFactory, call
+from zep_dev.charts.utils import ChartTestingConfig
 from zep_dev.cli import cli
 from zep_dev.commands.chart import push as push_module
-from zep_dev.models import ChartTestingConfig
 
 pytestmark = pytest.mark.usefixtures("cli_environment")
 

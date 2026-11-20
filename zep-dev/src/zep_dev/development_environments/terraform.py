@@ -24,7 +24,7 @@ from zep_dev.development_environments.templates import (
     EnvironmentTemplate,
 )
 from zep_dev.errors import ZepDevError
-from zep_dev.shared import execute
+from zep_dev.infrastructure.execution import execute
 
 
 class DatabaseConnection(TypedDict):

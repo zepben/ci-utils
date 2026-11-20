@@ -1,6 +1,7 @@
 """Read container registry authentication configuration."""
 
 from pathlib import Path
+from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -19,7 +20,7 @@ class RegistryConfig(BaseModel):
     credsStore: str | None = None
 
     @classmethod
-    def read(cls, path: Path) -> RegistryConfig:
+    def read(cls, path: Path) -> Self:
         try:
             return cls.model_validate_json(path.read_text(encoding="utf-8"))
         except ValidationError as error:

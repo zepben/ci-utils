@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from zep_dev.models import ChartTestingConfig
+from zep_dev.charts.utils import ChartTestingConfig
 
 
 @pytest.fixture

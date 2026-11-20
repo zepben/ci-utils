@@ -7,7 +7,7 @@ from zep_dev.development_environments import images, kind
 from zep_dev.development_environments.target import ExecutionTarget
 from zep_dev.errors import ZepDevError
 from zep_dev.infrastructure import container_engine
-from zep_dev.shared import CommandResult
+from zep_dev.infrastructure.execution import CommandResult
 
 
 def test_image_selection_excludes_cluster_and_digest_references() -> None:

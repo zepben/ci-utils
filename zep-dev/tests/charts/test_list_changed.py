@@ -4,7 +4,7 @@ import pytest
 from click.testing import CliRunner
 
 from tests.support.execution import FakeExecuteFactory, call
-from zep_dev import chart_version
+from zep_dev.charts import version as chart_version
 from zep_dev.cli import cli
 from zep_dev.commands.chart import list_changed as list_changed_module
 

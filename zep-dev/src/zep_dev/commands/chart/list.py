@@ -4,7 +4,7 @@ from pathlib import Path
 import click
 from pydantic.dataclasses import dataclass
 
-from zep_dev.models import ChartMetadata
+from zep_dev.charts.metadata import ChartMetadata
 
 
 @dataclass

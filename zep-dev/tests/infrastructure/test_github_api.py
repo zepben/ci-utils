@@ -1,7 +1,9 @@
+import json
+
 import pytest
 import requests
 
-from zep_dev.github_api import GitHubAPI
+from zep_dev.infrastructure.github_api import GitHubAPI
 
 SHA = "a" * 40
 
@@ -52,8 +54,6 @@ def test_dispatch_payload_uses_default_branch_and_sha(
 def test_pr_response_rejects_invalid_structure(
     monkeypatch: pytest.MonkeyPatch, payload: object
 ) -> None:
-    import json
-
     response = requests.Response()
     response.status_code = 200
     response._content = json.dumps(payload).encode()
@@ -61,3 +61,63 @@ def test_pr_response_rejects_invalid_structure(
     monkeypatch.setattr(requests, "request", lambda *args, **kwargs: response)
     with pytest.raises(RuntimeError, match="Invalid head response for PR #42"):
         GitHubAPI().pr_head("energy-workbench-server", 42)
+
+
+@pytest.mark.parametrize(
+    ("merge_sha", "merged_at", "expected"),
+    [
+        (SHA, "2026-11-18T00:00:00Z", 42),
+        (SHA, None, None),
+        ("b" * 40, "2026-11-18T00:00:00Z", None),
+    ],
+)
+def test_commit_lookup_selects_only_the_pull_request_merged_as_that_commit(
+    monkeypatch: pytest.MonkeyPatch,
+    merge_sha: str,
+    merged_at: str | None,
+    expected: int | None,
+) -> None:
+    monkeypatch.setenv("GH_TOKEN", "test-token")
+    response = requests.Response()
+    response.status_code = 200
+    response._content = json.dumps(
+        [
+            {
+                "number": 42,
+                "title": "Feature",
+                "body": None,
+                "html_url": "https://github.com/zepben/commons/pull/42",
+                "merge_commit_sha": merge_sha,
+                "merged_at": merged_at,
+            }
+        ]
+    ).encode()
+    sent: list[str] = []
+
+    def request(method: str, url: str, **kwargs: object) -> requests.Response:
+        assert method == "GET"
+        assert kwargs["headers"] == {
+            "Accept": "application/vnd.github+json",
+            "Authorization": "Bearer test-token",
+        }
+        sent.append(url)
+        return response
+
+    monkeypatch.setattr(requests, "request", request)
+    pull = GitHubAPI().merged_pull_request("zepben/commons", SHA)
+
+    assert (pull.number if pull is not None else None) == expected
+    assert sent == [f"https://api.github.com/repos/zepben/commons/commits/{SHA}/pulls"]
+
+
+def test_commit_lookup_rejects_invalid_api_structure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GH_TOKEN", "test-token")
+    response = requests.Response()
+    response.status_code = 200
+    response._content = b'{"message": "not a pull request list"}'
+    monkeypatch.setattr(requests, "request", lambda *args, **kwargs: response)
+
+    with pytest.raises(RuntimeError, match="Invalid pull request response"):
+        GitHubAPI().merged_pull_request("zepben/commons", SHA)

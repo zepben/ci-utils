@@ -8,9 +8,9 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, Field, ValidationError
 
-from zep_dev.chart_version import git_prefix, git_toplevel
 from zep_dev.charts.published import CHART_REPOSITORY, published_chart_metadata
-from zep_dev.shared import execute
+from zep_dev.charts.version import git_prefix, git_toplevel
+from zep_dev.infrastructure.execution import execute
 
 RUNTIME_CONTRACT_DIRECTORY = "runtime-contract"
 RUNTIME_CONTRACT_REF_ANNOTATION = "zepben.com/runtime-contract-ref"

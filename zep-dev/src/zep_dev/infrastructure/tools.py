@@ -1,6 +1,50 @@
-from pathlib import Path
+"""Managed-tool definitions, installation identity, paths and executable resolution."""
 
-from zep_dev.models import ArchiveFormat, RequiredTool
+import os
+import sys
+from contextlib import suppress
+from enum import StrEnum
+from pathlib import Path
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from zep_dev.errors import ZepDevError
+
+
+class ArchiveFormat(StrEnum):
+    NONE = "none"
+    TAR_GZ = "tar.gz"
+    ZIP = "zip"
+
+
+class RequiredTool(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    version: str
+    url: str
+    sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
+    archive_member: str | None = None
+    archive_format: ArchiveFormat = ArchiveFormat.NONE
+
+    @model_validator(mode="after")
+    def validate_archive_configuration(self) -> Self:
+        has_archive = self.archive_format is not ArchiveFormat.NONE
+        if has_archive != (self.archive_member is not None):
+            raise ValueError("archive_member and archive_format must be set together")
+        return self
+
+    def to_hash(self) -> str:
+        return f"{self.name}-{self.version}-{self.url}-{self.sha256}"
+
+    def exists(self, hash_dir: Path) -> bool:
+        with suppress(OSError):
+            return (hash_dir / self.name).read_text() == self.to_hash()
+        return False
+
+    def write_hash(self, hash_dir: Path) -> None:
+        (hash_dir / self.name).write_text(self.to_hash())
+
 
 TOOLS: list[RequiredTool] = [
     RequiredTool(
@@ -90,5 +134,36 @@ TOOLS: list[RequiredTool] = [
 ]
 TOOLS_BY_NAME = {tool.name: tool for tool in TOOLS}
 
-# The files should live relative to helm dir in Application repo
-CT_YAML = Path("ct.yaml")
+
+def get_repo_name() -> str:
+    if sys.prefix == sys.base_prefix:
+        raise ZepDevError("zep-dev must be run from an application virtualenv")
+    return Path(sys.prefix).resolve().parent.name
+
+
+def get_tools_dir() -> Path:
+    repo_name = get_repo_name()
+    return Path.home() / ".local" / "share" / repo_name
+
+
+def get_bin_dir() -> Path:
+    return get_tools_dir() / "bin"
+
+
+def get_hash_dir() -> Path:
+    return get_tools_dir() / "hash"
+
+
+def resolve(name: str) -> None:
+    """
+    Ensure we have our required tools present.
+    We inject the bin dir in PATH earlier in execution, but
+    this acts as a runtime safeguard and prevents accidentally
+    adding another tool that is not covered.
+    """
+    tool = TOOLS_BY_NAME.get(name)
+    if tool is None:
+        raise Exception(f"Failed to locate tool: {name}")
+    path = get_bin_dir() / tool.name
+    if not path.is_file() or not os.access(path, os.X_OK):
+        raise ZepDevError(f"{name} not installed at {path}; run: zep-dev tools install")

@@ -10,7 +10,7 @@ from zep_dev.development_environments import kind
 from zep_dev.development_environments.target import execution_target
 from zep_dev.development_environments.templates import KindConfig
 from zep_dev.errors import ZepDevError
-from zep_dev.shared import CommandResult
+from zep_dev.infrastructure.execution import CommandResult
 
 
 @pytest.mark.parametrize("fail", [False, True])

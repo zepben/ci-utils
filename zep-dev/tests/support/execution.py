@@ -2,8 +2,9 @@ import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from types import ModuleType
+from typing import Self
 
-from zep_dev.shared import CommandResult
+from zep_dev.infrastructure.execution import CommandResult
 
 ExecuteHook = Callable[[tuple[str, ...], dict[str, object]], None]
 
@@ -47,7 +48,7 @@ class FakeExecute:
         match_kwargs: dict[str, object] | None = None,
         raises: BaseException | None = None,
         hook: ExecuteHook | None = None,
-    ) -> FakeExecute:
+    ) -> Self:
         self._rules.append(
             _Rule(
                 prefix=prefix,
@@ -77,7 +78,7 @@ class FakeExecute:
             rule.hook(args, kwargs)
         if rule.raises is not None:
             raise rule.raises
-        # Like shared.execute, output reaches the caller only when captured.
+        # Like execution.execute, output reaches the caller only when captured.
         result = CommandResult(
             rule.result.returncode,
             rule.result.stdout if kwargs.get("capture_stdout") else "",

@@ -9,6 +9,7 @@ import pytest
 import requests
 
 from tests.support.clock import FakeClock
+from zep_dev.charts.metadata import ChartMetadata
 from zep_dev.development_environments import chart_sources
 from zep_dev.development_environments.chart_sources import ChartResolver, GitCache
 from zep_dev.development_environments.distributions import (
@@ -17,8 +18,7 @@ from zep_dev.development_environments.distributions import (
     PullRequestLocator,
 )
 from zep_dev.errors import ZepDevError
-from zep_dev.github_api import GitHubAPI
-from zep_dev.models import ChartMetadata
+from zep_dev.infrastructure.github_api import GitHubAPI
 
 SHA = "a" * 40
 

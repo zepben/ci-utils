@@ -1,6 +1,6 @@
 import pytest
 
-from zep_dev.models import ArchiveFormat, RequiredTool
+from zep_dev.infrastructure.tools import ArchiveFormat, RequiredTool
 
 
 @pytest.mark.parametrize(

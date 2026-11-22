@@ -7,7 +7,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Literal
 
-from zep_dev.chart_version import calculate_chart_version
+from zep_dev.charts.metadata import ChartMetadata, ChartValues
+from zep_dev.charts.version import calculate_chart_version
 from zep_dev.development_environments.distributions import ChartName
 from zep_dev.development_environments.target import state_home
 from zep_dev.errors import ZepDevError
@@ -17,8 +18,7 @@ from zep_dev.infrastructure.container_engine import (
     save_image_archive,
     tag_image,
 )
-from zep_dev.models import ChartMetadata, ChartValues
-from zep_dev.shared import execute
+from zep_dev.infrastructure.execution import execute
 
 
 @dataclass(frozen=True)

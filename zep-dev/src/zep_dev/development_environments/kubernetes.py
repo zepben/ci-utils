@@ -12,7 +12,7 @@ from zep_dev.development_environments.target import (
     ExecutionTarget,
     kubernetes_environment,
 )
-from zep_dev.shared import CommandResult, execute
+from zep_dev.infrastructure.execution import CommandResult, execute
 
 
 class ResourceMetadata(TypedDict):

@@ -1,8 +1,9 @@
 # Context: Development Environments
 
-The only bounded context in `zep-dev` today. Terms are defined in
-[language.md](language.md). Code: `src/zep_dev/development_environments/`.
-Tests: `tests/development_environments/`.
+Terms are defined in [language.md](language.md).
+Code: `src/zep_dev/development_environments/`.
+Tests: `tests/development_environments/`. Repository automation belongs to the
+separate [CI context](../ci/context.md).
 
 ## Purpose
 
@@ -24,9 +25,10 @@ together.
 
 | Neighbour | Direction | Relationship |
 | --- | --- | --- |
-| Kind, kubectl, Helm, Terraform, Podman/Docker, GHCR/OCI, GitHub API and Actions, and the Kind wrappers in Application repositories | Upstream | We conform to their commands and formats. `kind.py`, `kubernetes.py`, `helm.py`, `terraform.py` and `github_api.py` translate our model into their terms and keep tool details out of the core. Local image builds follow the release convention: build secrets `npm`, `maven` and `nuget` from `~/.npmrc`, `~/.m2/settings.xml` and `~/.nuget/NuGet/NuGet.Config`, each passed only when the file exists. |
+| Kind, kubectl, Helm, Terraform, Podman/Docker, GHCR/OCI, GitHub API and Actions, and the Kind wrappers in Application repositories | Upstream | We conform to their commands and formats. `kind.py`, `kubernetes.py`, `helm.py`, `terraform.py` and `infrastructure/github_api.py` translate our model into their terms and keep tool details out of the core. Local image builds follow the release convention: build secrets `npm`, `maven` and `nuget` from `~/.npmrc`, `~/.m2/settings.xml` and `~/.nuget/NuGet/NuGet.Config`, each passed only when the file exists. |
 | Application teams' integration tests, CI | Downstream | They consume `environment describe` JSON and the kubeconfig path (see Contracts and limits). |
-| Chart CI (`zep-dev chart ...`), tool installation | Separate | A future CI context will own them. They must not import this package (enforced). In that code "chart" means a directory under a Helm directory. |
+| [CI](../ci/context.md) (`zep-dev ci ...`) | Separate | Owns reusable repository checks and maintenance operations. Neither context imports the other; both may use shared infrastructure. |
+| Chart commands (`zep-dev chart ...`), tool installation | Separate | Remain outside both contexts pending capability migration. They must not import this package (enforced). In chart commands, "chart" means a directory under a Helm directory. |
 
 ## Rules
 
@@ -228,11 +230,13 @@ Generated payload types live with their integration: Kubernetes resource types i
 load-database configuration in `supporting.py`. A database service's provider
 module supplies only its in-cluster address (`kubernetes.ServiceAddress`).
 
-Outside the package: `shared.py`, `github_api.py`, `infrastructure/` (generic
-helpers); `charts/`, `commands/chart/`, `commands/runtime_contract/`,
-`commands/tools/`, `chart_version.py`, `runtime_contract.py`, `models.py` (chart
-CI and tool installation, a future context). `images pack` is registered in
-this context's CLI but implemented in `charts/images.py`.
+Outside the package: `ci/` (the separate CI context); `infrastructure/` (shared
+command execution, managed tools, registry discovery and GitHub integration);
+`charts/` (shared chart metadata, versioning, runtime-contract references and chart
+helpers). `commands/chart/`, `commands/runtime_contract/` and `commands/tools/`
+retain the existing command implementations. `images pack` is registered in this
+context's CLI but implemented in `charts/images.py`. The standalone CI Secret-file
+schema lives with its consumer in `secrets.py`.
 
 ## Tests
 

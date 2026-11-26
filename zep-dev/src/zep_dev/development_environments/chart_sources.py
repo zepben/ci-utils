@@ -132,7 +132,7 @@ class GitCache:
                 (temporary / "repo").rename(path)
             finally:
                 shutil.rmtree(temporary)
-        actual = self.git("remote", "get-url", "origin", cwd=path)
+        actual = self.git("config", "--local", "--get", "remote.origin.url", cwd=path)
         if actual != remote:
             raise ZepDevError(
                 f"Git cache at {path} has unexpected origin; remove it and retry"

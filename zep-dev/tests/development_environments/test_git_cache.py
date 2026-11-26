@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import Mock, call
 
 import pytest
 
@@ -26,6 +27,50 @@ def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, P
         git_cache.GitCache, "remote", staticmethod(lambda _name: str(remote))
     )
     return remote, work
+
+
+def test_cache_validates_stored_origin_not_rewritten_transport(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = tmp_path / "energy-workbench-server"
+    repo.mkdir()
+    responses = {
+        (
+            "config",
+            "--local",
+            "--get",
+            "remote.origin.url",
+        ): "git@github.com:zepben/energy-workbench-server.git",
+        (
+            "remote",
+            "get-url",
+            "origin",
+        ): "https://github.com/zepben/energy-workbench-server.git",
+        ("fetch", "--prune", "--prune-tags", "origin"): "",
+    }
+    mocked_git = Mock(side_effect=lambda *args, **kwargs: responses[args])
+    monkeypatch.setattr(git_cache.GitCache, "git", mocked_git)
+
+    assert git_cache.GitCache(root=tmp_path).ensure_repo("ewb") == repo
+    assert mocked_git.call_args_list == [
+        call("config", "--local", "--get", "remote.origin.url", cwd=repo),
+        call("fetch", "--prune", "--prune-tags", "origin", cwd=repo),
+    ]
+
+
+def test_cache_rejects_another_stored_repository_before_fetching(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = tmp_path / "energy-workbench-server"
+    repo.mkdir()
+    mocked_git = Mock(return_value="git@github.com:zepben/not-ewb.git")
+    monkeypatch.setattr(git_cache.GitCache, "git", mocked_git)
+
+    with pytest.raises(ZepDevError, match="unexpected origin"):
+        git_cache.GitCache(root=tmp_path).ensure_repo("ewb")
+    mocked_git.assert_called_once_with(
+        "config", "--local", "--get", "remote.origin.url", cwd=repo
+    )
 
 
 def advance(work: Path, content: str) -> str:

@@ -46,6 +46,13 @@ rejected) and `local_inputs.py` for Bindings.
 - Every call that acts on an Environment's cluster or files (Kind, kubectl, Helm,
   Terraform) targets it explicitly. Inherited Kubernetes and Helm context cannot
   redirect it (`target.kubernetes_environment`).
+- A cached source repository is validated against its locally stored
+  `remote.origin.url`, not the transport-expanded URL (`GitCache.ensure_repo`,
+  `test_git_cache.py`). The caller supplies Git credentials and URL rewrites;
+  zep-dev does not change Git configuration. CI can route the stored SSH URL
+  through authenticated HTTPS without changing repository identity. GitHub API
+  requests separately require `GH_TOKEN`; the same token can supply both, with
+  repository read access and Actions write access when a chart build is dispatched.
 - Terraform runs with a fixed set of environment variables, a temporary `HOME` and
   temporary Terraform configuration (`terraform.terraform_environment`). The only
   credential passed through is `SSH_AUTH_SOCK`, when it is set, so Terraform can
